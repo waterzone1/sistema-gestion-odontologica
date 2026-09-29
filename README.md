@@ -19,6 +19,8 @@ docker compose up -d --build
 
 Abrir <https://localhost>. El proxy usa una CA interna, por eso el navegador va a advertir el certificado hasta que se confíe en ella (ver [deployment](docs/deployment.md)).
 
+En el primer ingreso se muestra el asistente de configuración inicial; el código que pide aparece en el registro del backend (`docker compose logs backend | grep codigo`).
+
 - Estado del backend: <https://localhost/api/health>
 - Documentación de la API: <https://localhost/api/docs>
 
@@ -52,7 +54,18 @@ npm test
 npm run build
 ```
 
-Los tests de integración del backend usan la base indicada en `DATABASE_URL`.
+Los tests de integración del backend crean y usan una base propia (`<nombre>_test`) en el mismo servidor de `DATABASE_URL`, por lo que no tocan los datos de desarrollo.
+
+### Pruebas end-to-end
+
+Desde `frontend/`, con Docker disponible:
+
+```bash
+npx playwright install chromium
+npm run e2e
+```
+
+Levantan su propio stack de Compose (proyecto `sgo-e2e`, puertos 8443 y 8080, base descartable) y lo eliminan al terminar; no afectan al stack de desarrollo. Con `E2E_KEEP_STACK=1` se conserva para inspeccionarlo.
 
 ### API
 

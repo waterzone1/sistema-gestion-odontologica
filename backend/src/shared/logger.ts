@@ -6,10 +6,12 @@ export type { Logger }
 interface LoggerOptions {
   level: string
   pretty?: boolean
+  // permite capturar la salida (por ejemplo en tests)
+  destination?: NodeJS.WritableStream
 }
 
-export function createLogger({ level, pretty = false }: LoggerOptions): Logger {
-  return pino({
+export function createLogger({ level, pretty = false, destination }: LoggerOptions): Logger {
+  const options = {
     level,
     redact: {
       paths: [
@@ -22,5 +24,6 @@ export function createLogger({ level, pretty = false }: LoggerOptions): Logger {
       censor: '[oculto]',
     },
     ...(pretty ? { transport: { target: 'pino-pretty' } } : {}),
-  })
+  }
+  return destination ? pino(options, destination) : pino(options)
 }

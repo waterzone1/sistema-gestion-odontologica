@@ -1,11 +1,32 @@
 openapi: 3.1.0
 info:
   title: Sistema de Gestión Odontológica - API
-  version: 0.1.0
-  description: API REST del backend. Los errores siguen el formato ErrorBody.
+  version: 0.2.0
+  description: API REST del backend. Se autentica con una cookie de sesión
+    HttpOnly. Las escrituras requieren el header Origin de la aplicación y el
+    token CSRF de la sesión. Los errores siguen el formato ErrorBody.
 servers:
   - url: /
+tags:
+  - name: Health
+  - name: Setup
+  - name: Auth
+  - name: Usuarios
+  - name: Sedes
+  - name: Profesionales
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Cookie de sesión HttpOnly que emite el login o el setup inicial
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Token de la sesión (viene en la respuesta de login y de /auth/me).
+        Las escrituras también exigen el header Origin de la app.
   schemas:
     HealthResponse:
       type: object
@@ -46,6 +67,381 @@ components:
             - message
       required:
         - error
+    SetupStatus:
+      type: object
+      properties:
+        needsSetup:
+          type: boolean
+      required:
+        - needsSetup
+    SessionResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/SessionUser"
+        csrfToken:
+          type: string
+          description: Enviar en el header X-CSRF-Token en toda escritura
+      required:
+        - user
+        - csrfToken
+    SessionUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - users:manage
+              - branches:manage
+              - professionals:manage
+              - professionals:read
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mustChangePassword:
+          type: boolean
+        onboardingCompleted:
+          type: boolean
+      required:
+        - id
+        - username
+        - displayName
+        - roles
+        - permissions
+        - branchIds
+        - mustChangePassword
+        - onboardingCompleted
+    Role:
+      type: string
+      enum:
+        - ADMIN
+        - DENTIST
+        - RECEPTIONIST
+    SetupInput:
+      type: object
+      properties:
+        setupToken:
+          type: string
+          minLength: 1
+          maxLength: 200
+        organization:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 2
+              maxLength: 120
+            timezone:
+              type: string
+              default: America/Argentina/Buenos_Aires
+          required:
+            - name
+        branch:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 2
+              maxLength: 120
+            address:
+              type:
+                - string
+                - "null"
+              maxLength: 200
+            phone:
+              type:
+                - string
+                - "null"
+              maxLength: 200
+          required:
+            - name
+        admin:
+          type: object
+          properties:
+            username:
+              type: string
+              minLength: 3
+              maxLength: 64
+              pattern: ^[a-z0-9._-]+$
+            displayName:
+              type: string
+              minLength: 2
+              maxLength: 120
+            password:
+              type: string
+              maxLength: 256
+          required:
+            - username
+            - displayName
+            - password
+      required:
+        - setupToken
+        - organization
+        - branch
+        - admin
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - username
+        - password
+    ChangePasswordInput:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 256
+        newPassword:
+          type: string
+          maxLength: 256
+      required:
+        - currentPassword
+        - newPassword
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        displayName:
+          type: string
+        active:
+          type: boolean
+        mustChangePassword:
+          type: boolean
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        professional:
+          $ref: "#/components/schemas/ProfessionalSummary"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - displayName
+        - active
+        - mustChangePassword
+        - roles
+        - branchIds
+        - professional
+        - createdAt
+    ProfessionalSummary:
+      type:
+        - object
+        - "null"
+      properties:
+        licenseNumber:
+          type: string
+        specialty:
+          type:
+            - string
+            - "null"
+        active:
+          type: boolean
+      required:
+        - licenseNumber
+        - specialty
+        - active
+    CreateUserInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: ^[a-z0-9._-]+$
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 120
+        password:
+          type: string
+          maxLength: 256
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+          minItems: 1
+          maxItems: 3
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 50
+          default: []
+      required:
+        - username
+        - displayName
+        - password
+        - roles
+    UpdateUserInput:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 120
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+          minItems: 1
+          maxItems: 3
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 50
+    ResetPasswordInput:
+      type: object
+      properties:
+        password:
+          type: string
+          maxLength: 256
+      required:
+        - password
+    Branch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type:
+            - string
+            - "null"
+        phone:
+          type:
+            - string
+            - "null"
+        active:
+          type: boolean
+      required:
+        - id
+        - name
+        - address
+        - phone
+        - active
+    CreateBranchInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        address:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+      required:
+        - name
+    UpdateBranchInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        address:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        active:
+          type: boolean
+    Professional:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        licenseNumber:
+          type: string
+        specialty:
+          type:
+            - string
+            - "null"
+        active:
+          type: boolean
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - userId
+        - displayName
+        - licenseNumber
+        - specialty
+        - active
+        - branchIds
+    SaveProfessionalInput:
+      type: object
+      properties:
+        licenseNumber:
+          type: string
+          minLength: 1
+          maxLength: 40
+        specialty:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+        active:
+          type: boolean
+      required:
+        - licenseNumber
   parameters: {}
 paths:
   /api/health:
@@ -72,4 +468,739 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/setup/status:
+    get:
+      tags:
+        - Setup
+      summary: Indica si la instalación todavía necesita configuración inicial
+      responses:
+        "200":
+          description: Estado de la instalación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+  /api/setup:
+    post:
+      tags:
+        - Setup
+      summary: "Configuración inicial: organización, primera sede y primer
+        administrador"
+      description: Requiere el código de instalación que el servidor muestra en su log
+        al arrancar sin configurar. Solo funciona una vez.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupInput"
+      responses:
+        "201":
+          description: Instalación configurada; inicia sesión con el administrador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Código de instalación inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La instalación ya está configurada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: La contraseña del administrador no cumple los requisitos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Inicia sesión
+      description: Limitado a 10 intentos fallidos cada 15 minutos por usuario e IP.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Sesión iniciada; se emite la cookie sid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Usuario o contraseña incorrectos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: Demasiados intentos fallidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Cierra la sesión actual
+      security: &a1
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Sesión cerrada
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Usuario de la sesión, con sus permisos efectivos y el token CSRF
+      security: &a2
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Sesión actual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/change-password:
+    post:
+      tags:
+        - Auth
+      summary: Cambia la contraseña propia; cierra las demás sesiones del usuario
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "204":
+          description: Contraseña cambiada
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Contraseña actual incorrecta, igual a la actual o que no cumple los
+            requisitos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/onboarding/complete:
+    post:
+      tags:
+        - Auth
+      summary: Marca el tutorial inicial como completado
+      security: *a1
+      responses:
+        "204":
+          description: Registrado
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users:
+    get:
+      tags: &a3
+        - Usuarios
+      summary: Lista los usuarios de la organización
+      description: Requiere el permiso users:manage (rol Administrador).
+      security: *a2
+      responses:
+        "200":
+          description: Usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a3
+      summary: Crea un usuario con una contraseña temporal
+      description: El usuario debe cambiar la contraseña en su primer ingreso.
+        Odontólogos y recepción necesitan al menos una sede.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserInput"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El nombre de usuario ya existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Contraseña débil, sede requerida o sede inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users/{id}:
+    get:
+      tags: *a3
+      summary: Detalle de un usuario
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: *a3
+      summary: Edita nombre, roles o sedes
+      description: Los cambios de rol rigen de inmediato sobre las sesiones abiertas.
+        No se puede quitar el rol al último administrador activo.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserInput"
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Dejaría al sistema sin administradores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Sede requerida o inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users/{id}/reset-password:
+    post:
+      tags: *a3
+      summary: Fija una contraseña temporal y revoca las sesiones del usuario
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "204":
+          description: Contraseña restablecida
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Contraseña débil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users/{id}/deactivate:
+    post:
+      tags: *a3
+      summary: Da de baja al usuario y revoca todas sus sesiones
+      description: "No hay borrado de usuarios: se desactivan. No se puede desactivar
+        el propio usuario ni al último administrador."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Usuario desactivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Es el propio usuario o el último administrador activo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users/{id}/activate:
+    post:
+      tags: *a3
+      summary: Reactiva un usuario dado de baja
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Usuario activo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/users/{id}/revoke-sessions:
+    post:
+      tags: *a3
+      summary: Cierra todas las sesiones abiertas del usuario
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Cantidad de sesiones cerradas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revokedSessions:
+                    type: integer
+                required:
+                  - revokedSessions
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/branches:
+    get:
+      tags: &a4
+        - Sedes
+      summary: Lista las sedes de la organización
+      description: Disponible para cualquier usuario autenticado.
+      security: *a2
+      responses:
+        "200":
+          description: Sedes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Branch"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a4
+      summary: Crea una sede
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBranchInput"
+      responses:
+        "201":
+          description: Sede creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/branches/{id}:
+    patch:
+      tags: *a4
+      summary: Edita o desactiva una sede
+      description: No se puede desactivar la única sede activa.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBranchInput"
+      responses:
+        "200":
+          description: Sede actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Es la única sede activa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals:
+    get:
+      tags: &a5
+        - Profesionales
+      summary: Lista los perfiles profesionales
+      security: *a2
+      responses:
+        "200":
+          description: Profesionales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Professional"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{userId}:
+    put:
+      tags: *a5
+      summary: Crea o actualiza el perfil profesional de un usuario con rol Odontólogo
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: userId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveProfessionalInput"
+      responses:
+        "200":
+          description: Perfil guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Professional"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El usuario no tiene rol Odontólogo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
 webhooks: {}

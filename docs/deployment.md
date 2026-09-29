@@ -18,11 +18,23 @@ docker compose up -d --build
 
 Servicios: `postgres`, `backend` (aplica las migraciones al iniciar), `frontend` y `proxy` (Caddy).
 
+`PUBLIC_ORIGIN` debe ser la dirección con la que los usuarios abren la app (por ejemplo `https://consultorio.local`, con el puerto si no es el 443). El backend la usa para validar el origen de las escrituras.
+
 Verificación:
 
 ```bash
 curl -k https://localhost/api/health
 ```
+
+## Primer ingreso
+
+En una instalación nueva, el backend imprime en su registro un código de instalación de un solo uso:
+
+```bash
+docker compose logs backend | grep codigo
+```
+
+Al abrir la aplicación se muestra el asistente de configuración inicial (organización, primera sede y primer administrador), que pide ese código. Una vez completado, el asistente deja de estar disponible. Si el servidor se reinicia antes de terminarlo, se genera un código nuevo.
 
 ## HTTPS en la red local
 

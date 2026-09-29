@@ -1,6 +1,8 @@
 import { createApp } from './app.js'
 import { loadEnv } from './config/env.js'
 import type { Env } from './config/env.js'
+import { needsSetup } from './modules/organizations/setup.service.js'
+import { createSetupTokenStore } from './modules/organizations/setupToken.js'
 import { createDb } from './shared/db.js'
 import { createLogger } from './shared/logger.js'
 
@@ -14,11 +16,33 @@ try {
 
 const logger = createLogger({ level: env.LOG_LEVEL, pretty: env.NODE_ENV === 'development' })
 const db = createDb(env.DATABASE_URL)
-const app = createApp({ db, logger })
+const setupTokens = createSetupTokenStore()
+
+const app = createApp({
+  db,
+  logger,
+  setupTokens,
+  appOrigin: env.APP_ORIGIN,
+  cookieSecure: env.NODE_ENV === 'production',
+})
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'servidor escuchando')
 })
+
+// si la instalacion no esta configurada se genera un codigo de un solo uso y se muestra aca
+needsSetup(db)
+  .then((pending) => {
+    if (pending) {
+      logger.warn(
+        { codigo: setupTokens.issue() },
+        'instalacion sin configurar: usar este codigo en el asistente de configuracion inicial',
+      )
+    }
+  })
+  .catch((err: unknown) => {
+    logger.error({ err }, 'no se pudo comprobar si la instalacion esta configurada')
+  })
 
 function shutdown(signal: string): void {
   logger.info({ signal }, 'cerrando servidor')

@@ -1,20 +1,32 @@
-import { ApiStatus } from '@/components/api-status'
+'use client'
 
-export default function HomePage() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-8 px-4 py-12">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Sistema de Gestión Odontológica</h1>
-        <p className="text-sm text-muted-foreground">
-          Pacientes, agenda, historia clínica y cobros en un solo lugar.
-        </p>
-      </header>
-      <section className="rounded-lg border bg-card p-5 shadow-sm" aria-labelledby="estado">
-        <h2 id="estado" className="mb-3 text-sm font-medium">
-          Estado del sistema
-        </h2>
-        <ApiStatus />
-      </section>
-    </main>
-  )
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { LoadingBlock } from '@/components/page-header'
+import { useSession, useSetupStatus } from '@/hooks/use-session'
+
+// la raiz solo decide a donde ir: configuracion inicial, ingreso o inicio
+export default function RootPage() {
+  const router = useRouter()
+  const session = useSession()
+  const setup = useSetupStatus()
+
+  const destino = session.data
+    ? session.data.user.mustChangePassword
+      ? '/cambiar-clave'
+      : '/dashboard'
+    : setup.data?.needsSetup
+      ? '/setup'
+      : session.data === null && setup.data
+        ? '/login'
+        : null
+
+  useEffect(() => {
+    if (destino) router.replace(destino)
+  }, [destino, router])
+
+  if (session.isError || setup.isError) {
+    return <LoadingBlock label="No se pudo conectar con el servidor." />
+  }
+  return <LoadingBlock />
 }

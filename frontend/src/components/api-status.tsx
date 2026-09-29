@@ -5,7 +5,8 @@ import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { fetchHealth } from '@/lib/api'
 
-export function ApiStatus() {
+// con compact solo se muestra cuando hay algun problema con el servidor o la base
+export function ApiStatus({ compact = false }: { compact?: boolean }) {
   const { data, isPending, isError, refetch, isFetching } = useQuery({
     queryKey: ['health'],
     queryFn: fetchHealth,
@@ -13,6 +14,7 @@ export function ApiStatus() {
   })
 
   if (isPending) {
+    if (compact) return null
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
         <LoaderCircle className="size-4 animate-spin" aria-hidden />
@@ -24,7 +26,7 @@ export function ApiStatus() {
   if (isError) {
     return (
       <div className="space-y-3" role="alert">
-        <p className="flex items-center gap-2 text-sm text-destructive">
+        <p className="flex items-center justify-center gap-2 text-sm text-destructive">
           <CircleAlert className="size-4" aria-hidden />
           No se pudo conectar con el servidor.
         </p>
@@ -36,6 +38,8 @@ export function ApiStatus() {
   }
 
   const baseOk = data.db === 'up'
+  if (compact && baseOk) return null
+
   return (
     <ul className="space-y-2 text-sm" role="status">
       <li className="flex items-center gap-2 text-success">

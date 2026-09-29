@@ -54,9 +54,15 @@ Todas las respuestas de error usan el mismo formato:
 
 Logs estructurados en JSON con un `X-Request-Id` generado por el servidor. Los encabezados de autorización y cookies, y los campos `password` y `passwordHash`, se ocultan.
 
-## Seguridad (principios)
+## Seguridad
 
-- Contraseñas con Argon2id; sesiones en el servidor, guardadas en PostgreSQL, con cookie `HttpOnly`, `Secure` y `SameSite`. Sin JWT.
-- La autorización se valida siempre en el backend: sesión, organización, rol y sede.
+- **Contraseñas:** Argon2id (19 MiB, t=2, p=1). Mínimo 10 caracteres, sin claves comunes ni el nombre de usuario. El login tarda lo mismo exista o no el usuario y responde con el mismo mensaje.
+- **Sesiones:** en PostgreSQL. La cookie `sid` (`HttpOnly`, `SameSite=Lax`, `Secure` en producción) lleva un token aleatorio de 32 bytes y en la base solo queda su hash. Vencen a las 8 horas de inactividad y a los 7 días en total. Desactivar un usuario o revocar sus sesiones las invalida en la siguiente solicitud. Sin JWT.
+- **CSRF:** en toda escritura se verifica que el header `Origin` sea el de la aplicación y, si hay sesión, que llegue el token de la sesión en `X-CSRF-Token`.
+- **Fuerza bruta:** 10 intentos fallidos cada 15 minutos por usuario e IP (`429`), sin bloquear la cuenta.
+- **Autorización:** cada ruta declara una política (pública, autenticada o un permiso) y hay un test que falla si alguna no lo hace. Los permisos efectivos son la unión de los roles y se resuelven en cada solicitud, así que un cambio de rol rige de inmediato. Toda consulta se filtra por la organización de la sesión.
+- **Clave temporal:** el usuario creado o restablecido por un administrador solo puede cambiar su contraseña o salir hasta que lo haga.
+- **Instalación inicial:** el asistente exige un código de un solo uso que el servidor imprime en su registro al arrancar sin configurar, y una vez completado deja de estar disponible.
+- **Auditoría:** registro solo de agregado (un trigger de la base rechaza modificar o borrar) que no guarda secretos.
 - Los roles Administrador y Recepcionista no acceden a información clínica; el backend responde 403 aunque la interfaz oculte la opción.
-- No hay borrado físico de datos clínicos ni de pagos: se archivan, anulan o corrigen con adenda.
+- No hay borrado físico: los usuarios y las sedes se desactivan; los datos clínicos y los pagos se corrigen con adenda o anulación.

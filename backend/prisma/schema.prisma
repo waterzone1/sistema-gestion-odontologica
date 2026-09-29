@@ -16,6 +16,7 @@ model Organization {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   branches Branch[]
+  users    User[]
 }
 
 model Branch {
@@ -29,6 +30,102 @@ model Branch {
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  users        UserBranch[]
 
   @@index([organizationId])
+}
+
+enum Role {
+  ADMIN
+  DENTIST
+  RECEPTIONIST
+}
+
+model User {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  organizationId      String   @db.Uuid
+  username            String
+  displayName         String
+  passwordHash        String
+  active              Boolean  @default(true)
+  mustChangePassword  Boolean  @default(false)
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  roles               UserRole[]
+  branches            UserBranch[]
+  sessions            Session[]
+  professionalProfile ProfessionalProfile?
+
+  @@unique([organizationId, username])
+  @@index([organizationId])
+}
+
+model UserRole {
+  userId String @db.Uuid
+  role   Role
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([userId, role])
+}
+
+model UserBranch {
+  userId   String @db.Uuid
+  branchId String @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@id([userId, branchId])
+  @@index([branchId])
+}
+
+// del token de sesion solo se guarda el hash, nunca el valor que viaja en la cookie
+model Session {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  tokenHash  String    @unique
+  userId     String    @db.Uuid
+  csrfToken  String
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  ipAddress  String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ProfessionalProfile {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  userId        String   @unique @db.Uuid
+  licenseNumber String
+  specialty     String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// append-only: un trigger en la base rechaza update y delete
+model AuditLog {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String?  @db.Uuid
+  actorUserId    String?  @db.Uuid
+  action         String
+  entityType     String
+  entityId       String?
+  branchId       String?  @db.Uuid
+  metadata       Json?
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@index([entityType, entityId])
 }

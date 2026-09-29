@@ -1,6 +1,6 @@
 # Modelo de datos (ERD)
 
-Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization` y `Branch`.
+Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile` y `AuditLog`.
 
 ```mermaid
 erDiagram
@@ -84,13 +84,17 @@ erDiagram
     string displayName
     string passwordHash
     bool active
+    bool mustChangePassword
     bool onboardingCompleted }
   UserRole { uuid userId FK
     enum role "ADMIN DENTIST RECEPTIONIST" }
   UserBranch { uuid userId FK
     uuid branchId FK }
-  Session { string idHash PK
+  Session { uuid id PK
+    string tokenHash UK "sha256 del token de la cookie"
     uuid userId FK
+    string csrfToken
+    timestamptz lastSeenAt
     timestamptz expiresAt
     timestamptz revokedAt }
   ProfessionalProfile { uuid id PK
@@ -250,10 +254,11 @@ erDiagram
     uuid actorUserId FK "nullable"
     string action
     string entityType
-    uuid entityId
-    json before
-    json after
-    timestamptz at }
+    string entityId
+    uuid organizationId "nullable"
+    uuid branchId FK "nullable"
+    json metadata
+    timestamptz createdAt }
   BackupRecord { uuid id PK
     enum trigger "MANUAL SCHEDULED"
     enum status
@@ -276,7 +281,9 @@ erDiagram
 - **Cobros:** el saldo del paciente es la suma de importes a cargo del paciente menos los pagos activos. Un pago puede quedar parcialmente sin imputar (saldo a favor). Se anula con motivo, no se borra.
 - **Coberturas:** `PatientCoverage` conserva el historial y admite una sola cobertura principal activa. Los convenios de un mismo plan no pueden tener vigencias superpuestas.
 - **Liquidaciones:** los totales reclamado y aprobado se derivan de los ítems. Una prestación pertenece a una sola liquidación activa; un ítem rechazado puede volver a presentarse.
-- **Auditoría:** solo se agregan registros. Para entidades clínicas se guardan identificadores y nombres de campos, nunca contenido.
+- **Auditoría:** solo se agregan registros (un trigger de la base rechaza `UPDATE` y `DELETE`). Se guardan identificadores y nombres de campos en `metadata`, nunca contraseñas, tokens ni contenido clínico.
+- **Organización única:** un índice único sobre una expresión constante impide crear una segunda organización en la misma instalación.
+- **Sesiones:** del token de la cookie solo se guarda su hash SHA-256. Cada sesión tiene su propio token CSRF.
 - **Archivos clínicos:** la clave de almacenamiento es un UUID, sin el nombre original en la ruta. Se archivan, no se borran.
 - **Backups:** la fuente de verdad de cada backup es su `manifest.json` en el destino. La tabla `BackupRecord` se vuelve a sincronizar después de una restauración.
 - **Importes:** se guardan como decimales con dos posiciones; las reglas de dominio operan en centavos enteros.
