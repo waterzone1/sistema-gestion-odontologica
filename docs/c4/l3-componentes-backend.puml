@@ -1,0 +1,49 @@
+@startuml C4_L3_Componentes_Backend
+!include <C4/C4_Component>
+LAYOUT_WITH_LEGEND()
+title Nivel 3 - Componentes del Backend API
+
+Container(proxy, "Reverse Proxy", "Caddy", "Reenvía /api")
+ContainerDb(db, "PostgreSQL", "PostgreSQL 16", "Datos y sesiones")
+ContainerDb(files, "Clinical File Storage", "Volumen Docker", "Archivos clínicos")
+System_Ext(backupDest, "Destino de backups", "Disco separado")
+
+Container_Boundary(api, "Backend API - Node.js / Express") {
+  Component(pipeline, "HTTP pipeline", "Middleware", "requestId, logs, sesión, CSRF, validación, authorize (deny by default), errores")
+  Component(auth, "Auth", "Módulo", "Setup inicial, login/logout, sesiones, Argon2id")
+  Component(users, "Users / RBAC", "Módulo", "Usuarios, roles, sedes y permisos efectivos")
+  Component(org, "Organization & Catalog", "Módulo", "Organización, sedes, profesionales, disponibilidad, prácticas")
+  Component(patients, "Patients", "Módulo", "Datos administrativos, búsqueda, archivo, cobertura")
+  Component(appts, "Appointments", "Módulo", "Turnos, estados, solapamiento, disponibilidad, override")
+  Component(clinical, "Clinical", "Módulo", "Historia append-only y perfil clínico")
+  Component(odonto, "Odontogram", "Módulo", "Eventos por pieza y estado derivado")
+  Component(treat, "Treatments", "Módulo", "Plan de tratamiento y prestaciones")
+  Component(pay, "Payments", "Módulo", "Cobros, imputaciones, anulaciones y saldo derivado")
+  Component(cov, "Coverages / Liquidations", "Módulo", "Coberturas, convenios y liquidaciones")
+  Component(filesm, "Files", "Módulo", "Carga y descarga autorizada")
+  Component(audit, "Audit", "Módulo", "Registro append-only de acciones sensibles")
+  Component(backup, "Backups", "Módulo + node-cron", "Backup, verificación, retención y restauración")
+  Component(persist, "Persistencia", "Prisma Client", "Consultas tipadas y transacciones")
+}
+
+Rel(proxy, pipeline, "HTTP")
+Rel(pipeline, auth, "Resuelve la sesión")
+Rel(pipeline, users, "Consulta permisos efectivos")
+Rel(appts, patients, "Valida paciente")
+Rel(appts, org, "Valida disponibilidad y prácticas")
+Rel(clinical, patients, "Valida paciente")
+Rel(odonto, treat, "Vincula prestaciones")
+Rel(treat, cov, "Calcula importes de cobertura")
+Rel(pay, treat, "Imputa a prestaciones")
+Rel(cov, treat, "Agrupa prestaciones a liquidar")
+Rel(filesm, clinical, "Adjunta a entradas")
+Rel(users, audit, "Registra eventos")
+Rel(appts, audit, "Registra overrides y estados")
+Rel(clinical, audit, "Registra cambios")
+Rel(pay, audit, "Registra cobros y anulaciones")
+Rel(backup, audit, "Registra backups y restores")
+Rel(pay, persist, "Usa")
+Rel(persist, db, "SQL", "TCP")
+Rel(filesm, files, "Lee y escribe", "Filesystem")
+Rel(backup, backupDest, "Empaqueta y restaura", "pg_dump / archivos")
+@enduml

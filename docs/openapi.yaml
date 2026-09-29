@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: Sistema de Gestión Odontológica - API
+  version: 0.1.0
+  description: API REST del backend. Los errores siguen el formato ErrorBody.
+servers:
+  - url: /
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+          description: degraded si alguna dependencia no responde
+        db:
+          type: string
+          enum:
+            - up
+            - down
+        uptimeSeconds:
+          type: integer
+          minimum: 0
+      required:
+        - status
+        - db
+        - uptimeSeconds
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: APPOINTMENT_CONFLICT
+            message:
+              type: string
+              example: El profesional ya tiene un turno en ese horario
+            details: {}
+          required:
+            - code
+            - message
+      required:
+        - error
+  parameters: {}
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Estado del servicio y de la base de datos
+      responses:
+        "200":
+          description: Servicio y base de datos operativos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          description: Error inesperado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "503":
+          description: El servicio responde pero la base de datos no
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+webhooks: {}

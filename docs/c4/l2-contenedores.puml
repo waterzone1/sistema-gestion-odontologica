@@ -1,0 +1,26 @@
+@startuml C4_L2_Contenedores
+!include <C4/C4_Container>
+LAYOUT_WITH_LEGEND()
+title Nivel 2 - Contenedores
+
+Person(users, "Usuarios", "Administrador, Odontólogo y Recepcionista desde PC, tablet o celular en la LAN")
+Person_Ext(remote, "Acceso remoto", "Stretch: dispositivo externo por WireGuard")
+
+System_Boundary(sgo, "Servidor Ubuntu - Docker Compose") {
+  Container(proxy, "Reverse Proxy", "Caddy", "Termina TLS. Enruta / al frontend y /api al backend")
+  Container(web, "Web Frontend", "Next.js, React, TypeScript", "UI responsive. El navegador consume la API REST")
+  Container(api, "Backend API", "Node.js, Express, TypeScript, Prisma", "Reglas de negocio, autorización, sesiones, auditoría y jobs de backup")
+  ContainerDb(db, "PostgreSQL", "PostgreSQL 16", "Datos, sesiones, auditoría y metadatos de archivos")
+  ContainerDb(files, "Clinical File Storage", "Volumen Docker", "PDF/JPG/PNG clínicos fuera de carpeta pública")
+}
+
+System_Ext(backupDest, "Destino de backups", "Volumen o disco separado")
+
+Rel(users, proxy, "Usa", "HTTPS, LAN")
+Rel(remote, proxy, "Usa", "HTTPS sobre VPN (stretch)")
+Rel(proxy, web, "Sirve la interfaz", "HTTP")
+Rel(proxy, api, "Reenvía /api", "HTTP, REST/JSON")
+Rel(api, db, "Lee y escribe", "SQL / Prisma")
+Rel(api, files, "Guarda y sirve archivos tras autorizar", "Filesystem")
+Rel(api, backupDest, "Escribe backups y los lee al restaurar", "Filesystem")
+@enduml

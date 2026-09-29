@@ -1,0 +1,20 @@
+# en lan se usa la ca interna de caddy. hay que instalar su certificado raiz
+# en cada dispositivo que entre (ver docs/deployment.md)
+{$SITE_ADDRESS:localhost} {
+	tls internal
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy backend:4000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
