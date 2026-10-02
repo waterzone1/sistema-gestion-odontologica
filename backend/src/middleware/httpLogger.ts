@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { pinoHttp } from 'pino-http'
 import type { Logger } from '../shared/logger.js'
 
-// el id se genera siempre en el servidor, no se confia en el que mande el cliente
 export function httpLogger(logger: Logger) {
   return pinoHttp({
     logger,

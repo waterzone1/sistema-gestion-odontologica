@@ -4,7 +4,6 @@ import { safeEqual } from '../shared/tokens.js'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
-// dos capas: el origin tiene que ser el de la app y, si hay sesion, el token de la sesion en un header
 export function csrfProtection(appOrigin: string) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (SAFE_METHODS.has(req.method)) {

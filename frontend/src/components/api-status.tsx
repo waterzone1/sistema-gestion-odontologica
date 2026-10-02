@@ -3,9 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { fetchHealth } from '@/lib/api'
+import { fetchHealth, SERVER_UNREACHABLE } from '@/lib/api'
 
-// con compact solo se muestra cuando hay algun problema con el servidor o la base
 export function ApiStatus({ compact = false }: { compact?: boolean }) {
   const { data, isPending, isError, refetch, isFetching } = useQuery({
     queryKey: ['health'],
@@ -28,7 +27,7 @@ export function ApiStatus({ compact = false }: { compact?: boolean }) {
       <div className="space-y-3" role="alert">
         <p className="flex items-center justify-center gap-2 text-sm text-destructive">
           <CircleAlert className="size-4" aria-hidden />
-          No se pudo conectar con el servidor.
+          {SERVER_UNREACHABLE}
         </p>
         <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
           Reintentar

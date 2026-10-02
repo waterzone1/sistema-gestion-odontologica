@@ -21,7 +21,6 @@ export function absoluteExpiry(now: Date): Date {
   return new Date(now.getTime() + SESSION_ABSOLUTE_MS)
 }
 
-// no hace falta escribir en la base en cada request, alcanza con refrescar de a ratos
 export function shouldTouch(lastSeenAt: Date, now: Date): boolean {
   return now.getTime() - lastSeenAt.getTime() >= TOUCH_INTERVAL_MS
 }

@@ -1,7 +1,5 @@
--- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
--- CreateTable
 CREATE TABLE "Organization" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -13,7 +11,6 @@ CREATE TABLE "Organization" (
     CONSTRAINT "Organization_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
 CREATE TABLE "Branch" (
     "id" UUID NOT NULL,
     "organizationId" UUID NOT NULL,
@@ -27,9 +24,7 @@ CREATE TABLE "Branch" (
     CONSTRAINT "Branch_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
 CREATE INDEX "Branch_organizationId_idx" ON "Branch"("organizationId");
 
--- AddForeignKey
 ALTER TABLE "Branch" ADD CONSTRAINT "Branch_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

@@ -5,7 +5,6 @@ import { useState, type ReactNode } from 'react'
 import { sessionKey } from '@/hooks/use-session'
 import { ApiError, setCsrfToken } from '@/lib/api'
 
-// si el backend dice que la sesion ya no vale (vencio, la revocaron), se vuelve a la pantalla de ingreso
 function handleSessionLoss(client: QueryClient, error: unknown) {
   if (error instanceof ApiError && error.status === 401) {
     setCsrfToken(null)

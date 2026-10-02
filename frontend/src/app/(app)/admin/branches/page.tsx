@@ -8,13 +8,14 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { EmptyState, LoadingBlock, PageHeader } from '@/components/page-header'
+import { FormError } from '@/components/form-error'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { branchesKey, errorMessage, useBranches } from '@/hooks/use-admin'
+import { branchesKey, useBranches } from '@/hooks/use-admin'
 import { useSession } from '@/hooks/use-session'
 import { api, type Branch } from '@/lib/api'
 import { can } from '@/lib/permissions'
@@ -51,7 +52,7 @@ export default function BranchesPage() {
   })
 
   if (!me || !allowed || branches.isPending) return <LoadingBlock />
-  if (branches.isError) return <Alert>{errorMessage(branches.error)}</Alert>
+  if (branches.isError) return <FormError error={branches.error} />
 
   return (
     <>
@@ -67,7 +68,7 @@ export default function BranchesPage() {
       />
 
       {notice && <Alert variant="info" className="mb-4">{notice}</Alert>}
-      {toggle.error && <Alert className="mb-4">{errorMessage(toggle.error)}</Alert>}
+      <FormError error={toggle.error} className="mb-4" />
 
       {branches.data.length === 0 ? (
         <EmptyState title="Todavía no hay sedes" />
@@ -137,7 +138,7 @@ function BranchForm({ branch, onClose, onSaved }: { branch: Branch | null; onClo
 
   return (
     <form onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4" noValidate>
-      {save.error && <Alert>{errorMessage(save.error)}</Alert>}
+      <FormError error={save.error} />
       <Field label="Nombre" htmlFor="name" error={errors.name?.message}>
         <Input id="name" autoFocus {...register('name')} aria-invalid={!!errors.name} />
       </Field>

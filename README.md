@@ -74,6 +74,29 @@ Levantan su propio stack de Compose (proyecto `sgo-e2e`, puertos 8443 y 8080, ba
 
 La CI verifica que ambos estén al día.
 
+## Flujo de trabajo
+
+Se trabaja de a dos con tres tipos de rama:
+
+- `main`: producción. Solo recibe pull requests desde `develop`, y cada MVP se etiqueta (`mvp-1`, `mvp-2`, ...).
+- `develop`: integración y pruebas. Es lo que se levanta para el testeo manual.
+- `feature/*` y `fix/*`: salen de `develop` y vuelven por pull request con la CI en verde.
+
+Antes de cada commit:
+
+```bash
+node infra/checks/review.mjs
+```
+
+Verifica que no haya comentarios, código muerto (`knip`), duplicación (`jscpd`), datos falsos ni salidas de depuración en `src`. Después, lint, typecheck, tests y build en `backend/` y `frontend/`.
+
+El código no lleva comentarios: ni en fuentes ni en configuración. Los archivos generados se limpian solos:
+
+- `npm run api:types` (frontend) ya quita los comentarios de los tipos.
+- Las migraciones se crean con `npm run db:new` (en `backend/`), que genera el SQL sin aplicarlo y le quita los comentarios; después se aplica con `npm run db:migrate`.
+
+Antes de integrar código que llega de otra persona se revisa el diff y se corre la suite completa.
+
 ## Estructura
 
 ```text

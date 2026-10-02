@@ -13,7 +13,6 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM base AS runtime
-# cliente de postgres 16 (misma version mayor que el servidor) para backups y restore
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl gnupg \
   && install -d /usr/share/postgresql-common/pgdg \

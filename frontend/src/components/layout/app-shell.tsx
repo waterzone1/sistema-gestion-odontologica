@@ -7,6 +7,7 @@ import { useEffect, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { LoadingBlock } from '@/components/page-header'
 import { useLogout, useSession } from '@/hooks/use-session'
+import { SERVER_UNREACHABLE } from '@/lib/api'
 import { visibleNav } from '@/lib/nav'
 import { ROLE_LABELS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -27,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isError) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="text-sm text-destructive">No se pudo conectar con el servidor.</p>
+        <p className="text-sm text-destructive">{SERVER_UNREACHABLE}</p>
         <Button variant="outline" onClick={() => void refetch()}>
           Reintentar
         </Button>

@@ -33,8 +33,6 @@ describe('una instalacion, una organizacion', () => {
   })
 })
 
-// el indice unico impide una segunda organizacion, asi que para probar el aislamiento
-// se lo quita un momento dentro de estos tests y se restaura al terminar
 describe('aislamiento por organizacion', () => {
   let ajenoId: string
   let sedeAjenaId: string

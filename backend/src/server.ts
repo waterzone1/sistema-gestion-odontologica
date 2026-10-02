@@ -30,7 +30,6 @@ const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'servidor escuchando')
 })
 
-// si la instalacion no esta configurada se genera un codigo de un solo uso y se muestra aca
 needsSetup(db)
   .then((pending) => {
     if (pending) {

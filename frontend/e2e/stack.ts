@@ -4,10 +4,9 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(__dirname, '../..')
 
-export const E2E_ORIGIN = 'https://localhost:8443'
+const E2E_ORIGIN = 'https://localhost:8443'
 
 function composeEnv(): NodeJS.ProcessEnv {
-  // los valores del entorno pisan al .env, asi el stack de e2e nunca toca el de desarrollo
   process.env['E2E_DB_PASSWORD'] ??= randomBytes(12).toString('hex')
   return {
     ...process.env,
@@ -33,7 +32,6 @@ export function compose(...args: string[]): string {
   })
 }
 
-// el codigo de instalacion de un solo uso aparece en el log del backend al arrancar
 export function readSetupToken(): string {
   const logs = compose('logs', '--no-color', 'backend')
   const match = /"codigo":"([^"]+)"/.exec(logs)

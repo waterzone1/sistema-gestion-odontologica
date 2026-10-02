@@ -73,7 +73,6 @@ export async function runSetup(
     if (!auth) throw new AppError(500, 'INTERNAL_ERROR', 'No se pudo iniciar la sesión')
     return { session, response: toSessionResponse(auth) }
   } catch (err) {
-    // el indice unico de organizacion frena dos setups simultaneos
     if (isUniqueViolation(err)) {
       throw new AppError(409, 'ALREADY_SETUP', 'La instalación ya fue configurada')
     }

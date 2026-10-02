@@ -1,0 +1,10 @@
+{
+  "path": ["backend/src", "frontend/src"],
+  "format": ["typescript", "tsx"],
+  "minTokens": 60,
+  "minLines": 8,
+  "threshold": 2,
+  "ignore": ["**/generated/**", "**/api-types.ts"],
+  "reporters": ["console"],
+  "gitignore": true
+}

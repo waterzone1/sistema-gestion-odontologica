@@ -1,6 +1,5 @@
 import { generateToken, safeEqual } from '../../shared/tokens.js'
 
-// el token de setup vive solo en memoria: se muestra en el log del servidor al arrancar sin configurar
 export interface SetupTokenStore {
   issue(): string
   matches(candidate: string): boolean

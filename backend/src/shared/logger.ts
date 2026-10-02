@@ -6,7 +6,6 @@ export type { Logger }
 interface LoggerOptions {
   level: string
   pretty?: boolean
-  // permite capturar la salida (por ejemplo en tests)
   destination?: NodeJS.WritableStream
 }
 

@@ -12,7 +12,7 @@ export const ORIGIN = 'https://test.local'
 export const PASSWORD = 'Clave-de-prueba-1'
 export const SETUP_TOKEN = 'token-de-prueba'
 
-export const silentLogger = createLogger({ level: 'silent' })
+const silentLogger = createLogger({ level: 'silent' })
 
 let sharedDb: Db | undefined
 export function testDb(): Db {
@@ -23,7 +23,6 @@ export function testDb(): Db {
 }
 
 export async function resetDb(db: Db): Promise<void> {
-  // truncate no dispara el trigger append-only de la auditoria
   await db.$executeRawUnsafe(
     'TRUNCATE "AuditLog","Session","ProfessionalProfile","UserBranch","UserRole","User","Branch","Organization" CASCADE',
   )
@@ -41,7 +40,6 @@ export function buildApp(db: Db, overrides: Partial<AppDeps> = {}): Express {
   })
 }
 
-// logger que guarda todo lo que escribe, para revisar que no se filtren secretos
 export function capturingLogger() {
   const lines: string[] = []
   const destination = new Writable({
@@ -70,7 +68,6 @@ export interface Seed {
   secondBranchId: string
 }
 
-// organizacion con dos sedes; los usuarios se agregan con seedUser
 export async function seedInstall(db: Db): Promise<Seed> {
   const organization = await db.organization.create({ data: { name: 'Consultorio de Prueba' } })
   const branch = await db.branch.create({
@@ -118,7 +115,6 @@ export async function loginAs(app: Express, username: string, password = PASSWOR
   return { cookie: sid.split(';')[0] ?? '', csrfToken: body.csrfToken, userId: body.user.id }
 }
 
-// llamadas autenticadas: agregan cookie, origin y token csrf como lo haria el navegador
 export function as(app: Express, client: Client) {
   const withAuth = (req: request.Test, write: boolean) => {
     req.set('Cookie', client.cookie)

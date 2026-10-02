@@ -17,7 +17,6 @@ export const ROLE_PERMISSIONS: RolePermissions = {
   RECEPTIONIST: ['professionals:read'],
 }
 
-// los permisos efectivos son la union de los permisos de todos los roles del usuario
 export function effectivePermissions(
   roles: readonly Role[],
   map: RolePermissions = ROLE_PERMISSIONS,

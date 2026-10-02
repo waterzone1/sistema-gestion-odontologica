@@ -1,7 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 
-// flujo 4 del plan de pruebas: el admin crea un usuario, le asigna un rol, lo da de baja
-// y la sesion abierta de ese usuario queda revocada. Es un solo escenario en varios pasos.
 test.describe.configure({ mode: 'serial' })
 
 const CLAVE_ADMIN = 'Clave-del-admin-2026'
@@ -102,7 +100,6 @@ test('recepción no accede a la administración ni por la interfaz ni por la API
   await recepcion.goto('/admin/users')
   await expect(recepcion).toHaveURL(/\/dashboard$/)
 
-  // mismo navegador y misma cookie de sesion, pero pegandole directo a la API
   const usuarios = await recepcion.request.get('/api/users')
   expect(usuarios.status()).toBe(403)
   expect(await usuarios.json()).toMatchObject({ error: { code: 'FORBIDDEN' } })
@@ -122,7 +119,6 @@ test('dar de baja al usuario cierra su sesión abierta', async () => {
   await expect(fila).toContainText('De baja')
   await admin.screenshot({ path: captura('07-usuario-de-baja'), fullPage: true })
 
-  // la sesion de recepcion seguia abierta: ahora la API la rechaza y la app vuelve al ingreso
   const me = await recepcion.request.get('/api/auth/me')
   expect(me.status()).toBe(401)
   await recepcion.reload()

@@ -16,7 +16,7 @@ export const changePasswordSchema = z
   })
   .meta({ id: 'ChangePasswordInput' })
 
-export const sessionUserSchema = z
+const sessionUserSchema = z
   .object({
     id: z.uuid(),
     username: z.string(),

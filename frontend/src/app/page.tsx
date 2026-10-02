@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { LoadingBlock } from '@/components/page-header'
 import { useSession, useSetupStatus } from '@/hooks/use-session'
+import { SERVER_UNREACHABLE } from '@/lib/api'
 
-// la raiz solo decide a donde ir: configuracion inicial, ingreso o inicio
 export default function RootPage() {
   const router = useRouter()
   const session = useSession()
@@ -26,7 +26,7 @@ export default function RootPage() {
   }, [destino, router])
 
   if (session.isError || setup.isError) {
-    return <LoadingBlock label="No se pudo conectar con el servidor." />
+    return <LoadingBlock label={SERVER_UNREACHABLE} />
   }
   return <LoadingBlock />
 }

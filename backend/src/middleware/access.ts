@@ -3,7 +3,7 @@ import type { Permission } from '../modules/users/domain/permissions.js'
 import { hasPermission } from '../modules/users/domain/permissions.js'
 import { AppError } from '../shared/errors.js'
 
-export type AccessPolicy =
+type AccessPolicy =
   | { kind: 'public' }
   | { kind: 'authenticated' }
   | { kind: 'permission'; permission: Permission }
@@ -18,14 +18,12 @@ export function isGuarded(handler: unknown): handler is GuardedHandler {
   return typeof handler === 'function' && 'accessPolicy' in handler
 }
 
-// toda ruta tiene que declarar una de estas tres politicas; un test falla si alguna no lo hace
 export function publicRoute(): GuardedHandler {
   return guard({ kind: 'public' }, (_req, _res, next) => {
     next()
   })
 }
 
-// quien tiene una clave temporal solo puede ver su sesion, cambiarla o salir
 function requireSession(req: Request, allowPasswordChangePending: boolean): void {
   if (!req.auth) throw new AppError(401, 'UNAUTHENTICATED', 'Necesitás iniciar sesión')
   if (req.auth.mustChangePassword && !allowPasswordChangePending) {
@@ -53,7 +51,6 @@ export function requirePermission(permission: Permission): GuardedHandler {
   )
 }
 
-// devuelve el contexto de auth o falla; para usar dentro de handlers ya protegidos
 export function authOf(req: Request) {
   if (!req.auth) throw new AppError(401, 'UNAUTHENTICATED', 'Necesitás iniciar sesión')
   return req.auth

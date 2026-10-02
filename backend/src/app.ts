@@ -25,7 +25,6 @@ export interface AppDeps {
   db: Db
   logger: Logger
   setupTokens: SetupTokenStore
-  // origen que ve el navegador, contra el que se valida CSRF
   appOrigin: string
   cookieSecure: boolean
   loginRateLimit?: LoginRateLimit
@@ -46,7 +45,6 @@ export function createApp({
   app.use(httpLogger(logger))
 
   const openApiDocument = buildOpenApiDocument()
-  // swagger ui necesita scripts inline, por eso va antes con la csp apagada
   app.use(
     '/api/docs',
     helmet({ contentSecurityPolicy: false }),

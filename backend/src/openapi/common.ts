@@ -15,6 +15,5 @@ export const forbidden = errorResponse('Sin permiso, o falla la verificación CS
 export const notFound = errorResponse('El recurso no existe (o pertenece a otra organización)')
 export const invalidInput = errorResponse('Los datos enviados no son válidos')
 
-// las lecturas usan la cookie; las escrituras ademas necesitan Origin y el header X-CSRF-Token
 export const readSecurity = [{ cookieAuth: [] }]
 export const writeSecurity = [{ cookieAuth: [], csrfToken: [] }]

@@ -1,0 +1,5 @@
+{
+  "entry": ["scripts/*.ts"],
+  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "ignoreDependencies": ["@prisma/client", "pino-pretty", "@emnapi/core", "@emnapi/runtime", "@emnapi/wasi-threads"]
+}

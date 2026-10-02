@@ -12,7 +12,6 @@ export function branchesRouter(db: Db): Router {
   const router = Router()
   const manage = requirePermission('branches:manage')
 
-  // las sedes las necesita ver cualquier usuario autenticado (selector de sede, agenda)
   router.get('/', requireAuth(), async (req: Request, res: Response) => {
     res.json(await branchesService.listBranches(db, authOf(req)))
   })

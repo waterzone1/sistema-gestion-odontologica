@@ -83,7 +83,6 @@ model UserBranch {
   @@index([branchId])
 }
 
-// del token de sesion solo se guarda el hash, nunca el valor que viaja en la cookie
 model Session {
   id         String    @id @default(uuid(7)) @db.Uuid
   tokenHash  String    @unique
@@ -113,7 +112,6 @@ model ProfessionalProfile {
   user User @relation(fields: [userId], references: [id])
 }
 
-// append-only: un trigger en la base rechaza update y delete
 model AuditLog {
   id             String   @id @default(uuid(7)) @db.Uuid
   organizationId String?  @db.Uuid

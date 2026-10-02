@@ -66,7 +66,6 @@ describe('login', () => {
     }
     const bloqueado = await login(app, 'admin', 'mal-mal-mal-1')
     expect(bloqueado.status).toBe(429)
-    // el bloqueo es por usuario+ip: otro usuario sigue pudiendo entrar
     expect((await login(app, 'recepcion', PASSWORD)).status).toBe(200)
   })
 

@@ -8,12 +8,12 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { AuthCard } from '@/components/auth-card'
 import { LoadingBlock } from '@/components/page-header'
-import { Alert } from '@/components/ui/alert'
+import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { sessionKey, useSetupStatus } from '@/hooks/use-session'
-import { api, ApiError, passwordProblems, setCsrfToken, type SessionResponse } from '@/lib/api'
+import { api, setCsrfToken, type SessionResponse } from '@/lib/api'
 
 const schema = z
   .object({
@@ -85,11 +85,6 @@ export default function SetupPage() {
     if (await trigger(STEPS[step]?.fields)) setStep((s) => s + 1)
   }
 
-  const error = setup.error
-  const problemas = passwordProblems(error)
-  const message =
-    error instanceof ApiError ? error.message : error ? 'No se pudo conectar con el servidor.' : null
-
   return (
     <AuthCard
       title="Configuración inicial"
@@ -102,18 +97,7 @@ export default function SetupPage() {
         className="space-y-4"
         noValidate
       >
-        {message && (
-          <Alert>
-            <p>{message}</p>
-            {problemas.length > 0 && (
-              <ul className="list-disc pl-4">
-                {problemas.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            )}
-          </Alert>
-        )}
+        <FormError error={setup.error} />
 
         {step === 0 && (
           <>

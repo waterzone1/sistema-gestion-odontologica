@@ -60,7 +60,6 @@ export async function listProfessionals(db: Db, actor: AuthContext): Promise<Pro
   return profiles.map(toDto)
 }
 
-// el perfil profesional es de un usuario con rol odontologo
 export async function saveProfessional(
   db: Db,
   actor: AuthContext,

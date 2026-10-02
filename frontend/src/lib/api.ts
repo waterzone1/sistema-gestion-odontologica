@@ -23,7 +23,6 @@ export class ApiError extends Error {
   }
 }
 
-// el token csrf viene con la sesion y se manda en el header de toda escritura
 let csrfToken: string | null = null
 
 export function setCsrfToken(token: string | null) {
@@ -67,18 +66,23 @@ export const api = {
 
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch('/api/health', { cache: 'no-store' })
-  // con la base caida el backend responde 503 pero con el mismo cuerpo
   if (res.status !== 200 && res.status !== 503) {
     throw new Error(`respuesta inesperada del servidor (${res.status})`)
   }
   return (await res.json()) as HealthResponse
 }
 
-// lista de motivos que devuelve el backend cuando una contraseña no cumple los requisitos
 export function passwordProblems(error: unknown): string[] {
   if (error instanceof ApiError && error.code === 'WEAK_PASSWORD') {
     const problemas = (error.details as { problemas?: unknown } | undefined)?.problemas
     if (Array.isArray(problemas)) return problemas.filter((p): p is string => typeof p === 'string')
   }
   return []
+}
+
+export const SERVER_UNREACHABLE = 'No se pudo conectar con el servidor.'
+
+export function errorMessage(error: unknown): string | null {
+  if (!error) return null
+  return error instanceof ApiError ? error.message : SERVER_UNREACHABLE
 }

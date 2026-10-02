@@ -1,0 +1,4 @@
+{
+  "ignore": ["src/lib/api-types.ts"],
+  "ignoreDependencies": ["@emnapi/core", "@emnapi/runtime"]
+}

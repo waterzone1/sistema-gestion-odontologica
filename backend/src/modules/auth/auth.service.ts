@@ -1,6 +1,6 @@
 import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
-import { hashPassword, verifyAgainstDummy, verifyPassword } from '../../shared/password.js'
+import { hashPassword, verifyAgainstDecoy, verifyPassword } from '../../shared/password.js'
 import { recordAudit } from '../audit/audit.service.js'
 import { assertStrongPassword } from '../users/users.service.js'
 import type { AuthContext } from './auth.types.js'
@@ -45,10 +45,9 @@ export async function login(
 ): Promise<{ session: CreatedSession; response: SessionResponse }> {
   const user = await db.user.findFirst({ where: { username: input.username } })
 
-  // se verifica siempre una contraseña, exista o no el usuario, para no delatarlo por el tiempo
   let passwordOk = false
   if (user) passwordOk = await verifyPassword(user.passwordHash, input.password)
-  else await verifyAgainstDummy(input.password)
+  else await verifyAgainstDecoy(input.password)
 
   if (!user || !user.active || !passwordOk) {
     await recordAudit(db, {
@@ -105,7 +104,6 @@ export async function changePassword(
 
   await db.$transaction(async (tx) => {
     await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false } })
-    // las demas sesiones se cierran; queda solo la que hizo el cambio
     await revokeUserSessions(tx, user.id, auth.sessionId)
     await recordAudit(tx, {
       action: 'PASSWORD_CHANGED',

@@ -1,5 +1,5 @@
-export const PASSWORD_MIN_LENGTH = 10
-export const PASSWORD_MAX_LENGTH = 128
+const PASSWORD_MIN_LENGTH = 10
+const PASSWORD_MAX_LENGTH = 128
 
 const CLAVES_COMUNES = new Set([
   '1234567890',
@@ -23,7 +23,6 @@ const CLAVES_COMUNES = new Set([
   'riverplate1',
 ])
 
-// devuelve los motivos por los que la clave no sirve; lista vacia si es valida
 export function checkPassword(password: string, username: string): string[] {
   const problemas: string[] = []
   if (password.length < PASSWORD_MIN_LENGTH) {

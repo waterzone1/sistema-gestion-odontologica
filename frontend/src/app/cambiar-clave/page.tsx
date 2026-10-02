@@ -8,12 +8,12 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { AuthCard } from '@/components/auth-card'
 import { LoadingBlock } from '@/components/page-header'
-import { Alert } from '@/components/ui/alert'
+import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { sessionKey, useLogout, useSession } from '@/hooks/use-session'
-import { api, ApiError, passwordProblems } from '@/lib/api'
+import { api } from '@/lib/api'
 
 const schema = z
   .object({
@@ -55,28 +55,13 @@ export default function ChangePasswordPage() {
   if (session.isPending || !session.data) return <LoadingBlock />
   const forced = session.data.user.mustChangePassword
 
-  const error = change.error
-  const problemas = passwordProblems(error)
-  const message = error instanceof ApiError ? error.message : error ? 'No se pudo conectar con el servidor.' : null
-
   return (
     <AuthCard
       title="Cambiar contraseña"
       description={forced ? 'Tu contraseña es temporal: elegí una nueva para continuar.' : undefined}
     >
       <form onSubmit={handleSubmit((v) => change.mutate(v))} className="space-y-4" noValidate>
-        {message && (
-          <Alert>
-            <p>{message}</p>
-            {problemas.length > 0 && (
-              <ul className="list-disc pl-4">
-                {problemas.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            )}
-          </Alert>
-        )}
+        <FormError error={change.error} />
         <Field label="Contraseña actual" htmlFor="currentPassword" error={errors.currentPassword?.message}>
           <Input id="currentPassword" type="password" autoComplete="current-password" autoFocus {...register('currentPassword')} aria-invalid={!!errors.currentPassword} />
         </Field>

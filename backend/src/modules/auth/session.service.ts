@@ -15,7 +15,6 @@ export interface CreatedSession {
   expiresAt: Date
 }
 
-// el token viaja solo en la cookie; en la base queda su hash
 export async function createSession(
   db: Pick<Db, 'session'>,
   userId: string,

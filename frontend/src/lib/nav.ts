@@ -2,7 +2,7 @@ import { Building2, LayoutDashboard, Users, type LucideIcon } from 'lucide-react
 import type { Permission, SessionUser } from './api'
 import { can } from './permissions'
 
-export interface NavItem {
+interface NavItem {
   href: string
   label: string
   icon: LucideIcon
@@ -25,7 +25,6 @@ const NAV: NavGroup[] = [
   },
 ]
 
-// no se muestran opciones deshabilitadas: lo que el usuario no puede usar directamente no aparece
 export function visibleNav(user: Pick<SessionUser, 'permissions'>): NavGroup[] {
   return NAV.map((group) => ({
     ...group,

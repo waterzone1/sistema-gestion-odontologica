@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import pg from 'pg'
 
-// los tests corren contra una base propia (<nombre>_test) para no tocar los datos de desarrollo
 export default async function setup(): Promise<void> {
   const baseUrl = process.env['DATABASE_URL']
   if (!baseUrl) throw new Error('los tests de integracion necesitan DATABASE_URL')

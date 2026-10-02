@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState, LoadingBlock, PageHeader } from '@/components/page-header'
+import { FormError } from '@/components/form-error'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { errorMessage, useBranches, usersKey, useUsers } from '@/hooks/use-admin'
+import { useBranches, usersKey, useUsers } from '@/hooks/use-admin'
 import { useSession } from '@/hooks/use-session'
-import { api, type User } from '@/lib/api'
+import { api, errorMessage, type User } from '@/lib/api'
 import { can, ROLE_LABELS } from '@/lib/permissions'
 import { ResetPasswordDialog } from './reset-password-dialog'
 import { UserFormDialog } from './user-form-dialog'
@@ -57,7 +58,7 @@ export default function UsersPage() {
   if (!me || !allowed) return <LoadingBlock />
   if (users.isPending || branches.isPending) return <LoadingBlock />
   if (users.isError || branches.isError) {
-    return <Alert>{errorMessage(users.error ?? branches.error)}</Alert>
+    return <FormError error={users.error ?? branches.error} />
   }
 
   const branchName = new Map(branches.data.map((b) => [b.id, b.name]))

@@ -221,7 +221,6 @@ describe('contraseña, baja y sesiones', () => {
     expect(res.body).toEqual({ revokedSessions: 2 })
     expect((await as(app, a).get('/api/auth/me')).status).toBe(401)
     expect((await as(app, b).get('/api/auth/me')).status).toBe(401)
-    // el admin sigue con su sesion
     expect((await as(app, admin).get('/api/auth/me')).status).toBe(200)
   })
 

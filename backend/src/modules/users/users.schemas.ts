@@ -38,7 +38,7 @@ export const resetPasswordSchema = z
   .object({ password: z.string().max(256) })
   .meta({ id: 'ResetPasswordInput' })
 
-export const professionalSummarySchema = z
+const professionalSummarySchema = z
   .object({
     licenseNumber: z.string(),
     specialty: z.string().nullable(),

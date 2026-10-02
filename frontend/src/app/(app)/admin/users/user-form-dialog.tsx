@@ -6,13 +6,14 @@ import { useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Alert } from '@/components/ui/alert'
+import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { CheckboxGroup } from '@/components/ui/checkbox-group'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { branchesKey, usersKey, errorMessage } from '@/hooks/use-admin'
-import { api, passwordProblems, type Branch, type Professional, type Role, type User } from '@/lib/api'
+import { branchesKey, usersKey } from '@/hooks/use-admin'
+import { api, type Branch, type Professional, type Role, type User } from '@/lib/api'
 import { ALL_ROLES, requiresBranch, ROLE_LABELS } from '@/lib/permissions'
 
 const baseShape = {
@@ -56,7 +57,6 @@ interface Props {
 }
 
 export function UserFormDialog({ open, onOpenChange, user, branches, onSaved }: Props) {
-  // el formulario se monta al abrir y se descarta al cerrar, asi siempre arranca con los datos correctos
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && (
@@ -113,24 +113,12 @@ function UserForm({
     },
   })
 
-  const problemas = passwordProblems(save.error)
   const activeBranches = branches.filter((b) => b.active || user?.branchIds.includes(b.id))
 
   return (
     <>
       <form onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4" noValidate>
-        {save.error && (
-          <Alert>
-            <p>{errorMessage(save.error)}</p>
-            {problemas.length > 0 && (
-              <ul className="list-disc pl-4">
-                {problemas.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            )}
-          </Alert>
-        )}
+        <FormError error={save.error} />
 
         <Field label="Nombre y apellido" htmlFor="displayName" error={fieldErrors['displayName']?.message}>
           <Input id="displayName" autoFocus {...register('displayName')} aria-invalid={!!fieldErrors['displayName']} />
@@ -254,7 +242,7 @@ function ProfessionalSection({ user, onSaved }: { user: User; onSaved: () => voi
         className="space-y-3"
         noValidate
       >
-        {save.error && <Alert>{errorMessage(save.error)}</Alert>}
+        <FormError error={save.error} />
         {saved && <Alert variant="info">Perfil profesional guardado.</Alert>}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Matrícula" htmlFor="licenseNumber" error={errors.licenseNumber?.message}>

@@ -16,7 +16,6 @@ import {
 const db = testDb()
 const app = buildApp(db)
 
-// un uuid valido que no existe: la autorizacion se decide antes de buscarlo
 const FANTASMA = '00000000-0000-7000-8000-000000000000'
 
 type ActorName = 'anonimo' | 'admin' | 'odontologo' | 'recepcion' | 'admin+odontologo'
@@ -42,7 +41,6 @@ interface Endpoint {
   method: 'get' | 'post' | 'put' | 'patch'
   path: string
   body?: object
-  // que actores pasan la autorizacion; el resto tiene que recibir 403 (o 401 sin sesion)
   allowed: ActorName[]
 }
 
@@ -74,7 +72,6 @@ function expectationFor(endpoint: Endpoint, actor: ActorName): Expectation {
 async function call(endpoint: Endpoint, actor: ActorName): Promise<request.Response> {
   const client = clients.get(actor) ?? null
   if (!client) {
-    // sin sesion: se manda Origin para que el rechazo sea por autenticacion y no por CSRF
     const req = request(app)[endpoint.method](endpoint.path).set('Origin', 'https://test.local')
     return endpoint.body ? req.send(endpoint.body) : req
   }

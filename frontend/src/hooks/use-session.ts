@@ -5,7 +5,6 @@ import { api, ApiError, setCsrfToken, type SessionResponse } from '@/lib/api'
 
 export const sessionKey = ['session'] as const
 
-// null significa "sin sesion"; cualquier otro error se propaga
 export function useSession() {
   return useQuery({
     queryKey: sessionKey,

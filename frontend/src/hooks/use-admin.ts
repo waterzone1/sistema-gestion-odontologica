@@ -13,8 +13,3 @@ export function useUsers(enabled = true) {
 export function useBranches(enabled = true) {
   return useQuery({ queryKey: branchesKey, queryFn: () => api.get<Branch[]>('/api/branches'), enabled })
 }
-
-export function errorMessage(error: unknown): string | null {
-  if (!error) return null
-  return error instanceof Error ? error.message : 'Ocurrió un error inesperado'
-}

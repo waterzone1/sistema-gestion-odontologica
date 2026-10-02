@@ -8,7 +8,6 @@ export interface LoginRateLimit {
 
 export const DEFAULT_LOGIN_RATE_LIMIT: LoginRateLimit = { max: 10, windowMs: 15 * 60 * 1000 }
 
-// cuenta solo los intentos fallidos, por ip y usuario. no bloquea la cuenta, solo frena la fuerza bruta
 export function loginRateLimiter({ max, windowMs }: LoginRateLimit) {
   return rateLimit({
     windowMs,

@@ -24,7 +24,6 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* un solo color de marca (placeholder hasta definir el nombre del producto) */
 :root {
   --radius: 0.625rem;
   --background: oklch(0.985 0.002 250);

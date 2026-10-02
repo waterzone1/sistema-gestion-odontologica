@@ -6,7 +6,6 @@ import {
   type RolePermissions,
 } from '../../src/modules/users/domain/permissions.js'
 
-// mapa sintetico: cada rol tiene un permiso propio, para probar la union sin depender del mapa real
 const mapa: RolePermissions = {
   ADMIN: ['users:manage'],
   DENTIST: ['professionals:manage'],

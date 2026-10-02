@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// los e2e levantan su propio stack de docker compose (ver e2e/stack.ts), aislado del de desarrollo
 export default defineConfig({
   testDir: './e2e',
   workers: 1,

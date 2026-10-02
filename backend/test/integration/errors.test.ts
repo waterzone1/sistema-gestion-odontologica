@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { Db } from '../../src/shared/db.js'
 import { buildApp, ORIGIN } from '../helpers.js'
 
-// estas rutas no tocan la base, alcanza con un stub
 const app = buildApp({} as unknown as Db)
 
 describe('formato de errores', () => {
