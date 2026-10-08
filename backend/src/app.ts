@@ -17,6 +17,7 @@ import { healthRouter } from './modules/health/health.routes.js'
 import { patientsRouter } from './modules/patients/patients.routes.js'
 import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
+import { clinicalRouter } from './modules/clinical/clinical.routes.js'
 import { practicesRouter } from './modules/practices/practices.routes.js'
 import { professionalsRouter } from './modules/professionals/professionals.routes.js'
 import { usersRouter } from './modules/users/users.routes.js'
@@ -70,6 +71,7 @@ export function createApp({
   app.use('/api/users', usersRouter(db))
   app.use('/api/branches', branchesRouter(db))
   app.use('/api/professionals', professionalsRouter(db))
+  app.use('/api/patients/:patientId/clinical', clinicalRouter(db))
   app.use('/api/patients', patientsRouter(db))
   app.use('/api/practices', practicesRouter(db))
   app.use('/api/appointments', appointmentsRouter(db))
