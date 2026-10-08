@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Building2, Users } from 'lucide-react'
+import { Building2, UserRound, Users } from 'lucide-react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/page-header'
 import { Alert } from '@/components/ui/alert'
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   if (!user) return null
 
   const shortcuts = [
+    { href: '/patients', label: 'Pacientes', description: 'Buscar, dar de alta y ver fichas', icon: UserRound, show: can(user, 'patients:read') },
     { href: '/admin/users', label: 'Usuarios', description: 'Altas, roles y accesos', icon: Users, show: can(user, 'users:manage') },
     { href: '/admin/branches', label: 'Sedes', description: 'Sedes de la organización', icon: Building2, show: can(user, 'branches:manage') },
   ].filter((s) => s.show)

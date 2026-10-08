@@ -1,8 +1,9 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { ADMIN_PASSWORD } from './api'
 
 test.describe.configure({ mode: 'serial' })
 
-const CLAVE_ADMIN = 'Clave-del-admin-2026'
+const CLAVE_ADMIN = ADMIN_PASSWORD
 const CLAVE_TEMPORAL = 'Temporal-2026-ok'
 const CLAVE_NUEVA = 'Clave-nueva-de-recepcion-77'
 const captura = (nombre: string) => `test-results/screens/${nombre}.png`

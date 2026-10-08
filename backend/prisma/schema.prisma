@@ -17,6 +17,7 @@ model Organization {
 
   branches Branch[]
   users    User[]
+  patients Patient[]
 }
 
 model Branch {
@@ -126,4 +127,36 @@ model AuditLog {
   @@index([createdAt])
   @@index([actorUserId])
   @@index([entityType, entityId])
+}
+
+enum DocumentType {
+  DNI
+  LE
+  LC
+  PASAPORTE
+  OTRO
+}
+
+model Patient {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  organizationId   String       @db.Uuid
+  firstName        String
+  lastName         String
+  documentType     DocumentType @default(DNI)
+  documentNumber   String?
+  birthDate        DateTime?    @db.Date
+  phone            String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  searchText       String
+  archivedAt       DateTime?    @db.Timestamptz(3)
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, documentType, documentNumber])
+  @@index([organizationId, archivedAt])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Patient_searchText_trgm_idx")
 }

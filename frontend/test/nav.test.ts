@@ -7,12 +7,14 @@ const enlaces = (permissions: Permission[]) =>
   visibleNav({ permissions }).flatMap((group) => group.items.map((item) => item.href))
 
 describe('navegacion segun permisos', () => {
-  it('el administrador ve usuarios y sedes', () => {
-    expect(enlaces(['users:manage', 'branches:manage', 'professionals:read'])).toEqual([
-      '/dashboard',
-      '/admin/users',
-      '/admin/branches',
-    ])
+  it('el administrador ve pacientes, usuarios y sedes', () => {
+    expect(
+      enlaces(['users:manage', 'branches:manage', 'professionals:read', 'patients:read']),
+    ).toEqual(['/dashboard', '/patients', '/admin/users', '/admin/branches'])
+  })
+
+  it('quien puede leer pacientes ve el listado aunque no administre nada', () => {
+    expect(enlaces(['patients:read'])).toEqual(['/dashboard', '/patients'])
   })
 
   it('un rol sin permisos de administracion solo ve el inicio y no aparece el grupo vacio', () => {

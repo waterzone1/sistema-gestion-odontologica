@@ -1,4 +1,4 @@
-import { Building2, LayoutDashboard, Users, type LucideIcon } from 'lucide-react'
+import { Building2, LayoutDashboard, UserRound, Users, type LucideIcon } from 'lucide-react'
 import type { Permission, SessionUser } from './api'
 import { can } from './permissions'
 
@@ -15,7 +15,12 @@ export interface NavGroup {
 }
 
 const NAV: NavGroup[] = [
-  { items: [{ href: '/dashboard', label: 'Inicio', icon: LayoutDashboard }] },
+  {
+    items: [
+      { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+      { href: '/patients', label: 'Pacientes', icon: UserRound, permission: 'patients:read' },
+    ],
+  },
   {
     label: 'Administración',
     items: [

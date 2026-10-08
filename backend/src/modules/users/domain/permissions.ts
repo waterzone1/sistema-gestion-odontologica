@@ -6,15 +6,24 @@ export const PERMISSIONS = [
   'branches:manage',
   'professionals:manage',
   'professionals:read',
+  'patients:read',
+  'patients:write',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
 export type RolePermissions = Readonly<Record<Role, readonly Permission[]>>
 
 export const ROLE_PERMISSIONS: RolePermissions = {
-  ADMIN: ['users:manage', 'branches:manage', 'professionals:manage', 'professionals:read'],
-  DENTIST: ['professionals:read'],
-  RECEPTIONIST: ['professionals:read'],
+  ADMIN: [
+    'users:manage',
+    'branches:manage',
+    'professionals:manage',
+    'professionals:read',
+    'patients:read',
+    'patients:write',
+  ],
+  DENTIST: ['professionals:read', 'patients:read'],
+  RECEPTIONIST: ['professionals:read', 'patients:read', 'patients:write'],
 }
 
 export function effectivePermissions(
