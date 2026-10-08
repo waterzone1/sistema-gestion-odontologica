@@ -63,6 +63,7 @@ model User {
   sessions            Session[]
   professionalProfile ProfessionalProfile?
   createdAppointments Appointment[]
+  payments            Payment[]            @relation("PaymentCreatedBy")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -114,9 +115,10 @@ model ProfessionalProfile {
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
-  user            User            @relation(fields: [userId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
   appointments    Appointment[]
   clinicalEntries ClinicalEntry[]
+  services        PerformedService[]
 }
 
 model AuditLog {
@@ -160,9 +162,11 @@ model Patient {
   createdAt        DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
 
-  organization    Organization    @relation(fields: [organizationId], references: [id])
+  organization    Organization       @relation(fields: [organizationId], references: [id])
   appointments    Appointment[]
   clinicalEntries ClinicalEntry[]
+  services        PerformedService[]
+  payments        Payment[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -180,8 +184,9 @@ model Practice {
   createdAt              DateTime @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime @updatedAt @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
   appointments Appointment[]
+  services     PerformedService[]
 
   @@unique([organizationId, code])
 }
@@ -217,6 +222,7 @@ model Appointment {
   practice        Practice?           @relation(fields: [practiceId], references: [id])
   createdBy       User                @relation(fields: [createdById], references: [id])
   clinicalEntries ClinicalEntry[]
+  services        PerformedService[]
 
   @@index([organizationId, startsAt])
   @@index([professionalId, startsAt])
@@ -246,4 +252,70 @@ model ClinicalEntry {
 
   @@index([patientId, createdAt])
   @@index([correctionOfId])
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  MERCADOPAGO
+  OTHER
+}
+
+model PerformedService {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @db.Uuid
+  patientId      String    @db.Uuid
+  professionalId String    @db.Uuid
+  practiceId     String    @db.Uuid
+  appointmentId  String?   @db.Uuid
+  price          Decimal   @db.Decimal(14, 2)
+  performedAt    DateTime  @db.Timestamptz(3)
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  voidedAt       DateTime? @db.Timestamptz(3)
+  voidReason     String?
+  voidedById     String?   @db.Uuid
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice     Practice            @relation(fields: [practiceId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id])
+  allocations  PaymentAllocation[]
+
+  @@index([organizationId, patientId, performedAt])
+}
+
+model Payment {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  organizationId    String        @db.Uuid
+  patientId         String        @db.Uuid
+  amount            Decimal       @db.Decimal(14, 2)
+  method            PaymentMethod
+  externalReference String?
+  receivedAt        DateTime      @db.Timestamptz(3)
+  createdById       String        @db.Uuid
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  voidedAt          DateTime?     @db.Timestamptz(3)
+  voidReason        String?
+  voidedById        String?       @db.Uuid
+
+  patient     Patient             @relation(fields: [patientId], references: [id])
+  createdBy   User                @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([organizationId, patientId, receivedAt])
+}
+
+model PaymentAllocation {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  paymentId String  @db.Uuid
+  serviceId String  @db.Uuid
+  amount    Decimal @db.Decimal(14, 2)
+
+  payment Payment          @relation(fields: [paymentId], references: [id])
+  service PerformedService @relation(fields: [serviceId], references: [id])
+
+  @@unique([paymentId, serviceId])
+  @@index([serviceId])
 }

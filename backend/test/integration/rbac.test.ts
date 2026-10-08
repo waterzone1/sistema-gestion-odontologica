@@ -85,6 +85,23 @@ const ENDPOINTS: Endpoint[] = [
     body: { content: 'Correccion' },
     allowed: SOLO_ODONTOLOGO,
   },
+  { method: 'get', path: `/api/patients/${FANTASMA}/services`, allowed: TODOS },
+  { method: 'post', path: `/api/patients/${FANTASMA}/services`, body: {}, allowed: SOLO_ODONTOLOGO },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/services/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: SOLO_ADMIN,
+  },
+  { method: 'get', path: `/api/patients/${FANTASMA}/account`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/payments`, body: {}, allowed: ADMIN_Y_RECEPCION },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/payments/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: SOLO_ADMIN,
+  },
+  { method: 'get', path: '/api/debtors', allowed: ADMIN_Y_RECEPCION },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 

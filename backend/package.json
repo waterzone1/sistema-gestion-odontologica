@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run db:generate",
     "test": "vitest run",
+    "demo:seed": "tsx --env-file-if-exists=../.env prisma/demo/seed.ts",
     "openapi:export": "tsx scripts/export-openapi.ts",
     "openapi:check": "tsx scripts/export-openapi.ts --check",
     "comments:check": "node ../infra/checks/no-comments.mjs",

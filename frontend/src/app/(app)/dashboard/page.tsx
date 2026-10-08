@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Building2, CalendarDays, ClipboardList, UserRound, Users } from 'lucide-react'
 import Link from 'next/link'
+import { Debtors } from '@/components/billing/debtors'
 import { TodayAppointments } from '@/components/appointments/today-appointments'
 import { PageHeader } from '@/components/page-header'
 import { Alert } from '@/components/ui/alert'
@@ -58,6 +59,7 @@ export default function DashboardPage() {
       )}
 
       {can(user, 'appointments:read') && <TodayAppointments user={user} />}
+      {can(user, 'account:read') && <Debtors />}
 
       {shortcuts.length > 0 ? (
         <section aria-label="Accesos directos" className="mt-6 grid gap-3 sm:grid-cols-2">

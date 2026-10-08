@@ -28,6 +28,10 @@ type AuditAction =
   | 'CLINICAL_HISTORY_VIEWED'
   | 'CLINICAL_ENTRY_CREATED'
   | 'CLINICAL_ENTRY_CORRECTED'
+  | 'SERVICE_RECORDED'
+  | 'SERVICE_VOIDED'
+  | 'PAYMENT_RECORDED'
+  | 'PAYMENT_VOIDED'
 
 type Metadata = Record<string, string | number | boolean | null | string[]>
 
