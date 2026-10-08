@@ -118,6 +118,8 @@ components:
               - appointments:read
               - appointments:manage
               - appointments:attend
+              - clinical:read
+              - clinical:write
         branchIds:
           type: array
           items:
@@ -629,6 +631,74 @@ components:
             - string
             - "null"
           maxLength: 200
+    ClinicalEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entryType:
+          type: string
+          enum:
+            - EVOLUTION
+            - CORRECTION
+        content:
+          type: string
+        correctionOfId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - entryType
+        - content
+        - correctionOfId
+        - appointmentId
+        - professional
+        - createdAt
+    CreateClinicalEntryInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 3
+          maxLength: 10000
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+      required:
+        - content
+    CorrectClinicalEntryInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 3
+          maxLength: 10000
+      required:
+        - content
     Practice:
       type: object
       properties:
@@ -1911,9 +1981,169 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/practices:
+  /api/patients/{patientId}/clinical:
     get:
       tags: &a7
+        - Historia clínica
+      summary: Historia clínica del paciente
+      description: Solo los odontólogos acceden. Administración y recepción reciben
+        403. Cada apertura de la historia queda registrada en la auditoría.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Notas, de la más reciente a la más antigua
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicalEntry"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a7
+      summary: Registra una nota de evolución
+      description: "La nota queda a nombre del odontólogo y no se puede editar ni
+        borrar: se corrige con una adenda."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClinicalEntryInput"
+      responses:
+        "201":
+          description: Nota registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalEntry"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado, usuario sin perfil profesional o turno que no
+            corresponde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/clinical/{entryId}/corrections:
+    post:
+      tags: *a7
+      summary: Corrige una nota con una adenda
+      description: La nota original se conserva intacta; la adenda queda vinculada a ella.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: entryId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorrectClinicalEntryInput"
+      responses:
+        "201":
+          description: Adenda registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalEntry"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado, sin perfil profesional, o la nota ya es una
+            corrección
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices:
+    get:
+      tags: &a8
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -1955,7 +2185,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a7
+      tags: *a8
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -1997,7 +2227,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a7
+      tags: *a8
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -2053,7 +2283,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a8
+      tags: &a9
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -2124,7 +2354,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a8
+      tags: *a9
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -2181,7 +2411,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a8
+      tags: *a9
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -2217,7 +2447,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a8
+      tags: *a9
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -2279,7 +2509,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a8
+      tags: *a9
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno, una vez

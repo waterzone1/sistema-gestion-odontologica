@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { PatientAppointments } from '@/components/appointments/patient-appointments'
+import { ClinicalHistory } from '@/components/clinical/clinical-history'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
@@ -56,6 +57,7 @@ export default function PatientPage() {
   const tabs = [
     { id: 'resumen', label: 'Resumen' },
     ...(can(user, 'appointments:read') ? [{ id: 'turnos', label: 'Turnos' }] : []),
+    ...(can(user, 'clinical:read') ? [{ id: 'historia', label: 'Historia clínica' }] : []),
   ]
 
   return (
@@ -99,6 +101,13 @@ export default function PatientPage() {
           <PatientAppointments
             patient={{ id: data.id, fullName: fullName(data), archived: data.archivedAt !== null }}
             user={user}
+          />
+        )}
+        {tab === 'historia' && (
+          <ClinicalHistory
+            patientId={data.id}
+            canWrite={can(user, 'clinical:write')}
+            archived={data.archivedAt !== null}
           />
         )}
         {tab === 'resumen' && (

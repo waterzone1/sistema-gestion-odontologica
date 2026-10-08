@@ -1,0 +1,145 @@
+'use client'
+
+import { useState } from 'react'
+import { FormError } from '@/components/form-error'
+import { EmptyState, LoadingBlock } from '@/components/page-header'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Field } from '@/components/ui/field'
+import { Textarea } from '@/components/ui/input'
+import { useAddClinicalEntry, useClinicalEntries } from '@/hooks/use-clinical'
+import type { ClinicalEntry } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
+
+interface Props {
+  patientId: string
+  canWrite: boolean
+  archived: boolean
+}
+
+export function ClinicalHistory({ patientId, canWrite, archived }: Props) {
+  const entries = useClinicalEntries(patientId)
+  const [correcting, setCorrecting] = useState<string | null>(null)
+
+  if (entries.isPending) return <LoadingBlock />
+  if (entries.isError) return <FormError error={entries.error} />
+
+  const corrections = new Map<string, ClinicalEntry[]>()
+  for (const entry of entries.data) {
+    if (entry.correctionOfId) {
+      corrections.set(entry.correctionOfId, [...(corrections.get(entry.correctionOfId) ?? []), entry])
+    }
+  }
+  const notes = entries.data.filter((entry) => !entry.correctionOfId)
+  const writable = canWrite && !archived
+
+  return (
+    <div className="space-y-6">
+      {writable && <EntryForm patientId={patientId} label="Nueva nota de evolución" submitLabel="Guardar nota" />}
+      {canWrite && archived && (
+        <p className="text-sm text-muted-foreground">El paciente está archivado: reactivalo para registrar notas.</p>
+      )}
+
+      <section aria-label="Notas clínicas">
+        <h2 className="mb-2 text-sm font-semibold">Notas clínicas</h2>
+        {notes.length === 0 ? (
+          <EmptyState title="Todavía no hay notas clínicas" />
+        ) : (
+          <ul className="space-y-3">
+            {notes.map((note) => (
+              <li key={note.id} className="rounded-lg border bg-card p-4 shadow-sm">
+                <Entry entry={note} />
+                {(corrections.get(note.id) ?? [])
+                  .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                  .map((correction) => (
+                    <div key={correction.id} className="mt-3 border-l-2 border-primary/40 pl-3">
+                      <Entry entry={correction} />
+                    </div>
+                  ))}
+                {writable &&
+                  (correcting === note.id ? (
+                    <div className="mt-3">
+                      <EntryForm
+                        patientId={patientId}
+                        correctionOfId={note.id}
+                        label="Corrección (adenda)"
+                        submitLabel="Guardar adenda"
+                        onDone={() => setCorrecting(null)}
+                        onCancel={() => setCorrecting(null)}
+                      />
+                    </div>
+                  ) : (
+                    <Button variant="secondary" className="mt-2" onClick={() => setCorrecting(note.id)}>
+                      Corregir con adenda
+                    </Button>
+                  ))}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function Entry({ entry }: { entry: ClinicalEntry }) {
+  return (
+    <article>
+      <header className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{entry.professional.displayName}</span>
+        <span>{formatDateTime(entry.createdAt)}</span>
+        {entry.entryType === 'CORRECTION' && <Badge variant="muted">Adenda</Badge>}
+      </header>
+      <p className="whitespace-pre-wrap text-sm">{entry.content}</p>
+    </article>
+  )
+}
+
+function EntryForm({
+  patientId,
+  correctionOfId,
+  label,
+  submitLabel,
+  onDone,
+  onCancel,
+}: {
+  patientId: string
+  correctionOfId?: string
+  label: string
+  submitLabel: string
+  onDone?: () => void
+  onCancel?: () => void
+}) {
+  const [content, setContent] = useState('')
+  const add = useAddClinicalEntry(patientId, correctionOfId)
+  const id = `entry-${correctionOfId ?? 'new'}`
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault()
+    add.mutate(content, {
+      onSuccess: () => {
+        setContent('')
+        onDone?.()
+      },
+    })
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
+      <Field label={label} htmlFor={id} hint="Una vez guardada, la nota no se puede editar ni borrar.">
+        <Textarea id={id} value={content} onChange={(event) => setContent(event.target.value)} maxLength={10000} />
+      </Field>
+      <FormError error={add.error} />
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        )}
+        <Button type="submit" disabled={add.isPending || content.trim().length < 3}>
+          {submitLabel}
+        </Button>
+      </div>
+    </form>
+  )
+}

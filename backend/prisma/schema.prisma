@@ -114,8 +114,9 @@ model ProfessionalProfile {
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
-  user         User          @relation(fields: [userId], references: [id])
-  appointments Appointment[]
+  user            User            @relation(fields: [userId], references: [id])
+  appointments    Appointment[]
+  clinicalEntries ClinicalEntry[]
 }
 
 model AuditLog {
@@ -159,8 +160,9 @@ model Patient {
   createdAt        DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  appointments Appointment[]
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  appointments    Appointment[]
+  clinicalEntries ClinicalEntry[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -208,14 +210,40 @@ model Appointment {
   createdAt          DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
 
-  organization Organization        @relation(fields: [organizationId], references: [id])
-  branch       Branch              @relation(fields: [branchId], references: [id])
-  patient      Patient             @relation(fields: [patientId], references: [id])
-  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
-  practice     Practice?           @relation(fields: [practiceId], references: [id])
-  createdBy    User                @relation(fields: [createdById], references: [id])
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  branch          Branch              @relation(fields: [branchId], references: [id])
+  patient         Patient             @relation(fields: [patientId], references: [id])
+  professional    ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice        Practice?           @relation(fields: [practiceId], references: [id])
+  createdBy       User                @relation(fields: [createdById], references: [id])
+  clinicalEntries ClinicalEntry[]
 
   @@index([organizationId, startsAt])
   @@index([professionalId, startsAt])
   @@index([patientId, startsAt])
+}
+
+enum ClinicalEntryType {
+  EVOLUTION
+  CORRECTION
+}
+
+model ClinicalEntry {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  patientId      String            @db.Uuid
+  professionalId String            @db.Uuid
+  appointmentId  String?           @db.Uuid
+  entryType      ClinicalEntryType
+  content        String
+  correctionOfId String?           @db.Uuid
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  correctionOf ClinicalEntry?      @relation("Correction", fields: [correctionOfId], references: [id], onDelete: Restrict)
+  corrections  ClinicalEntry[]     @relation("Correction")
+
+  @@index([patientId, createdAt])
+  @@index([correctionOfId])
 }

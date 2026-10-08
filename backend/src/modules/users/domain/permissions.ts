@@ -13,6 +13,8 @@ export const PERMISSIONS = [
   'appointments:read',
   'appointments:manage',
   'appointments:attend',
+  'clinical:read',
+  'clinical:write',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -38,6 +40,8 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'practices:read',
     'appointments:read',
     'appointments:attend',
+    'clinical:read',
+    'clinical:write',
   ],
   RECEPTIONIST: [
     'professionals:read',

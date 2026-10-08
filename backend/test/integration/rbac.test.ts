@@ -46,6 +46,7 @@ interface Endpoint {
 
 const SOLO_ADMIN: ActorName[] = ['admin', 'admin+odontologo']
 const TODOS: ActorName[] = ['admin', 'odontologo', 'recepcion', 'admin+odontologo']
+const SOLO_ODONTOLOGO: ActorName[] = ['odontologo', 'admin+odontologo']
 const ADMIN_Y_RECEPCION: ActorName[] = ['admin', 'recepcion', 'admin+odontologo']
 
 const ENDPOINTS: Endpoint[] = [
@@ -76,6 +77,14 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'get', path: `/api/appointments/${FANTASMA}`, allowed: TODOS },
   { method: 'patch', path: `/api/appointments/${FANTASMA}`, body: { notes: 'x' }, allowed: ADMIN_Y_RECEPCION },
   { method: 'post', path: `/api/appointments/${FANTASMA}/status`, body: { status: 'ATTENDED' }, allowed: TODOS },
+  { method: 'get', path: `/api/patients/${FANTASMA}/clinical`, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/clinical`, body: { content: 'Control' }, allowed: SOLO_ODONTOLOGO },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/clinical/${FANTASMA}/corrections`,
+    body: { content: 'Correccion' },
+    allowed: SOLO_ODONTOLOGO,
+  },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 
