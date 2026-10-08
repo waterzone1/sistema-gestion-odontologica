@@ -68,6 +68,14 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'patch', path: `/api/patients/${FANTASMA}`, body: { firstName: 'X' }, allowed: ADMIN_Y_RECEPCION },
   { method: 'post', path: `/api/patients/${FANTASMA}/archive`, allowed: ADMIN_Y_RECEPCION },
   { method: 'post', path: `/api/patients/${FANTASMA}/unarchive`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: '/api/practices', allowed: TODOS },
+  { method: 'post', path: '/api/practices', body: {}, allowed: SOLO_ADMIN },
+  { method: 'patch', path: `/api/practices/${FANTASMA}`, body: { name: 'X' }, allowed: SOLO_ADMIN },
+  { method: 'get', path: '/api/appointments', allowed: TODOS },
+  { method: 'post', path: '/api/appointments', body: {}, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: `/api/appointments/${FANTASMA}`, allowed: TODOS },
+  { method: 'patch', path: `/api/appointments/${FANTASMA}`, body: { notes: 'x' }, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/appointments/${FANTASMA}/status`, body: { status: 'ATTENDED' }, allowed: TODOS },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 

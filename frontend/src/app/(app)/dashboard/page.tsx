@@ -1,8 +1,9 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Building2, UserRound, Users } from 'lucide-react'
+import { Building2, CalendarDays, ClipboardList, UserRound, Users } from 'lucide-react'
 import Link from 'next/link'
+import { TodayAppointments } from '@/components/appointments/today-appointments'
 import { PageHeader } from '@/components/page-header'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,8 @@ export default function DashboardPage() {
   if (!user) return null
 
   const shortcuts = [
+    { href: '/agenda', label: 'Agenda', description: 'Turnos por día y semana', icon: CalendarDays, show: can(user, 'appointments:read') },
+    { href: '/admin/practices', label: 'Prácticas', description: 'Catálogo, duraciones y precios', icon: ClipboardList, show: can(user, 'practices:manage') },
     { href: '/patients', label: 'Pacientes', description: 'Buscar, dar de alta y ver fichas', icon: UserRound, show: can(user, 'patients:read') },
     { href: '/admin/users', label: 'Usuarios', description: 'Altas, roles y accesos', icon: Users, show: can(user, 'users:manage') },
     { href: '/admin/branches', label: 'Sedes', description: 'Sedes de la organización', icon: Building2, show: can(user, 'branches:manage') },
@@ -54,8 +57,10 @@ export default function DashboardPage() {
         </Alert>
       )}
 
+      {can(user, 'appointments:read') && <TodayAppointments user={user} />}
+
       {shortcuts.length > 0 ? (
-        <section aria-label="Accesos directos" className="grid gap-3 sm:grid-cols-2">
+        <section aria-label="Accesos directos" className="mt-6 grid gap-3 sm:grid-cols-2">
           {shortcuts.map(({ href, label, description, icon: Icon }) => (
             <Link key={href} href={href} className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted">
               <Icon className="size-5 text-primary" aria-hidden />

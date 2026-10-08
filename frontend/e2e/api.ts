@@ -4,6 +4,8 @@ const ORIGIN = 'https://localhost:8443'
 
 export const ADMIN_USERNAME = 'marta'
 export const ADMIN_PASSWORD = 'Clave-del-admin-2026'
+export const RECEPCION = { username: 'recepcion1', password: 'Clave-de-rosa-2026', displayName: 'Rosa Recepción' }
+export const ODONTOLOGO = { username: 'odontologo1', password: 'Clave-de-juan-2026', displayName: 'Dr. Juan Paz' }
 
 export interface ApiSession {
   userId: string

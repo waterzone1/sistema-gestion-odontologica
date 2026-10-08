@@ -20,6 +20,11 @@ type AuditAction =
   | 'PATIENT_UPDATED'
   | 'PATIENT_ARCHIVED'
   | 'PATIENT_UNARCHIVED'
+  | 'PRACTICE_CREATED'
+  | 'PRACTICE_UPDATED'
+  | 'APPOINTMENT_CREATED'
+  | 'APPOINTMENT_UPDATED'
+  | 'APPOINTMENT_STATUS_CHANGED'
 
 type Metadata = Record<string, string | number | boolean | null | string[]>
 

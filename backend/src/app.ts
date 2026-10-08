@@ -10,12 +10,14 @@ import { httpLogger } from './middleware/httpLogger.js'
 import { notFound } from './middleware/notFound.js'
 import { DEFAULT_LOGIN_RATE_LIMIT, type LoginRateLimit } from './middleware/rateLimit.js'
 import { sessionMiddleware } from './middleware/session.js'
+import { appointmentsRouter } from './modules/appointments/appointments.routes.js'
 import { authRouter } from './modules/auth/auth.routes.js'
 import { branchesRouter } from './modules/branches/branches.routes.js'
 import { healthRouter } from './modules/health/health.routes.js'
 import { patientsRouter } from './modules/patients/patients.routes.js'
 import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
+import { practicesRouter } from './modules/practices/practices.routes.js'
 import { professionalsRouter } from './modules/professionals/professionals.routes.js'
 import { usersRouter } from './modules/users/users.routes.js'
 import { buildOpenApiDocument } from './openapi/document.js'
@@ -69,6 +71,8 @@ export function createApp({
   app.use('/api/branches', branchesRouter(db))
   app.use('/api/professionals', professionalsRouter(db))
   app.use('/api/patients', patientsRouter(db))
+  app.use('/api/practices', practicesRouter(db))
+  app.use('/api/appointments', appointmentsRouter(db))
 
   app.use(notFound)
   app.use(errorHandler)
