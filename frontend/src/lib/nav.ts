@@ -1,4 +1,12 @@
-import { Building2, LayoutDashboard, UserRound, Users, type LucideIcon } from 'lucide-react'
+import {
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import type { Permission, SessionUser } from './api'
 import { can } from './permissions'
 
@@ -18,6 +26,7 @@ const NAV: NavGroup[] = [
   {
     items: [
       { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+      { href: '/agenda', label: 'Agenda', icon: CalendarDays, permission: 'appointments:read' },
       { href: '/patients', label: 'Pacientes', icon: UserRound, permission: 'patients:read' },
     ],
   },
@@ -26,6 +35,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: '/admin/users', label: 'Usuarios', icon: Users, permission: 'users:manage' },
       { href: '/admin/branches', label: 'Sedes', icon: Building2, permission: 'branches:manage' },
+      { href: '/admin/practices', label: 'Prácticas', icon: ClipboardList, permission: 'practices:manage' },
     ],
   },
 ]

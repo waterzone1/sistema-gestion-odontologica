@@ -15,6 +15,8 @@ tags:
   - name: Sedes
   - name: Profesionales
   - name: Pacientes
+  - name: Prácticas
+  - name: Turnos
 components:
   securitySchemes:
     cookieAuth:
@@ -111,6 +113,11 @@ components:
               - professionals:read
               - patients:read
               - patients:write
+              - practices:read
+              - practices:manage
+              - appointments:read
+              - appointments:manage
+              - appointments:attend
         branchIds:
           type: array
           items:
@@ -404,6 +411,9 @@ components:
     Professional:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
         userId:
           type: string
           format: uuid
@@ -423,6 +433,7 @@ components:
             type: string
             format: uuid
       required:
+        - id
         - userId
         - displayName
         - licenseNumber
@@ -618,6 +629,245 @@ components:
             - string
             - "null"
           maxLength: 200
+    Practice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        defaultDurationMinutes:
+          type: integer
+        basePrice:
+          type: string
+          example: "25000.00"
+          description: Importe en pesos con dos decimales
+        active:
+          type: boolean
+      required:
+        - id
+        - code
+        - name
+        - defaultDurationMinutes
+        - basePrice
+        - active
+    CreatePracticeInput:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        defaultDurationMinutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+          default: 30
+        basePrice:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+      required:
+        - code
+        - name
+        - basePrice
+    UpdatePracticeInput:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        defaultDurationMinutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+        basePrice:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+        active:
+          type: boolean
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type:
+            - string
+            - "null"
+        cancellationReason:
+          type:
+            - string
+            - "null"
+        branch:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        patient:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            fullName:
+              type: string
+          required:
+            - id
+            - fullName
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - userId
+            - displayName
+        practice:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            code:
+              type: string
+            name:
+              type: string
+          required:
+            - id
+            - code
+            - name
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - status
+        - startsAt
+        - endsAt
+        - notes
+        - cancellationReason
+        - branch
+        - patient
+        - professional
+        - practice
+        - createdAt
+    AppointmentStatus:
+      type: string
+      enum:
+        - SCHEDULED
+        - CONFIRMED
+        - ATTENDED
+        - NO_SHOW
+        - CANCELLED
+    CreateAppointmentInput:
+      type: object
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        professionalId:
+          type: string
+          format: uuid
+        branchId:
+          type: string
+          format: uuid
+        practiceId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+      required:
+        - patientId
+        - professionalId
+        - branchId
+        - startsAt
+        - endsAt
+    UpdateAppointmentInput:
+      type: object
+      properties:
+        professionalId:
+          type: string
+          format: uuid
+        branchId:
+          type: string
+          format: uuid
+        practiceId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+    ChangeAppointmentStatusInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - CONFIRMED
+            - ATTENDED
+            - NO_SHOW
+            - CANCELLED
+        cancellationReason:
+          type: string
+          minLength: 3
+          maxLength: 200
+      required:
+        - status
   parameters: {}
 paths:
   /api/health:
@@ -1657,6 +1907,429 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
           description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices:
+    get:
+      tags: &a7
+        - Prácticas
+      summary: Lista el catálogo de prácticas
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - active
+              - all
+            default: all
+          required: false
+          name: status
+          in: query
+      responses:
+        "200":
+          description: Prácticas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a7
+      summary: Crea una práctica
+      description: El código es único por organización y se guarda en mayúsculas.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePracticeInput"
+      responses:
+        "201":
+          description: Práctica creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe una práctica con ese código
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices/{id}:
+    patch:
+      tags: *a7
+      summary: Edita o desactiva una práctica
+      description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
+        modifica las prestaciones ya registradas."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeInput"
+      responses:
+        "200":
+          description: Práctica actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe una práctica con ese código
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/appointments:
+    get:
+      tags: &a8
+        - Turnos
+      summary: Lista los turnos de un rango de fechas
+      description: Recepción y administración ven los turnos de sus sedes (el
+        administrador, los de todas). Un odontólogo ve solo los suyos. El rango
+        máximo es de 62 días, o de 366 si se filtra por paciente.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: to
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: branchId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: professionalId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: patientId
+          in: query
+        - schema:
+            $ref: "#/components/schemas/AppointmentStatus"
+          required: false
+          name: status
+          in: query
+      responses:
+        "200":
+          description: Turnos del rango
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a8
+      summary: Crea un turno
+      description: "Un profesional no puede tener dos turnos no cancelados que se
+        superpongan, aunque sean en sedes distintas: lo garantiza la base de
+        datos."
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentInput"
+      responses:
+        "201":
+          description: Turno creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El profesional ya tiene un turno en ese horario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Rango horario inválido, sede, profesional o práctica inválidos, o
+            paciente archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/appointments/{id}:
+    get:
+      tags: *a8
+      summary: Detalle de un turno
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Turno
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: *a8
+      summary: Edita o reprograma un turno pendiente o confirmado
+      description: Si se cambia el horario o el profesional de un turno confirmado,
+        vuelve a quedar pendiente de confirmar.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentInput"
+      responses:
+        "200":
+          description: Turno actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Horario ocupado o turno que ya no se puede modificar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Rango horario, sede, profesional o práctica inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/appointments/{id}/status:
+    post:
+      tags: *a8
+      summary: Cambia el estado del turno
+      description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
+        o ausente también lo puede hacer el odontólogo dueño del turno, una vez
+        llegada la hora. Cancelar exige un motivo y el turno se conserva.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeAppointmentStatusInput"
+      responses:
+        "200":
+          description: Turno actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Transición no permitida, o todavía no es la hora del turno
           content:
             application/json:
               schema:

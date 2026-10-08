@@ -28,3 +28,23 @@ export function documentLabel(patient: Pick<Patient, 'documentType' | 'documentN
 export function fullName(patient: Pick<Patient, 'lastName' | 'firstName'>): string {
   return `${patient.lastName}, ${patient.firstName}`
 }
+
+const pad = (value: number) => String(value).padStart(2, '0')
+
+export function formatTime(iso: string): string {
+  const date = new Date(iso)
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso)
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${formatTime(iso)}`
+}
+
+export function toDateTimeInput(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function formatMoney(amount: string): string {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(amount))
+}

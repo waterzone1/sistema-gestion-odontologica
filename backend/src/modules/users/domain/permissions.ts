@@ -8,6 +8,11 @@ export const PERMISSIONS = [
   'professionals:read',
   'patients:read',
   'patients:write',
+  'practices:read',
+  'practices:manage',
+  'appointments:read',
+  'appointments:manage',
+  'appointments:attend',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -21,9 +26,28 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'professionals:read',
     'patients:read',
     'patients:write',
+    'practices:read',
+    'practices:manage',
+    'appointments:read',
+    'appointments:manage',
+    'appointments:attend',
   ],
-  DENTIST: ['professionals:read', 'patients:read'],
-  RECEPTIONIST: ['professionals:read', 'patients:read', 'patients:write'],
+  DENTIST: [
+    'professionals:read',
+    'patients:read',
+    'practices:read',
+    'appointments:read',
+    'appointments:attend',
+  ],
+  RECEPTIONIST: [
+    'professionals:read',
+    'patients:read',
+    'patients:write',
+    'practices:read',
+    'appointments:read',
+    'appointments:manage',
+    'appointments:attend',
+  ],
 }
 
 export function effectivePermissions(

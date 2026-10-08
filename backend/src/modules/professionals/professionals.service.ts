@@ -22,6 +22,7 @@ export const saveProfessionalSchema = z
 
 export const professionalSchema = z
   .object({
+    id: z.uuid(),
     userId: z.uuid(),
     displayName: z.string(),
     licenseNumber: z.string(),
@@ -42,6 +43,7 @@ type ProfileRecord = NonNullable<
 
 function toDto(profile: ProfileRecord): ProfessionalDto {
   return {
+    id: profile.id,
     userId: profile.userId,
     displayName: profile.user.displayName,
     licenseNumber: profile.licenseNumber,

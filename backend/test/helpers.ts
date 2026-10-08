@@ -127,6 +127,77 @@ export async function seedPatient(db: Db, seed: Seed, data: SeedPatient = {}) {
   })
 }
 
+let professionalCounter = 0
+
+export async function seedProfessional(
+  db: Db,
+  seed: Seed,
+  data: { username: string; displayName?: string; branchIds?: string[] },
+) {
+  professionalCounter += 1
+  const user = await seedUser(db, seed, {
+    username: data.username,
+    displayName: data.displayName ?? data.username,
+    roles: ['DENTIST'],
+    ...(data.branchIds ? { branchIds: data.branchIds } : {}),
+  })
+  const profile = await db.professionalProfile.create({
+    data: { userId: user.id, licenseNumber: `MP-${professionalCounter}` },
+  })
+  return { user, profile }
+}
+
+let practiceCounter = 0
+
+export async function seedPractice(
+  db: Db,
+  seed: Seed,
+  data: { code?: string; name?: string; basePrice?: string; minutes?: number; active?: boolean } = {},
+) {
+  practiceCounter += 1
+  return db.practice.create({
+    data: {
+      organizationId: seed.organizationId,
+      code: data.code ?? `P${practiceCounter}`,
+      name: data.name ?? `Practica ${practiceCounter}`,
+      basePrice: data.basePrice ?? '10000.00',
+      defaultDurationMinutes: data.minutes ?? 30,
+      active: data.active ?? true,
+    },
+  })
+}
+
+export function minutesFromNow(minutes: number): Date {
+  return new Date(Date.now() + minutes * 60_000)
+}
+
+export async function seedAppointment(
+  db: Db,
+  seed: Seed,
+  data: {
+    patientId: string
+    professionalId: string
+    createdById: string
+    startsAt: Date
+    endsAt: Date
+    branchId?: string
+    status?: 'SCHEDULED' | 'CONFIRMED' | 'ATTENDED' | 'NO_SHOW' | 'CANCELLED'
+  },
+) {
+  return db.appointment.create({
+    data: {
+      organizationId: seed.organizationId,
+      branchId: data.branchId ?? seed.branchId,
+      patientId: data.patientId,
+      professionalId: data.professionalId,
+      createdById: data.createdById,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      status: data.status ?? 'SCHEDULED',
+    },
+  })
+}
+
 export interface Client {
   cookie: string
   csrfToken: string

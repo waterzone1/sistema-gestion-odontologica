@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { ADMIN_PASSWORD, ADMIN_USERNAME, apiLogin, provisionUser } from './api'
+import { RECEPCION } from './api'
 
 test.describe.configure({ mode: 'serial' })
 
-const RECEPCION = { username: 'recepcion1', password: 'Clave-de-rosa-2026' }
 const captura = (nombre: string) => `test-results/screens/${nombre}.png`
 
 let page: Page
@@ -17,16 +16,6 @@ async function loginUi(target: Page, username: string, password: string) {
 }
 
 test.beforeAll(async ({ browser }) => {
-  const admin = await apiLogin(ADMIN_USERNAME, ADMIN_PASSWORD)
-  const branches = (await (await admin.get('/api/branches')).json()) as { id: string }[]
-  await provisionUser(admin, {
-    username: RECEPCION.username,
-    displayName: 'Rosa Recepción',
-    roles: ['RECEPTIONIST'],
-    branchIds: [branches[0]?.id ?? ''],
-    password: RECEPCION.password,
-  })
-  await admin.dispose()
   page = await (await browser.newContext()).newPage()
   await loginUi(page, RECEPCION.username, RECEPCION.password)
 })
@@ -38,7 +27,7 @@ test.afterAll(async () => {
 test('recepción da de alta un paciente y llega a su ficha', async () => {
   await page.getByRole('link', { name: 'Pacientes' }).first().click()
   await expect(page.getByRole('heading', { name: 'Pacientes' })).toBeVisible()
-  await expect(page.getByText('Todavía no hay pacientes')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Rossi, Luca' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Nuevo paciente' }).click()
   const dialogo = page.getByRole('dialog')
@@ -97,7 +86,8 @@ test('edita el teléfono y archiva al paciente sin borrarlo', async () => {
   await expect(page.getByText('Archivado').first()).toBeVisible()
 
   await page.goto('/patients')
-  await expect(page.getByText('Todavía no hay pacientes')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Rossi, Luca' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Gómez, Ana' })).toHaveCount(0)
   await page.getByLabel('Estado').selectOption('archived')
   await expect(page.getByRole('link', { name: 'Gómez, Ana' })).toBeVisible()
 })

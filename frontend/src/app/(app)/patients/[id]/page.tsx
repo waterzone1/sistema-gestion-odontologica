@@ -5,6 +5,7 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { PatientAppointments } from '@/components/appointments/patient-appointments'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
@@ -52,7 +53,10 @@ export default function PatientPage() {
   if (patient.isError) return <FormError error={patient.error} />
 
   const data = patient.data
-  const tabs = [{ id: 'resumen', label: 'Resumen' }]
+  const tabs = [
+    { id: 'resumen', label: 'Resumen' },
+    ...(can(user, 'appointments:read') ? [{ id: 'turnos', label: 'Turnos' }] : []),
+  ]
 
   return (
     <>
@@ -91,6 +95,13 @@ export default function PatientPage() {
       </header>
 
       <Tabs items={tabs} active={tab} onChange={setTab} label="Secciones de la ficha del paciente">
+        {tab === 'turnos' && (
+          <PatientAppointments
+            patient={{ id: data.id, fullName: fullName(data), archived: data.archivedAt !== null }}
+            user={user}
+          />
+        )}
+        {tab === 'resumen' && (
         <section aria-label="Datos administrativos" className="rounded-lg border bg-card p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold">Datos administrativos</h2>
           <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
@@ -103,6 +114,7 @@ export default function PatientPage() {
             <Item label="Alta en el sistema" value={formatDate(data.createdAt)} />
           </dl>
         </section>
+        )}
       </Tabs>
 
       <PatientFormDialog
