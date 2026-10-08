@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { PatientAppointments } from '@/components/appointments/patient-appointments'
+import { AccountTab } from '@/components/billing/account-tab'
+import { ServicesTab } from '@/components/billing/services-tab'
 import { ClinicalHistory } from '@/components/clinical/clinical-history'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
@@ -58,6 +60,8 @@ export default function PatientPage() {
     { id: 'resumen', label: 'Resumen' },
     ...(can(user, 'appointments:read') ? [{ id: 'turnos', label: 'Turnos' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'historia', label: 'Historia clínica' }] : []),
+    ...(can(user, 'services:read') ? [{ id: 'prestaciones', label: 'Prestaciones' }] : []),
+    ...(can(user, 'account:read') ? [{ id: 'cuenta', label: 'Cuenta' }] : []),
   ]
 
   return (
@@ -108,6 +112,21 @@ export default function PatientPage() {
             patientId={data.id}
             canWrite={can(user, 'clinical:write')}
             archived={data.archivedAt !== null}
+          />
+        )}
+        {tab === 'prestaciones' && (
+          <ServicesTab
+            patientId={data.id}
+            canRecord={can(user, 'services:write')}
+            canVoid={can(user, 'services:void')}
+            archived={data.archivedAt !== null}
+          />
+        )}
+        {tab === 'cuenta' && (
+          <AccountTab
+            patientId={data.id}
+            canCollect={can(user, 'payments:create')}
+            canVoid={can(user, 'payments:void')}
           />
         )}
         {tab === 'resumen' && (

@@ -120,6 +120,12 @@ components:
               - appointments:attend
               - clinical:read
               - clinical:write
+              - services:read
+              - services:write
+              - services:void
+              - account:read
+              - payments:create
+              - payments:void
         branchIds:
           type: array
           items:
@@ -631,6 +637,225 @@ components:
             - string
             - "null"
           maxLength: 200
+    PerformedService:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        practice:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            code:
+              type: string
+            name:
+              type: string
+          required:
+            - id
+            - code
+            - name
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        price:
+          type: string
+          example: "25000.00"
+        paid:
+          type: string
+          example: "10000.00"
+          description: Importe cubierto por pagos vigentes
+        pending:
+          type: string
+          example: "15000.00"
+        performedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - VOIDED
+        voidReason:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - practice
+        - professional
+        - appointmentId
+        - price
+        - paid
+        - pending
+        - performedAt
+        - status
+        - voidReason
+    CreateServiceInput:
+      type: object
+      properties:
+        practiceId:
+          type: string
+          format: uuid
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        performedAt:
+          type: string
+          format: date-time
+      required:
+        - practiceId
+    VoidInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 300
+      required:
+        - reason
+    Account:
+      type: object
+      properties:
+        balance:
+          type: string
+          example: "15000.00"
+          description: Prestaciones vigentes menos pagos vigentes. Negativo si el paciente
+            tiene saldo a favor
+        totalServices:
+          type: string
+        totalPayments:
+          type: string
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformedService"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+      required:
+        - balance
+        - totalServices
+        - totalPayments
+        - services
+        - payments
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          example: "10000.00"
+        method:
+          $ref: "#/components/schemas/PaymentMethod"
+        externalReference:
+          type:
+            - string
+            - "null"
+        receivedAt:
+          type: string
+          format: date-time
+        allocated:
+          type: string
+        unallocated:
+          type: string
+          description: "Parte del pago que no cubre ninguna prestación: saldo a favor"
+        createdBy:
+          type: string
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - VOIDED
+        voidReason:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - amount
+        - method
+        - externalReference
+        - receivedAt
+        - allocated
+        - unallocated
+        - createdBy
+        - status
+        - voidReason
+    PaymentMethod:
+      type: string
+      enum:
+        - CASH
+        - TRANSFER
+        - CARD
+        - MERCADOPAGO
+        - OTHER
+    CreatePaymentInput:
+      type: object
+      properties:
+        amount:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+        method:
+          type: string
+          enum:
+            - CASH
+            - TRANSFER
+            - CARD
+            - MERCADOPAGO
+            - OTHER
+        externalReference:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+        receivedAt:
+          type: string
+          format: date-time
+        serviceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 100
+      required:
+        - amount
+        - method
+    Debtor:
+      type: object
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        balance:
+          type: string
+      required:
+        - patientId
+        - fullName
+        - balance
     ClinicalEntry:
       type: object
       properties:
@@ -1981,9 +2206,353 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/patients/{patientId}/clinical:
+  /api/patients/{patientId}/services:
     get:
       tags: &a7
+        - Prestaciones y cobros
+      summary: Prestaciones realizadas al paciente
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Prestaciones, de la más reciente a la más antigua
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformedService"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a7
+      summary: Registra una prestación realizada
+      description: Solo la registra un odontólogo, a su nombre. El precio se toma del
+        catálogo en ese momento y queda fijo en la prestación.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceInput"
+      responses:
+        "201":
+          description: Prestación registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformedService"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado, sin perfil profesional, práctica o turno
+            inválidos, o fecha futura
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/services/{serviceId}/void:
+    post:
+      tags: *a7
+      summary: Anula una prestación
+      description: Solo administración. La prestación se conserva marcada como
+        anulada, con el motivo.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: serviceId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidInput"
+      responses:
+        "200":
+          description: Prestación anulada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformedService"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La prestación ya estaba anulada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/account:
+    get:
+      tags: *a7
+      summary: Cuenta corriente del paciente
+      description: El saldo se calcula siempre como prestaciones vigentes menos pagos
+        vigentes; no se guarda. Un saldo negativo es saldo a favor.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Cuenta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/payments:
+    post:
+      tags: *a7
+      summary: Registra un pago
+      description: Se aplica a las prestaciones indicadas, o a las pendientes más
+        antiguas primero si no se indican. Admite pagos parciales; lo que excede
+        lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago
+        con referencia opcional.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentInput"
+      responses:
+        "201":
+          description: Pago registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Fecha futura o prestaciones elegidas inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/payments/{paymentId}/void:
+    post:
+      tags: *a7
+      summary: Anula un pago
+      description: Solo administración. El pago se conserva marcado como anulado, con
+        el motivo, y deja de contar en el saldo.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: paymentId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidInput"
+      responses:
+        "200":
+          description: Pago anulado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El pago ya estaba anulado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/debtors:
+    get:
+      tags: *a7
+      summary: Pacientes con saldo pendiente
+      description: Los 20 mayores saldos a cobrar.
+      security: *a2
+      responses:
+        "200":
+          description: Pacientes con saldo a cobrar
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Debtor"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/clinical:
+    get:
+      tags: &a8
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -2024,7 +2593,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a7
+      tags: *a8
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige con una adenda."
@@ -2081,7 +2650,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a7
+      tags: *a8
       summary: Corrige una nota con una adenda
       description: La nota original se conserva intacta; la adenda queda vinculada a ella.
       security: *a1
@@ -2143,7 +2712,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a8
+      tags: &a9
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -2185,7 +2754,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a8
+      tags: *a9
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -2227,7 +2796,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a8
+      tags: *a9
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -2283,7 +2852,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a9
+      tags: &a10
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -2354,7 +2923,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a9
+      tags: *a10
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -2411,7 +2980,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a9
+      tags: *a10
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -2447,7 +3016,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a9
+      tags: *a10
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -2509,7 +3078,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a9
+      tags: *a10
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno, una vez

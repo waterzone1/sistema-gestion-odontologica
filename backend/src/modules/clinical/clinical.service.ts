@@ -48,24 +48,22 @@ async function writableProfile(db: Pick<Db, 'patient' | 'professionalProfile'>, 
 }
 
 export async function listEntries(db: Db, actor: AuthContext, patientId: string): Promise<ClinicalEntryDto[]> {
-  await findPatientOrFail(db, actor, patientId)
-  const [entries] = await db.$transaction([
-    db.clinicalEntry.findMany({
+  return db.$transaction(async (tx) => {
+    await findPatientOrFail(tx, actor, patientId)
+    await recordAudit(tx, {
+      action: 'CLINICAL_HISTORY_VIEWED',
+      entityType: 'Patient',
+      entityId: patientId,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+    })
+    const entries = await tx.clinicalEntry.findMany({
       where: { patientId },
       include,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    }),
-    db.auditLog.create({
-      data: {
-        action: 'CLINICAL_HISTORY_VIEWED',
-        entityType: 'Patient',
-        entityId: patientId,
-        organizationId: actor.organizationId,
-        actorUserId: actor.userId,
-      },
-    }),
-  ])
-  return entries.map(toDto)
+    })
+    return entries.map(toDto)
+  })
 }
 
 export async function createEntry(

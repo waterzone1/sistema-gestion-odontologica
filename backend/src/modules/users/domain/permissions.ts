@@ -15,6 +15,12 @@ export const PERMISSIONS = [
   'appointments:attend',
   'clinical:read',
   'clinical:write',
+  'services:read',
+  'services:write',
+  'services:void',
+  'account:read',
+  'payments:create',
+  'payments:void',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -33,6 +39,11 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'appointments:read',
     'appointments:manage',
     'appointments:attend',
+    'services:read',
+    'services:void',
+    'account:read',
+    'payments:create',
+    'payments:void',
   ],
   DENTIST: [
     'professionals:read',
@@ -42,6 +53,8 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'appointments:attend',
     'clinical:read',
     'clinical:write',
+    'services:read',
+    'services:write',
   ],
   RECEPTIONIST: [
     'professionals:read',
@@ -51,6 +64,9 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'appointments:read',
     'appointments:manage',
     'appointments:attend',
+    'services:read',
+    'account:read',
+    'payments:create',
   ],
 }
 
