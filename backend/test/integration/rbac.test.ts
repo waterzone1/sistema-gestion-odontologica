@@ -46,6 +46,7 @@ interface Endpoint {
 
 const SOLO_ADMIN: ActorName[] = ['admin', 'admin+odontologo']
 const TODOS: ActorName[] = ['admin', 'odontologo', 'recepcion', 'admin+odontologo']
+const ADMIN_Y_RECEPCION: ActorName[] = ['admin', 'recepcion', 'admin+odontologo']
 
 const ENDPOINTS: Endpoint[] = [
   { method: 'get', path: '/api/users', allowed: SOLO_ADMIN },
@@ -61,6 +62,12 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'patch', path: `/api/branches/${FANTASMA}`, body: { name: 'Otra' }, allowed: SOLO_ADMIN },
   { method: 'get', path: '/api/professionals', allowed: TODOS },
   { method: 'put', path: `/api/professionals/${FANTASMA}`, body: {}, allowed: SOLO_ADMIN },
+  { method: 'get', path: '/api/patients', allowed: TODOS },
+  { method: 'post', path: '/api/patients', body: {}, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: `/api/patients/${FANTASMA}`, allowed: TODOS },
+  { method: 'patch', path: `/api/patients/${FANTASMA}`, body: { firstName: 'X' }, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/archive`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/unarchive`, allowed: ADMIN_Y_RECEPCION },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 

@@ -14,6 +14,7 @@ tags:
   - name: Usuarios
   - name: Sedes
   - name: Profesionales
+  - name: Pacientes
 components:
   securitySchemes:
     cookieAuth:
@@ -108,6 +109,8 @@ components:
               - branches:manage
               - professionals:manage
               - professionals:read
+              - patients:read
+              - patients:write
         branchIds:
           type: array
           items:
@@ -442,6 +445,179 @@ components:
           type: boolean
       required:
         - licenseNumber
+    PatientList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Patient"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required:
+        - items
+        - total
+        - page
+        - pageSize
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        documentType:
+          $ref: "#/components/schemas/DocumentType"
+        documentNumber:
+          type:
+            - string
+            - "null"
+        birthDate:
+          type:
+            - string
+            - "null"
+          format: date
+        phone:
+          type:
+            - string
+            - "null"
+        email:
+          type:
+            - string
+            - "null"
+        address:
+          type:
+            - string
+            - "null"
+        emergencyContact:
+          type:
+            - string
+            - "null"
+        archivedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firstName
+        - lastName
+        - documentType
+        - documentNumber
+        - birthDate
+        - phone
+        - email
+        - address
+        - emergencyContact
+        - archivedAt
+        - createdAt
+    DocumentType:
+      type: string
+      enum:
+        - DNI
+        - LE
+        - LC
+        - PASAPORTE
+        - OTRO
+    CreatePatientInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        documentType:
+          $ref: "#/components/schemas/DocumentType"
+        documentNumber:
+          type:
+            - string
+            - "null"
+          maxLength: 24
+        birthDate:
+          type:
+            - string
+            - "null"
+          format: date
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 40
+        email:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+        address:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        emergencyContact:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+      required:
+        - firstName
+        - lastName
+    UpdatePatientInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        documentType:
+          $ref: "#/components/schemas/DocumentType"
+        documentNumber:
+          type:
+            - string
+            - "null"
+          maxLength: 24
+        birthDate:
+          type:
+            - string
+            - "null"
+          format: date
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 40
+        email:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+        address:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        emergencyContact:
+          type:
+            - string
+            - "null"
+          maxLength: 200
   parameters: {}
 paths:
   /api/health:
@@ -1199,6 +1375,288 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "422":
           description: El usuario no tiene rol Odontólogo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients:
+    get:
+      tags: &a6
+        - Pacientes
+      summary: Busca y lista pacientes
+      description: La búsqueda q ignora tildes y mayúsculas y acepta varias palabras
+        (apellido, nombre, documento o teléfono). Excluye archivados salvo que
+        se pida otro estado.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            maxLength: 80
+          required: false
+          name: q
+          in: query
+        - schema:
+            type: string
+            enum:
+              - active
+              - archived
+              - all
+            default: active
+          required: false
+          name: status
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            default: 1
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          required: false
+          name: pageSize
+          in: query
+      responses:
+        "200":
+          description: Pacientes de la página pedida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientList"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a6
+      summary: Da de alta un paciente
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientInput"
+      responses:
+        "201":
+          description: Paciente creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe un paciente con ese documento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El documento no tiene un formato válido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{id}:
+    get:
+      tags: *a6
+      summary: Datos administrativos de un paciente
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Paciente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: *a6
+      summary: Edita los datos administrativos de un paciente
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatientInput"
+      responses:
+        "200":
+          description: Paciente actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe otro paciente con ese documento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El documento no tiene un formato válido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{id}/archive:
+    post:
+      tags: *a6
+      summary: Archiva un paciente (no se borra)
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Paciente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{id}/unarchive:
+    post:
+      tags: *a6
+      summary: Reactiva un paciente archivado
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Paciente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
           content:
             application/json:
               schema:

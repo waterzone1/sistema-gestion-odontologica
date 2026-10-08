@@ -85,6 +85,22 @@ describe('aislamiento por organizacion', () => {
     expect(codigo(res)).toBe('INVALID_BRANCH')
   })
 
+  it('no ve ni modifica pacientes de otra organizacion', async () => {
+    const ajeno = await db.patient.create({
+      data: {
+        organizationId: (await db.branch.findUniqueOrThrow({ where: { id: sedeAjenaId } })).organizationId,
+        firstName: 'Ajena',
+        lastName: 'Paciente',
+        searchText: 'paciente ajena',
+      },
+    })
+    const lista = await as(app, admin).get('/api/patients?q=ajena&status=all')
+    expect((lista.body as { items: unknown[] }).items).toHaveLength(0)
+    expect((await as(app, admin).get(`/api/patients/${ajeno.id}`)).status).toBe(404)
+    expect((await as(app, admin).patch(`/api/patients/${ajeno.id}`, { firstName: 'Hackeada' })).status).toBe(404)
+    expect((await as(app, admin).post(`/api/patients/${ajeno.id}/archive`)).status).toBe(404)
+  })
+
   it('no le da perfil profesional a un usuario ajeno', async () => {
     const res = await as(app, admin).put(`/api/professionals/${ajenoId}`, { licenseNumber: 'MP-1' })
     expect(res.status).toBe(404)

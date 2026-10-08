@@ -13,6 +13,7 @@ import { sessionMiddleware } from './middleware/session.js'
 import { authRouter } from './modules/auth/auth.routes.js'
 import { branchesRouter } from './modules/branches/branches.routes.js'
 import { healthRouter } from './modules/health/health.routes.js'
+import { patientsRouter } from './modules/patients/patients.routes.js'
 import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
 import { professionalsRouter } from './modules/professionals/professionals.routes.js'
@@ -67,6 +68,7 @@ export function createApp({
   app.use('/api/users', usersRouter(db))
   app.use('/api/branches', branchesRouter(db))
   app.use('/api/professionals', professionalsRouter(db))
+  app.use('/api/patients', patientsRouter(db))
 
   app.use(notFound)
   app.use(errorHandler)

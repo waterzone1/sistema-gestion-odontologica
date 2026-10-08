@@ -7,6 +7,7 @@ import type { Role } from '../src/modules/users/domain/permissions.js'
 import { createDb, type Db } from '../src/shared/db.js'
 import { hashPassword } from '../src/shared/password.js'
 import { createLogger } from '../src/shared/logger.js'
+import { buildSearchText } from '../src/modules/patients/domain/search.js'
 
 export const ORIGIN = 'https://test.local'
 export const PASSWORD = 'Clave-de-prueba-1'
@@ -92,6 +93,36 @@ export async function seedUser(db: Db, seed: Seed, user: SeedUser) {
       mustChangePassword: user.mustChangePassword ?? false,
       roles: { create: user.roles.map((role) => ({ role })) },
       branches: { create: branchIds.map((branchId) => ({ branchId })) },
+    },
+  })
+}
+
+interface SeedPatient {
+  firstName?: string
+  lastName?: string
+  documentNumber?: string | null
+  phone?: string | null
+  archived?: boolean
+}
+
+let patientCounter = 0
+
+export async function seedPatient(db: Db, seed: Seed, data: SeedPatient = {}) {
+  patientCounter += 1
+  const firstName = data.firstName ?? 'Paciente'
+  const lastName = data.lastName ?? `Numero${patientCounter}`
+  const documentNumber =
+    data.documentNumber === undefined ? String(20000000 + patientCounter) : data.documentNumber
+  const phone = data.phone === undefined ? null : data.phone
+  return db.patient.create({
+    data: {
+      organizationId: seed.organizationId,
+      firstName,
+      lastName,
+      documentNumber,
+      phone,
+      searchText: buildSearchText({ firstName, lastName, documentNumber, phone }),
+      archivedAt: data.archived ? new Date() : null,
     },
   })
 }
