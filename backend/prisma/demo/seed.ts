@@ -87,6 +87,17 @@ async function main() {
         db.professionalProfile.create({ data: { userId: user.id, licenseNumber: `MP-DEMO-${index + 1}` } }),
       ),
     )
+    await db.availabilityRule.createMany({
+      data: profiles.flatMap((profile) =>
+        [1, 2, 3, 4, 5].map((weekday) => ({
+          professionalId: profile.id,
+          branchId: branch.id,
+          weekday,
+          startMinute: FIRST_HOUR * 60,
+          endMinute: FIRST_HOUR * 60 + SLOTS_PER_DAY * 30,
+        })),
+      ),
+    })
 
     const practices = await Promise.all(
       PRACTICES.map((practice) =>

@@ -1,6 +1,6 @@
 # Modelo de datos (ERD)
 
-Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment` y `PaymentAllocation`.
+Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException` y `ProfessionalPractice`.
 
 ```mermaid
 erDiagram
@@ -18,6 +18,9 @@ erDiagram
   ProfessionalProfile ||--o{ AvailabilityRule : "define"
   Branch ||--o{ AvailabilityRule : "en"
   ProfessionalProfile ||--o{ AvailabilityException : "tiene"
+  ProfessionalProfile ||--o{ ProfessionalPractice : "realiza"
+  Practice ||--o{ ProfessionalPractice : "es realizada por"
+  CreditApplication ||--o{ PaymentAllocation : "agrupa"
 
   Patient ||--o{ PatientClinicalProfile : "versiones"
   Patient ||--o{ PatientCoverage : "tiene"
@@ -100,7 +103,11 @@ erDiagram
   ProfessionalProfile { uuid id PK
     uuid userId FK,UK
     string licenseNumber
+    string phone "nullable"
+    string email "nullable"
     bool active }
+  ProfessionalPractice { uuid professionalId PK,FK
+    uuid practiceId PK,FK }
   AvailabilityRule { uuid id PK
     uuid professionalId FK
     uuid branchId FK
@@ -112,7 +119,9 @@ erDiagram
     uuid branchId FK "nullable"
     enum type "BLOCK VACATION ABSENCE EXTRA"
     timestamptz startsAt
-    timestamptz endsAt }
+    timestamptz endsAt
+    string reason
+    timestamptz revokedAt "nullable" }
   Patient { uuid id PK
     uuid organizationId FK
     string firstName
@@ -234,7 +243,12 @@ erDiagram
   PaymentAllocation { uuid id PK
     uuid paymentId FK
     uuid performedServiceId FK
+    uuid creditApplicationId FK "nullable"
     decimal amount }
+  CreditApplication { uuid id PK
+    uuid patientId FK
+    decimal amount
+    timestamptz voidedAt "nullable" }
   Liquidation { uuid id PK
     uuid providerId FK
     date periodFrom

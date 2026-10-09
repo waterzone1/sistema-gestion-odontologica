@@ -1,22 +1,11 @@
 import { z } from 'zod'
+import { emailSchema, optionalText, phoneSchema } from '../../shared/schemas.js'
 import { normalizeDocumentNumber } from './domain/document.js'
 
 const documentTypeSchema = z.enum(['DNI', 'LE', 'LC', 'PASAPORTE', 'OTRO']).meta({ id: 'DocumentType' })
 
 const nameSchema = (label: string) => z.string().trim().min(1, `Ingresá ${label}`).max(80)
 
-const optionalText = (max: number, valid?: (value: string) => boolean, message = 'Valor inválido') =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .refine((value) => value === '' || !valid || valid(value), { message })
-    .transform((value) => (value === '' ? null : value))
-    .nullable()
-    .optional()
-
-const phoneSchema = optionalText(40, (value) => /^[\d\s+()-]{6,40}$/.test(value), 'Teléfono inválido')
-const emailSchema = optionalText(120, (value) => z.email().safeParse(value).success, 'Email inválido')
 
 const documentNumberSchema = z
   .string()
