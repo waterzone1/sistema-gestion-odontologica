@@ -23,6 +23,10 @@ describe('navegacion segun permisos', () => {
     expect(enlaces(['professionals:read'])).toEqual(['/dashboard'])
   })
 
+  it('quien gestiona la disponibilidad ve profesionales', () => {
+    expect(enlaces(['availability:manage', 'appointments:read'])).toEqual(['/dashboard', '/agenda', '/professionals'])
+  })
+
   it('no muestra opciones sueltas: cada item exige su propio permiso', () => {
     expect(enlaces(['users:manage'])).toEqual(['/dashboard', '/admin/users'])
   })

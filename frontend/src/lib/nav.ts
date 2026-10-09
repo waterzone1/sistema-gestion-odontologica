@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
+  Stethoscope,
   UserRound,
   Users,
   type LucideIcon,
@@ -28,6 +29,7 @@ const NAV: NavGroup[] = [
       { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
       { href: '/agenda', label: 'Agenda', icon: CalendarDays, permission: 'appointments:read' },
       { href: '/patients', label: 'Pacientes', icon: UserRound, permission: 'patients:read' },
+      { href: '/professionals', label: 'Profesionales', icon: Stethoscope, permission: 'availability:manage' },
     ],
   },
   {
