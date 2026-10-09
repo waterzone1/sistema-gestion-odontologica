@@ -2,8 +2,9 @@ import { Router, type Request, type Response } from 'express'
 import { authOf, requirePermission } from '../../middleware/access.js'
 import type { Db } from '../../shared/db.js'
 import {
+  adjustPriceSchema,
   billingPatientParamsSchema,
-  createPaymentSchema,
+  createChargeSchema,
   createServiceSchema,
   paymentParamsSchema,
   serviceParamsSchema,
@@ -25,6 +26,12 @@ export function patientBillingRouter(db: Db): Router {
     res.status(201).json(await billing.createService(db, authOf(req), patientId, input))
   })
 
+  router.post('/services/:serviceId/price', requirePermission('services:price'), async (req: Request, res: Response) => {
+    const { patientId, serviceId } = serviceParamsSchema.parse(req.params)
+    const { price } = adjustPriceSchema.parse(req.body)
+    res.json(await billing.adjustServicePrice(db, authOf(req), patientId, serviceId, price))
+  })
+
   router.post('/services/:serviceId/void', requirePermission('services:void'), async (req: Request, res: Response) => {
     const { patientId, serviceId } = serviceParamsSchema.parse(req.params)
     const { reason } = voidSchema.parse(req.body)
@@ -38,8 +45,8 @@ export function patientBillingRouter(db: Db): Router {
 
   router.post('/payments', requirePermission('payments:create'), async (req: Request, res: Response) => {
     const { patientId } = billingPatientParamsSchema.parse(req.params)
-    const input = createPaymentSchema.parse(req.body)
-    res.status(201).json(await billing.createPayment(db, authOf(req), patientId, input))
+    const input = createChargeSchema.parse(req.body)
+    res.status(201).json(await billing.createCharge(db, authOf(req), patientId, input))
   })
 
   router.post('/payments/:paymentId/void', requirePermission('payments:void'), async (req: Request, res: Response) => {

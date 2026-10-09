@@ -9,9 +9,10 @@ import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
-import { Input, Select } from '@/components/ui/input'
+import { Input, MaskedInput, Select } from '@/components/ui/input'
 import { patientsKey } from '@/hooks/use-patients'
 import { api, ApiError, type Patient } from '@/lib/api'
+import { formatDate, maskDate, parseDateText } from '@/lib/format'
 
 const DOCUMENT_TYPES = [
   { value: 'DNI', label: 'DNI' },
@@ -26,14 +27,16 @@ const schema = z.object({
   lastName: z.string().trim().min(1, 'Ingresá el apellido'),
   documentType: z.enum(['DNI', 'LE', 'LC', 'PASAPORTE', 'OTRO']),
   documentNumber: z.string().trim(),
-  birthDate: z.string().trim(),
+  birthDate: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || parseDateText(value) !== null, 'Usá el formato dd/mm/aaaa con una fecha válida'),
   phone: z.string().trim(),
   email: z
     .string()
     .trim()
     .refine((value) => value === '' || z.email().safeParse(value).success, 'Email inválido'),
   address: z.string().trim(),
-  emergencyContact: z.string().trim(),
 })
 type Values = z.infer<typeof schema>
 
@@ -83,11 +86,10 @@ function PatientForm({
       lastName: patient?.lastName ?? '',
       documentType: patient?.documentType ?? 'DNI',
       documentNumber: patient?.documentNumber ?? '',
-      birthDate: patient?.birthDate ?? '',
+      birthDate: patient?.birthDate ? formatDate(patient.birthDate) : '',
       phone: patient?.phone ?? '',
       email: patient?.email ?? '',
       address: patient?.address ?? '',
-      emergencyContact: patient?.emergencyContact ?? '',
     },
   })
 
@@ -96,11 +98,10 @@ function PatientForm({
       const body = {
         ...values,
         documentNumber: emptyToNull(values.documentNumber),
-        birthDate: emptyToNull(values.birthDate),
+        birthDate: values.birthDate ? parseDateText(values.birthDate) : null,
         phone: emptyToNull(values.phone),
         email: emptyToNull(values.email),
         address: emptyToNull(values.address),
-        emergencyContact: emptyToNull(values.emergencyContact),
       }
       return patient
         ? api.patch<Patient>(`/api/patients/${patient.id}`, body)
@@ -147,11 +148,17 @@ function PatientForm({
               ))}
             </Select>
           </Field>
-          <Field label="Número de documento" htmlFor="documentNumber" hint="Opcional. Puede escribirse con puntos.">
+          <Field label="Número de documento" htmlFor="documentNumber">
             <Input id="documentNumber" inputMode="text" {...register('documentNumber')} />
           </Field>
-          <Field label="Fecha de nacimiento" htmlFor="birthDate">
-            <Input id="birthDate" type="date" {...register('birthDate')} />
+          <Field label="Fecha de nacimiento" htmlFor="birthDate" error={errors.birthDate?.message}>
+            <MaskedInput
+              id="birthDate"
+              placeholder="dd/mm/aaaa"
+              mask={maskDate}
+              {...register('birthDate')}
+              aria-invalid={!!errors.birthDate}
+            />
           </Field>
         </div>
       </fieldset>
@@ -167,9 +174,6 @@ function PatientForm({
           </Field>
           <Field label="Dirección" htmlFor="address">
             <Input id="address" {...register('address')} />
-          </Field>
-          <Field label="Contacto de emergencia" htmlFor="emergencyContact" hint="Nombre y teléfono">
-            <Input id="emergencyContact" {...register('emergencyContact')} />
           </Field>
         </div>
       </fieldset>

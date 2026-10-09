@@ -91,14 +91,14 @@ export function registerAppointmentsDocs(registry: OpenAPIRegistry): void {
     tags,
     summary: 'Cambia el estado del turno',
     description:
-      'Confirmar y cancelar requieren gestionar la agenda; marcar atendido o ausente también lo puede hacer el odontólogo dueño del turno, una vez llegada la hora. Cancelar exige un motivo y el turno se conserva.',
+      'Confirmar y cancelar requieren gestionar la agenda; marcar atendido o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar exige un motivo y el turno se conserva.',
     security: writeSecurity,
     request: { ...params, ...bodyOf(changeStatusSchema) },
     responses: {
       200: json(appointmentSchema, 'Turno actualizado'),
       400: invalidInput,
       404: notFound,
-      409: errorResponse('Transición no permitida, o todavía no es la hora del turno'),
+      409: errorResponse('Transición no permitida'),
       ...common,
     },
   })

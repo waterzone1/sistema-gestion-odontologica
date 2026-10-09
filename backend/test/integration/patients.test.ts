@@ -4,9 +4,12 @@ import {
   as,
   buildApp,
   loginAs,
+  minutesFromNow,
   resetDb,
+  seedAppointment,
   seedInstall,
   seedPatient,
+  seedProfessional,
   seedUser,
   testDb,
   type Client,
@@ -252,6 +255,42 @@ describe('edicion y archivo', () => {
     const reactivado = await as(app, recepcion).post(`/api/patients/${paciente.id}/unarchive`)
     expect((reactivado.body as { archivedAt: string | null }).archivedAt).toBeNull()
     expect(ids(await as(app, recepcion).get('/api/patients'))).toContain(paciente.id)
+  })
+
+  it('archivar con turnos por venir pide confirmacion y luego los cancela sin borrarlos', async () => {
+    const paciente = await seedPatient(db, seed)
+    const { profile } = await seedProfessional(db, seed, { username: 'dra', displayName: 'Dra. Paz' })
+    const turno = (desde: number, status: 'SCHEDULED' | 'CONFIRMED' | 'ATTENDED' = 'SCHEDULED') =>
+      seedAppointment(db, seed, {
+        patientId: paciente.id,
+        professionalId: profile.id,
+        createdById: recepcion.userId,
+        startsAt: minutesFromNow(desde),
+        endsAt: minutesFromNow(desde + 30),
+        status,
+      })
+    const futuro = await turno(120)
+    const confirmado = await turno(300, 'CONFIRMED')
+    const pasado = await turno(-600, 'ATTENDED')
+
+    const sinConfirmar = await as(app, recepcion).post(`/api/patients/${paciente.id}/archive`)
+    expect(sinConfirmar.status).toBe(409)
+    expect(codigo(sinConfirmar)).toBe('ACTIVE_APPOINTMENTS')
+    const detalle = (sinConfirmar.body as { error: { details: { appointments: { id: string; professional: string }[] } } })
+      .error.details.appointments
+    expect(detalle.map((a) => a.id)).toEqual([futuro.id, confirmado.id])
+    expect(detalle[0]?.professional).toBe('Dra. Paz')
+    expect((await db.patient.findUniqueOrThrow({ where: { id: paciente.id } })).archivedAt).toBeNull()
+
+    const ok = await as(app, recepcion).post(`/api/patients/${paciente.id}/archive`, { cancelActiveAppointments: true })
+    expect(ok.status).toBe(200)
+    const turnos = await db.appointment.findMany({ where: { patientId: paciente.id }, orderBy: { startsAt: 'asc' } })
+    expect(turnos.map((t) => [t.id, t.status, t.cancellationReason])).toEqual([
+      [pasado.id, 'ATTENDED', null],
+      [futuro.id, 'CANCELLED', 'Paciente archivado'],
+      [confirmado.id, 'CANCELLED', 'Paciente archivado'],
+    ])
+    expect(await db.auditLog.count({ where: { action: 'APPOINTMENT_STATUS_CHANGED' } })).toBe(2)
   })
 
   it('un paciente inexistente o con id mal formado da 404 y 400', async () => {

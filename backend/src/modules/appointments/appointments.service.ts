@@ -8,7 +8,6 @@ import { hasPermission } from '../users/domain/permissions.js'
 import {
   canTransition,
   isEditable,
-  requiresStarted,
   type AppointmentStatus,
 } from './domain/status.js'
 import { rangeProblem } from './domain/timeRange.js'
@@ -311,9 +310,6 @@ export async function changeAppointmentStatus(
     const from: AppointmentStatus = current.status
     if (!canTransition(from, input.status)) {
       throw new AppError(409, 'INVALID_TRANSITION', 'El turno no puede pasar a ese estado desde el actual')
-    }
-    if (requiresStarted(input.status) && current.startsAt > new Date()) {
-      throw new AppError(409, 'TOO_EARLY', 'Todavía no es la hora del turno')
     }
 
     const updated = await tx.appointment.update({

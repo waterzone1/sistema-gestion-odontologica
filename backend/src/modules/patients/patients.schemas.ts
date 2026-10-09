@@ -43,7 +43,6 @@ const patientFields = {
   phone: phoneSchema,
   email: emailSchema,
   address: optionalText(200),
-  emergencyContact: optionalText(200),
 }
 
 export const createPatientSchema = z
@@ -57,6 +56,10 @@ export const updatePatientSchema = z
   .meta({ id: 'UpdatePatientInput' })
 
 export const patientIdParamsSchema = z.object({ id: z.uuid() })
+
+export const archivePatientSchema = z
+  .object({ cancelActiveAppointments: z.boolean().default(false) })
+  .meta({ id: 'ArchivePatientInput' })
 
 export const listPatientsQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
@@ -76,7 +79,6 @@ export const patientSchema = z
     phone: z.string().nullable(),
     email: z.string().nullable(),
     address: z.string().nullable(),
-    emergencyContact: z.string().nullable(),
     archivedAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
   })

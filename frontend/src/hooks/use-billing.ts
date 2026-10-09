@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type Account, type Debtor, type Payment, type PaymentMethod, type PerformedService } from '@/lib/api'
+import { api, type Account, type Debtor, type PaymentMethod, type PerformedService } from '@/lib/api'
 
 const billingKey = (patientId: string) => ['billing', patientId] as const
 const debtorsKey = ['debtors'] as const
@@ -41,23 +41,32 @@ function useBillingMutation<T, V>(patientId: string, run: (variables: V) => Prom
   })
 }
 
+export interface ServiceInput {
+  practiceId: string
+  professionalId?: string
+  price?: string
+}
+
 export function useRecordService(patientId: string) {
-  return useBillingMutation(patientId, (practiceId: string) =>
-    api.post<PerformedService>(`/api/patients/${patientId}/services`, { practiceId }),
+  return useBillingMutation(patientId, (input: ServiceInput) =>
+    api.post<PerformedService>(`/api/patients/${patientId}/services`, input),
   )
 }
 
-export interface PaymentInput {
-  amount: string
-  method: PaymentMethod
-  externalReference?: string
+export function useAdjustPrice(patientId: string) {
+  return useBillingMutation(patientId, ({ id, price }: { id: string; price: string }) =>
+    api.post<PerformedService>(`/api/patients/${patientId}/services/${id}/price`, { price }),
+  )
+}
+
+export interface ChargeInput {
+  lines: { amount: string; method: PaymentMethod; externalReference?: string }[]
+  credit?: string
   serviceIds?: string[]
 }
 
-export function useRecordPayment(patientId: string) {
-  return useBillingMutation(patientId, (input: PaymentInput) =>
-    api.post<Payment>(`/api/patients/${patientId}/payments`, input),
-  )
+export function useRecordCharge(patientId: string) {
+  return useBillingMutation(patientId, (input: ChargeInput) => api.post(`/api/patients/${patientId}/payments`, input))
 }
 
 export function useVoid(patientId: string, kind: 'services' | 'payments') {

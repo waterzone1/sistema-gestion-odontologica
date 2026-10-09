@@ -26,7 +26,6 @@ function toPatientDto(patient: PatientRecord): PatientDto {
     phone: patient.phone,
     email: patient.email,
     address: patient.address,
-    emergencyContact: patient.emergencyContact,
     archivedAt: patient.archivedAt ? patient.archivedAt.toISOString() : null,
     createdAt: patient.createdAt.toISOString(),
   }
@@ -113,7 +112,6 @@ export async function createPatient(
           phone,
           email: input.email ?? null,
           address: input.address ?? null,
-          emergencyContact: input.emergencyContact ?? null,
           searchText: buildSearchText({
             firstName: input.firstName,
             lastName: input.lastName,
@@ -170,9 +168,6 @@ export async function updatePatient(
           ...(input.birthDate !== undefined ? { birthDate: toDate(input.birthDate) } : {}),
           ...(input.email !== undefined ? { email: input.email } : {}),
           ...(input.address !== undefined ? { address: input.address } : {}),
-          ...(input.emergencyContact !== undefined
-            ? { emergencyContact: input.emergencyContact }
-            : {}),
           searchText: buildSearchText({ firstName, lastName, documentNumber, phone }),
         },
       })
@@ -195,15 +190,55 @@ export async function updatePatient(
   }
 }
 
+const ARCHIVE_CANCELLATION_REASON = 'Paciente archivado'
+
 export async function setPatientArchived(
   db: Db,
   actor: AuthContext,
   id: string,
   archived: boolean,
+  cancelActiveAppointments = false,
 ): Promise<PatientDto> {
   return db.$transaction(async (tx) => {
     const current = await findPatientOrFail(tx, actor.organizationId, id)
     if ((current.archivedAt !== null) === archived) return toPatientDto(current)
+    if (archived) {
+      const active = await tx.appointment.findMany({
+        where: {
+          patientId: id,
+          organizationId: actor.organizationId,
+          status: { in: ['SCHEDULED', 'CONFIRMED'] },
+          endsAt: { gt: new Date() },
+        },
+        select: { id: true, startsAt: true, professional: { select: { user: { select: { displayName: true } } } } },
+        orderBy: { startsAt: 'asc' },
+      })
+      if (active.length > 0 && !cancelActiveAppointments) {
+        throw new AppError(409, 'ACTIVE_APPOINTMENTS', 'El paciente tiene turnos pendientes', {
+          appointments: active.map((a) => ({
+            id: a.id,
+            startsAt: a.startsAt.toISOString(),
+            professional: a.professional.user.displayName,
+          })),
+        })
+      }
+      if (active.length > 0) {
+        await tx.appointment.updateMany({
+          where: { id: { in: active.map((a) => a.id) } },
+          data: { status: 'CANCELLED', cancellationReason: ARCHIVE_CANCELLATION_REASON },
+        })
+        for (const appointment of active) {
+          await recordAudit(tx, {
+            action: 'APPOINTMENT_STATUS_CHANGED',
+            entityType: 'Appointment',
+            entityId: appointment.id,
+            organizationId: actor.organizationId,
+            actorUserId: actor.userId,
+            metadata: { hacia: 'CANCELLED', motivo: ARCHIVE_CANCELLATION_REASON },
+          })
+        }
+      }
+    }
     const updated = await tx.patient.update({
       where: { id },
       data: { archivedAt: archived ? new Date() : null },

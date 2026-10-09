@@ -126,6 +126,8 @@ components:
               - account:read
               - payments:create
               - payments:void
+              - services:price
+              - billing:void-any-day
         branchIds:
           type: array
           items:
@@ -515,10 +517,6 @@ components:
           type:
             - string
             - "null"
-        emergencyContact:
-          type:
-            - string
-            - "null"
         archivedAt:
           type:
             - string
@@ -537,7 +535,6 @@ components:
         - phone
         - email
         - address
-        - emergencyContact
         - archivedAt
         - createdAt
     DocumentType:
@@ -586,11 +583,6 @@ components:
             - string
             - "null"
           maxLength: 200
-        emergencyContact:
-          type:
-            - string
-            - "null"
-          maxLength: 200
       required:
         - firstName
         - lastName
@@ -632,11 +624,12 @@ components:
             - string
             - "null"
           maxLength: 200
-        emergencyContact:
-          type:
-            - string
-            - "null"
-          maxLength: 200
+    ArchivePatientInput:
+      type: object
+      properties:
+        cancelActiveAppointments:
+          type: boolean
+          default: false
     PerformedService:
       type: object
       properties:
@@ -674,15 +667,29 @@ components:
             - "null"
           format: uuid
         price:
-          type: string
+          type:
+            - string
+            - "null"
           example: "25000.00"
+          description: Precio final. Nulo para quien no puede ver importes
+        catalogPrice:
+          type:
+            - string
+            - "null"
+          example: "25000.00"
+          description: Precio del catálogo al registrarla
         paid:
-          type: string
-          example: "10000.00"
+          type:
+            - string
+            - "null"
+          example: "25000.00"
           description: Importe cubierto por pagos vigentes
         pending:
-          type: string
-          example: "15000.00"
+          type:
+            - string
+            - "null"
+          example: "25000.00"
+          description: Importe que falta pagar
         performedAt:
           type: string
           format: date-time
@@ -695,21 +702,33 @@ components:
           type:
             - string
             - "null"
+        voidable:
+          type: boolean
+          description: Si quien consulta puede anularlo ahora
+        createdAt:
+          type: string
+          format: date-time
       required:
         - id
         - practice
         - professional
         - appointmentId
         - price
+        - catalogPrice
         - paid
         - pending
         - performedAt
         - status
         - voidReason
+        - voidable
+        - createdAt
     CreateServiceInput:
       type: object
       properties:
         practiceId:
+          type: string
+          format: uuid
+        professionalId:
           type: string
           format: uuid
         appointmentId:
@@ -720,8 +739,19 @@ components:
         performedAt:
           type: string
           format: date-time
+        price:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
       required:
         - practiceId
+    AdjustPriceInput:
+      type: object
+      properties:
+        price:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+      required:
+        - price
     VoidInput:
       type: object
       properties:
@@ -743,6 +773,9 @@ components:
           type: string
         totalPayments:
           type: string
+        availableCredit:
+          type: string
+          description: Saldo a favor disponible para aplicar a prestaciones
         services:
           type: array
           items:
@@ -755,6 +788,7 @@ components:
         - balance
         - totalServices
         - totalPayments
+        - availableCredit
         - services
         - payments
     Payment:
@@ -791,6 +825,12 @@ components:
           type:
             - string
             - "null"
+        voidable:
+          type: boolean
+          description: Si quien consulta puede anularlo ahora
+        createdAt:
+          type: string
+          format: date-time
       required:
         - id
         - amount
@@ -802,6 +842,8 @@ components:
         - createdBy
         - status
         - voidReason
+        - voidable
+        - createdAt
     PaymentMethod:
       type: string
       enum:
@@ -810,25 +852,44 @@ components:
         - CARD
         - MERCADOPAGO
         - OTHER
-    CreatePaymentInput:
+    ChargeResult:
       type: object
       properties:
-        amount:
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+        creditApplied:
+          type: string
+      required:
+        - payments
+        - creditApplied
+    CreateChargeInput:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                type: string
+                pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+              method:
+                $ref: "#/components/schemas/PaymentMethod"
+              externalReference:
+                type:
+                  - string
+                  - "null"
+                maxLength: 120
+            required:
+              - amount
+              - method
+          maxItems: 10
+          default: []
+        credit:
           type: string
           pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
-        method:
-          type: string
-          enum:
-            - CASH
-            - TRANSFER
-            - CARD
-            - MERCADOPAGO
-            - OTHER
-        externalReference:
-          type:
-            - string
-            - "null"
-          maxLength: 120
         receivedAt:
           type: string
           format: date-time
@@ -839,9 +900,6 @@ components:
             format: uuid
           minItems: 1
           maxItems: 100
-      required:
-        - amount
-        - method
     Debtor:
       type: object
       properties:
@@ -2136,6 +2194,9 @@ paths:
     post:
       tags: *a6
       summary: Archiva un paciente (no se borra)
+      description: Si tiene turnos pendientes o confirmados por venir responde 409 con
+        la lista; con cancelActiveAppointments los cancela con el motivo
+        "Paciente archivado".
       security: *a1
       parameters:
         - schema:
@@ -2144,6 +2205,11 @@ paths:
           required: true
           name: id
           in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchivePatientInput"
       responses:
         "200":
           description: Paciente
@@ -2165,6 +2231,12 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
           description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El paciente tiene turnos pendientes
           content:
             application/json:
               schema:
@@ -2249,8 +2321,10 @@ paths:
     post:
       tags: *a7
       summary: Registra una prestación realizada
-      description: Solo la registra un odontólogo, a su nombre. El precio se toma del
-        catálogo en ese momento y queda fijo en la prestación.
+      description: La registra un odontólogo (siempre a su nombre), recepción o
+        administración (eligiendo el profesional). El precio es el del catálogo
+        salvo que recepción o administración indiquen otro; el odontólogo no ve
+        importes.
       security: *a1
       parameters:
         - schema:
@@ -2302,12 +2376,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/services/{serviceId}/price:
+    post:
+      tags: *a7
+      summary: Ajusta el precio de una prestación
+      description: Recepción y administración. No puede quedar por debajo de lo ya
+        pagado. Queda auditado con el precio anterior.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: serviceId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustPriceInput"
+      responses:
+        "200":
+          description: Prestación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformedService"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La prestación está anulada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El precio es menor a lo ya pagado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/void:
     post:
       tags: *a7
       summary: Anula una prestación
-      description: Solo administración. La prestación se conserva marcada como
-        anulada, con el motivo.
+      description: Recepción solo lo cargado en el día; administración siempre. La
+        prestación se conserva marcada como anulada, con el motivo.
       security: *a1
       parameters:
         - schema:
@@ -2406,11 +2548,12 @@ paths:
   /api/patients/{patientId}/payments:
     post:
       tags: *a7
-      summary: Registra un pago
-      description: Se aplica a las prestaciones indicadas, o a las pendientes más
-        antiguas primero si no se indican. Admite pagos parciales; lo que excede
-        lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago
-        con referencia opcional.
+      summary: Registra un cobro
+      description: Un cobro puede combinar varios medios de pago y usar saldo a favor.
+        Primero se aplica el saldo a favor y después cada medio, a las
+        prestaciones indicadas o a las pendientes más antiguas. Admite pagos
+        parciales; lo que excede lo pendiente queda como saldo a favor. Mercado
+        Pago es un medio de pago con referencia opcional.
       security: *a1
       parameters:
         - schema:
@@ -2423,14 +2566,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePaymentInput"
+              $ref: "#/components/schemas/CreateChargeInput"
       responses:
         "201":
-          description: Pago registrado
+          description: Cobro registrado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Payment"
+                $ref: "#/components/schemas/ChargeResult"
         "400":
           description: Los datos enviados no son válidos
           content:
@@ -2456,7 +2599,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "422":
-          description: Fecha futura o prestaciones elegidas inválidas
+          description: Fecha futura, prestaciones elegidas inválidas o saldo a favor
+            insuficiente
           content:
             application/json:
               schema:
@@ -2465,8 +2609,9 @@ paths:
     post:
       tags: *a7
       summary: Anula un pago
-      description: Solo administración. El pago se conserva marcado como anulado, con
-        el motivo, y deja de contar en el saldo.
+      description: Recepción solo lo cargado en el día; administración siempre. El
+        pago se conserva marcado como anulado, con el motivo, y deja de contar
+        en el saldo.
       security: *a1
       parameters:
         - schema:
@@ -2596,7 +2741,7 @@ paths:
       tags: *a8
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
-        borrar: se corrige con una adenda."
+        borrar: se corrige agregando una corrección."
       security: *a1
       parameters:
         - schema:
@@ -2651,8 +2796,9 @@ paths:
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
       tags: *a8
-      summary: Corrige una nota con una adenda
-      description: La nota original se conserva intacta; la adenda queda vinculada a ella.
+      summary: Agrega una corrección a una nota
+      description: La nota original se conserva intacta; la corrección queda vinculada
+        a ella.
       security: *a1
       parameters:
         - schema:
@@ -3081,8 +3227,8 @@ paths:
       tags: *a10
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
-        o ausente también lo puede hacer el odontólogo dueño del turno, una vez
-        llegada la hora. Cancelar exige un motivo y el turno se conserva.
+        o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
+        exige un motivo y el turno se conserva.
       security: *a1
       parameters:
         - schema:
@@ -3128,7 +3274,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
         "409":
-          description: Transición no permitida, o todavía no es la hora del turno
+          description: Transición no permitida
           content:
             application/json:
               schema:

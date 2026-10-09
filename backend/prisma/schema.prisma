@@ -146,21 +146,20 @@ enum DocumentType {
 }
 
 model Patient {
-  id               String       @id @default(uuid(7)) @db.Uuid
-  organizationId   String       @db.Uuid
-  firstName        String
-  lastName         String
-  documentType     DocumentType @default(DNI)
-  documentNumber   String?
-  birthDate        DateTime?    @db.Date
-  phone            String?
-  email            String?
-  address          String?
-  emergencyContact String?
-  searchText       String
-  archivedAt       DateTime?    @db.Timestamptz(3)
-  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
+  id             String       @id @default(uuid(7)) @db.Uuid
+  organizationId String       @db.Uuid
+  firstName      String
+  lastName       String
+  documentType   DocumentType @default(DNI)
+  documentNumber String?
+  birthDate      DateTime?    @db.Date
+  phone          String?
+  email          String?
+  address        String?
+  searchText     String
+  archivedAt     DateTime?    @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
 
   organization    Organization       @relation(fields: [organizationId], references: [id])
   appointments    Appointment[]
@@ -270,6 +269,7 @@ model PerformedService {
   practiceId     String    @db.Uuid
   appointmentId  String?   @db.Uuid
   price          Decimal   @db.Decimal(14, 2)
+  catalogPrice   Decimal   @db.Decimal(14, 2)
   performedAt    DateTime  @db.Timestamptz(3)
   createdById    String    @db.Uuid
   createdAt      DateTime  @default(now()) @db.Timestamptz(3)
@@ -316,6 +316,6 @@ model PaymentAllocation {
   payment Payment          @relation(fields: [paymentId], references: [id])
   service PerformedService @relation(fields: [serviceId], references: [id])
 
-  @@unique([paymentId, serviceId])
+  @@index([paymentId])
   @@index([serviceId])
 }

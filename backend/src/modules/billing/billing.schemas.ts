@@ -16,29 +16,48 @@ export const paymentParamsSchema = z.object({ patientId: z.uuid(), paymentId: z.
 export const createServiceSchema = z
   .object({
     practiceId: z.uuid(),
+    professionalId: z.uuid().optional(),
     appointmentId: z.uuid().nullish(),
     performedAt: z.iso.datetime().optional(),
+    price: moneySchema.optional(),
   })
   .meta({ id: 'CreateServiceInput' })
 
+export const adjustPriceSchema = z.object({ price: moneySchema }).meta({ id: 'AdjustPriceInput' })
+
 export const voidSchema = z.object({ reason: reasonSchema }).meta({ id: 'VoidInput' })
 
-export const createPaymentSchema = z
+const paymentMethodSchema = z.enum(PAYMENT_METHODS).meta({ id: 'PaymentMethod' })
+
+export const createChargeSchema = z
   .object({
-    amount: moneySchema,
-    method: z.enum(PAYMENT_METHODS),
-    externalReference: z.string().trim().max(120).nullish(),
+    lines: z
+      .array(
+        z.object({
+          amount: moneySchema,
+          method: paymentMethodSchema,
+          externalReference: z.string().trim().max(120).nullish(),
+        }),
+      )
+      .max(10)
+      .default([]),
+    credit: moneySchema.optional(),
     receivedAt: z.iso.datetime().optional(),
     serviceIds: z.array(z.uuid()).min(1).max(100).optional(),
   })
-  .meta({ id: 'CreatePaymentInput' })
-
-const paymentMethodSchema = z.enum(PAYMENT_METHODS).meta({ id: 'PaymentMethod' })
+  .refine((value) => value.lines.length > 0 || value.credit !== undefined, {
+    message: 'Agregá al menos un medio de pago',
+  })
+  .meta({ id: 'CreateChargeInput' })
 
 const record = {
   status: z.enum(['ACTIVE', 'VOIDED']),
   voidReason: z.string().nullable(),
+  voidable: z.boolean().meta({ description: 'Si quien consulta puede anularlo ahora' }),
+  createdAt: z.iso.datetime(),
 }
+
+const amount = (description: string) => z.string().nullable().meta({ example: '25000.00', description })
 
 export const serviceSchema = z
   .object({
@@ -46,9 +65,10 @@ export const serviceSchema = z
     practice: z.object({ id: z.uuid(), code: z.string(), name: z.string() }),
     professional: z.object({ id: z.uuid(), displayName: z.string() }),
     appointmentId: z.uuid().nullable(),
-    price: z.string().meta({ example: '25000.00' }),
-    paid: z.string().meta({ example: '10000.00', description: 'Importe cubierto por pagos vigentes' }),
-    pending: z.string().meta({ example: '15000.00' }),
+    price: amount('Precio final. Nulo para quien no puede ver importes'),
+    catalogPrice: amount('Precio del catálogo al registrarla'),
+    paid: amount('Importe cubierto por pagos vigentes'),
+    pending: amount('Importe que falta pagar'),
     performedAt: z.iso.datetime(),
     ...record,
   })
@@ -68,6 +88,13 @@ export const paymentSchema = z
   })
   .meta({ id: 'Payment' })
 
+export const chargeResultSchema = z
+  .object({
+    payments: z.array(paymentSchema),
+    creditApplied: z.string(),
+  })
+  .meta({ id: 'ChargeResult' })
+
 export const accountSchema = z
   .object({
     balance: z.string().meta({
@@ -76,6 +103,7 @@ export const accountSchema = z
     }),
     totalServices: z.string(),
     totalPayments: z.string(),
+    availableCredit: z.string().meta({ description: 'Saldo a favor disponible para aplicar a prestaciones' }),
     services: z.array(serviceSchema),
     payments: z.array(paymentSchema),
   })
@@ -90,8 +118,9 @@ export const debtorSchema = z
   .meta({ id: 'Debtor' })
 
 export type CreateServiceInput = z.infer<typeof createServiceSchema>
-export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
+export type CreateChargeInput = z.infer<typeof createChargeSchema>
 export type ServiceDto = z.infer<typeof serviceSchema>
 export type PaymentDto = z.infer<typeof paymentSchema>
+export type ChargeResultDto = z.infer<typeof chargeResultSchema>
 export type AccountDto = z.infer<typeof accountSchema>
 export type DebtorDto = z.infer<typeof debtorSchema>

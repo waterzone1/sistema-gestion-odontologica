@@ -32,17 +32,49 @@ export function fullName(patient: Pick<Patient, 'lastName' | 'firstName'>): stri
 const pad = (value: number) => String(value).padStart(2, '0')
 
 export function formatTime(iso: string): string {
-  const date = new Date(iso)
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return toTimeText(new Date(iso))
 }
 
 export function formatDateTime(iso: string): string {
   const date = new Date(iso)
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${formatTime(iso)}`
+  return `${toDateText(date)} ${toTimeText(date)}`
 }
 
-export function toDateTimeInput(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+export function toDateText(date: Date): string {
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`
+}
+
+export function toTimeText(date: Date): string {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function maskDate(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 8)
+  if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+  if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return digits
+}
+
+export function maskTime(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 4)
+  return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits
+}
+
+export function parseDateText(text: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim())
+  if (!match) return null
+  const [, day, month, year] = match as unknown as [string, string, string, string]
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+  if (date.getUTCDate() !== Number(day) || date.getUTCMonth() !== Number(month) - 1) return null
+  return `${year}-${month}-${day}`
+}
+
+export function parseDateTimeText(dateText: string, timeText: string): Date | null {
+  const isoDate = parseDateText(dateText)
+  const time = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(timeText.trim())
+  if (!isoDate || !time) return null
+  const [year, month, day] = isoDate.split('-').map(Number) as [number, number, number]
+  return new Date(year, month - 1, day, Number(time[1]), Number(time[2]))
 }
 
 export function formatMoney(amount: string): string {

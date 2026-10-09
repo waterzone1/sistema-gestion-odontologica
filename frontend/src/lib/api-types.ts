@@ -1506,7 +1506,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ArchivePatientInput"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -1533,6 +1537,14 @@ export interface paths {
                     };
                 };
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1732,6 +1744,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/patients/{patientId}/services/{serviceId}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    patientId: string;
+                    serviceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdjustPriceInput"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PerformedService"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/patients/{patientId}/services/{serviceId}/void": {
         parameters: {
             query?: never;
@@ -1893,7 +1994,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CreatePaymentInput"];
+                    "application/json": components["schemas"]["CreateChargeInput"];
                 };
             };
             responses: {
@@ -1902,7 +2003,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Payment"];
+                        "application/json": components["schemas"]["ChargeResult"];
                     };
                 };
                 400: {
@@ -2858,7 +2959,7 @@ export interface components {
             username: string;
             displayName: string;
             roles: components["schemas"]["Role"][];
-            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void")[];
+            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void" | "services:price" | "billing:void-any-day")[];
             branchIds: string[];
             mustChangePassword: boolean;
             onboardingCompleted: boolean;
@@ -2968,7 +3069,6 @@ export interface components {
             phone: string | null;
             email: string | null;
             address: string | null;
-            emergencyContact: string | null;
             archivedAt: string | null;
             createdAt: string;
         };
@@ -2982,7 +3082,6 @@ export interface components {
             phone?: string | null;
             email?: string | null;
             address?: string | null;
-            emergencyContact?: string | null;
         };
         UpdatePatientInput: {
             firstName?: string;
@@ -2993,7 +3092,9 @@ export interface components {
             phone?: string | null;
             email?: string | null;
             address?: string | null;
-            emergencyContact?: string | null;
+        };
+        ArchivePatientInput: {
+            cancelActiveAppointments: boolean;
         };
         PerformedService: {
             id: string;
@@ -3007,17 +3108,25 @@ export interface components {
                 displayName: string;
             };
             appointmentId: string | null;
-            price: string;
-            paid: string;
-            pending: string;
+            price: string | null;
+            catalogPrice: string | null;
+            paid: string | null;
+            pending: string | null;
             performedAt: string;
             status: "ACTIVE" | "VOIDED";
             voidReason: string | null;
+            voidable: boolean;
+            createdAt: string;
         };
         CreateServiceInput: {
             practiceId: string;
+            professionalId?: string;
             appointmentId?: string | null;
             performedAt?: string;
+            price?: string;
+        };
+        AdjustPriceInput: {
+            price: string;
         };
         VoidInput: {
             reason: string;
@@ -3026,6 +3135,7 @@ export interface components {
             balance: string;
             totalServices: string;
             totalPayments: string;
+            availableCredit: string;
             services: components["schemas"]["PerformedService"][];
             payments: components["schemas"]["Payment"][];
         };
@@ -3040,12 +3150,21 @@ export interface components {
             createdBy: string;
             status: "ACTIVE" | "VOIDED";
             voidReason: string | null;
+            voidable: boolean;
+            createdAt: string;
         };
         PaymentMethod: "CASH" | "TRANSFER" | "CARD" | "MERCADOPAGO" | "OTHER";
-        CreatePaymentInput: {
-            amount: string;
-            method: "CASH" | "TRANSFER" | "CARD" | "MERCADOPAGO" | "OTHER";
-            externalReference?: string | null;
+        ChargeResult: {
+            payments: components["schemas"]["Payment"][];
+            creditApplied: string;
+        };
+        CreateChargeInput: {
+            lines: {
+                amount: string;
+                method: components["schemas"]["PaymentMethod"];
+                externalReference?: string | null;
+            }[];
+            credit?: string;
             receivedAt?: string;
             serviceIds?: string[];
         };

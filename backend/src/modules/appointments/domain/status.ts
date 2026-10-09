@@ -15,7 +15,3 @@ export function canTransition(from: AppointmentStatus, to: AppointmentStatus): b
 export function isEditable(status: AppointmentStatus): boolean {
   return status === 'SCHEDULED' || status === 'CONFIRMED'
 }
-
-export function requiresStarted(target: AppointmentStatus): boolean {
-  return target === 'ATTENDED' || target === 'NO_SHOW'
-}

@@ -3,21 +3,29 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { AppointmentDialog } from '@/components/appointments/appointment-dialog'
+import { AppointmentFormDialog } from '@/components/appointments/appointment-form-dialog'
 import { FormError } from '@/components/form-error'
 import { Badge } from '@/components/ui/badge'
+import { useBranches } from '@/hooks/use-admin'
 import { useAppointments } from '@/hooks/use-appointments'
+import { usePractices, useProfessionals } from '@/hooks/use-catalog'
 import type { Appointment, SessionUser } from '@/lib/api'
 import { dayRange, STATUS_LABELS, STATUS_VARIANT } from '@/lib/appointments'
 import { formatTime } from '@/lib/format'
-import { can } from '@/lib/permissions'
+import { can, visibleBranches } from '@/lib/permissions'
 
 export function TodayAppointments({ user }: { user: SessionUser }) {
   const [today] = useState(() => dayRange(new Date()))
   const appointments = useAppointments(today)
   const [selected, setSelected] = useState<Appointment | null>(null)
+  const [editing, setEditing] = useState<Appointment | null>(null)
+  const canManage = can(user, 'appointments:manage')
+  const branches = useBranches(canManage)
+  const professionals = useProfessionals(canManage)
+  const practices = usePractices('active', canManage)
 
   const items = (appointments.data ?? []).filter((a) => a.status !== 'CANCELLED')
-  const own = !can(user, 'appointments:manage')
+  const own = !canManage
 
   return (
     <section aria-labelledby="turnos-hoy" className="mt-6 rounded-lg border bg-card p-5 shadow-sm">
@@ -62,8 +70,21 @@ export function TodayAppointments({ user }: { user: SessionUser }) {
       <AppointmentDialog
         appointment={selected}
         onOpenChange={(open) => !open && setSelected(null)}
-        canManage={can(user, 'appointments:manage')}
+        canManage={canManage}
         canAttend={can(user, 'appointments:attend')}
+        onEdit={(appointment) => {
+          setSelected(null)
+          setEditing(appointment)
+        }}
+      />
+      <AppointmentFormDialog
+        open={editing !== null}
+        onOpenChange={(open) => !open && setEditing(null)}
+        appointment={editing}
+        defaults={null}
+        branches={visibleBranches(user, branches.data ?? [])}
+        professionals={professionals.data ?? []}
+        practices={practices.data ?? []}
       />
     </section>
   )

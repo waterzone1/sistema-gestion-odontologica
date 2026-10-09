@@ -24,22 +24,29 @@ interface Allocation {
 export interface AllocationResult {
   allocations: Allocation[]
   unallocatedCents: number
+  remaining: PendingService[]
 }
 
 export function allocatePayment(paymentCents: number, services: readonly PendingService[]): AllocationResult {
   const allocations: Allocation[] = []
-  let remaining = paymentCents
+  const remaining: PendingService[] = []
+  let left = paymentCents
   for (const service of services) {
-    if (remaining <= 0) break
-    const cents = Math.min(remaining, service.pendingCents)
-    if (cents <= 0) continue
-    allocations.push({ serviceId: service.id, cents })
-    remaining -= cents
+    const cents = Math.max(0, Math.min(left, service.pendingCents))
+    if (cents > 0) {
+      allocations.push({ serviceId: service.id, cents })
+      left -= cents
+    }
+    if (service.pendingCents - cents > 0) remaining.push({ id: service.id, pendingCents: service.pendingCents - cents })
   }
-  return { allocations, unallocatedCents: remaining }
+  return { allocations, unallocatedCents: left, remaining }
 }
 
 export function balanceCents(serviceCents: readonly number[], paymentCents: readonly number[]): number {
   const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0)
   return sum(serviceCents) - sum(paymentCents)
+}
+
+export function localDay(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
 }

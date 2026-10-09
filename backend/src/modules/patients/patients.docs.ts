@@ -11,6 +11,7 @@ import {
   writeSecurity,
 } from '../../openapi/common.js'
 import {
+  archivePatientSchema,
   createPatientSchema,
   listPatientsQuerySchema,
   patientIdParamsSchema,
@@ -84,16 +85,30 @@ export function registerPatientsDocs(registry: OpenAPIRegistry): void {
     },
   })
 
-  for (const accion of ['archive', 'unarchive'] as const) {
-    registry.registerPath({
-      method: 'post',
-      path: `/api/patients/{id}/${accion}`,
-      tags,
-      summary:
-        accion === 'archive' ? 'Archiva un paciente (no se borra)' : 'Reactiva un paciente archivado',
-      security: writeSecurity,
-      request: params,
-      responses: { 200: json(patientSchema, 'Paciente'), 404: notFound, ...common },
-    })
-  }
+  registry.registerPath({
+    method: 'post',
+    path: '/api/patients/{id}/archive',
+    tags,
+    summary: 'Archiva un paciente (no se borra)',
+    description:
+      'Si tiene turnos pendientes o confirmados por venir responde 409 con la lista; con cancelActiveAppointments los cancela con el motivo "Paciente archivado".',
+    security: writeSecurity,
+    request: { ...params, ...bodyOf(archivePatientSchema) },
+    responses: {
+      200: json(patientSchema, 'Paciente'),
+      404: notFound,
+      409: errorResponse('El paciente tiene turnos pendientes'),
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/patients/{id}/unarchive',
+    tags,
+    summary: 'Reactiva un paciente archivado',
+    security: writeSecurity,
+    request: params,
+    responses: { 200: json(patientSchema, 'Paciente'), 404: notFound, ...common },
+  })
 }

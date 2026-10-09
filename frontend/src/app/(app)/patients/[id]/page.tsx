@@ -1,6 +1,5 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -9,23 +8,22 @@ import { PatientAppointments } from '@/components/appointments/patient-appointme
 import { AccountTab } from '@/components/billing/account-tab'
 import { ServicesTab } from '@/components/billing/services-tab'
 import { ClinicalHistory } from '@/components/clinical/clinical-history'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs } from '@/components/ui/tabs'
-import { patientsKey, usePatient } from '@/hooks/use-patients'
+import { usePatient } from '@/hooks/use-patients'
 import { useSession } from '@/hooks/use-session'
-import { api, ApiError, type Patient } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 import { ageFrom, documentLabel, formatDate, fullName } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { ArchivePatientDialog } from '../archive-patient-dialog'
 import { PatientFormDialog } from '../patient-form-dialog'
 
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const client = useQueryClient()
   const session = useSession()
   const user = session.data?.user
   const allowed = can(user, 'patients:read')
@@ -39,15 +37,6 @@ export default function PatientPage() {
   useEffect(() => {
     if (user && !allowed) router.replace('/dashboard')
   }, [user, allowed, router])
-
-  const archive = useMutation({
-    mutationFn: (archived: boolean) =>
-      api.post<Patient>(`/api/patients/${id}/${archived ? 'archive' : 'unarchive'}`),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: patientsKey })
-      setArchiving(false)
-    },
-  })
 
   if (!user || !allowed || patient.isPending) return <LoadingBlock />
   if (patient.error instanceof ApiError && patient.error.status === 404) {
@@ -118,16 +107,12 @@ export default function PatientPage() {
           <ServicesTab
             patientId={data.id}
             canRecord={can(user, 'services:write')}
-            canVoid={can(user, 'services:void')}
+            canPrice={can(user, 'services:price')}
             archived={data.archivedAt !== null}
           />
         )}
         {tab === 'cuenta' && (
-          <AccountTab
-            patientId={data.id}
-            canCollect={can(user, 'payments:create')}
-            canVoid={can(user, 'payments:void')}
-          />
+          <AccountTab patientId={data.id} canCollect={can(user, 'payments:create')} />
         )}
         {tab === 'resumen' && (
         <section aria-label="Datos administrativos" className="rounded-lg border bg-card p-5 shadow-sm">
@@ -138,7 +123,6 @@ export default function PatientPage() {
             <Item label="Teléfono" value={data.phone} />
             <Item label="Email" value={data.email} />
             <Item label="Dirección" value={data.address} />
-            <Item label="Contacto de emergencia" value={data.emergencyContact} />
             <Item label="Alta en el sistema" value={formatDate(data.createdAt)} />
           </dl>
         </section>
@@ -151,20 +135,7 @@ export default function PatientPage() {
         patient={data}
         onSaved={() => setEditing(false)}
       />
-      <ConfirmDialog
-        open={archiving}
-        onOpenChange={setArchiving}
-        title={data.archivedAt ? 'Reactivar paciente' : 'Archivar paciente'}
-        description={
-          data.archivedAt
-            ? 'Vuelve a aparecer en las búsquedas y se pueden registrar nuevos turnos.'
-            : 'Deja de aparecer en las búsquedas habituales. No se borra nada: sus datos y su historial se conservan y se puede reactivar.'
-        }
-        confirmLabel={data.archivedAt ? 'Reactivar' : 'Archivar'}
-        pending={archive.isPending}
-        error={archive.error ? 'No se pudo completar la acción' : undefined}
-        onConfirm={() => archive.mutate(!data.archivedAt)}
-      />
+      <ArchivePatientDialog patient={data} open={archiving} onOpenChange={setArchiving} />
     </>
   )
 }

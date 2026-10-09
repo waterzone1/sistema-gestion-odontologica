@@ -38,3 +38,21 @@ export function Textarea({ className, ...props }: React.ComponentProps<'textarea
     />
   )
 }
+
+export function MaskedInput({
+  mask,
+  onChange,
+  ...props
+}: React.ComponentProps<'input'> & { mask: (value: string) => string }) {
+  return (
+    <Input
+      inputMode="numeric"
+      autoComplete="off"
+      {...props}
+      onChange={(event) => {
+        event.target.value = mask(event.target.value)
+        onChange?.(event)
+      }}
+    />
+  )
+}

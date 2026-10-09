@@ -56,6 +56,7 @@ function Detail({
   const client = useQueryClient()
   const [cancelling, setCancelling] = useState(false)
   const [reason, setReason] = useState('')
+  const [early, setEarly] = useState<'ATTENDED' | 'NO_SHOW' | null>(null)
 
   const change = useMutation({
     mutationFn: (body: { status: AppointmentStatus; cancellationReason?: string }) =>
@@ -67,6 +68,10 @@ function Detail({
   })
 
   const editable = isEditable(appointment)
+  const mark = (status: 'ATTENDED' | 'NO_SHOW') => {
+    if (new Date(appointment.startsAt).getTime() > Date.now()) setEarly(status)
+    else change.mutate({ status })
+  }
 
   return (
     <div className="space-y-4">
@@ -92,7 +97,22 @@ function Detail({
 
       <FormError error={change.error} />
 
-      {cancelling ? (
+      {early ? (
+        <div role="alert" className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+          <p>
+            El turno todavía no empezó (es el {formatDateTime(appointment.startsAt)}). ¿Lo marcás igual como{' '}
+            {early === 'ATTENDED' ? 'atendido' : 'ausente'}?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEarly(null)} disabled={change.isPending}>
+              Volver
+            </Button>
+            <Button size="sm" disabled={change.isPending} onClick={() => change.mutate({ status: early })}>
+              {early === 'ATTENDED' ? 'Marcar atendido igual' : 'Marcar ausente igual'}
+            </Button>
+          </div>
+        </div>
+      ) : cancelling ? (
         <div className="space-y-3 rounded-md border bg-muted/30 p-3">
           <Field label="Motivo de la cancelación" htmlFor="cancel-reason">
             <Input id="cancel-reason" autoFocus value={reason} onChange={(event) => setReason(event.target.value)} />
@@ -123,12 +143,12 @@ function Detail({
             </Button>
           )}
           {editable && canAttend && (
-            <Button variant="outline" onClick={() => change.mutate({ status: 'NO_SHOW' })} disabled={change.isPending}>
+            <Button variant="outline" onClick={() => mark('NO_SHOW')} disabled={change.isPending}>
               Marcar ausente
             </Button>
           )}
           {editable && canAttend && (
-            <Button variant="outline" onClick={() => change.mutate({ status: 'ATTENDED' })} disabled={change.isPending}>
+            <Button variant="outline" onClick={() => mark('ATTENDED')} disabled={change.isPending}>
               Marcar atendido
             </Button>
           )}

@@ -32,10 +32,16 @@ const createSchema = z
       .min(3, 'Debe tener al menos 3 caracteres')
       .regex(/^[a-z0-9._-]+$/, 'Solo letras, números, punto, guion y guion bajo'),
     password: z.string().min(10, 'Debe tener al menos 10 caracteres'),
+    licenseNumber: z.string().trim(),
+    specialty: z.string().trim(),
   })
   .refine((v) => !requiresBranch(v.roles) || v.branchIds.length > 0, {
     path: ['branchIds'],
     message: 'Este usuario necesita al menos una sede',
+  })
+  .refine((v) => !v.roles.includes('DENTIST') || v.licenseNumber.length > 0, {
+    path: ['licenseNumber'],
+    message: 'Ingresá la matrícula del odontólogo',
   })
 
 const editSchema = z
@@ -92,7 +98,7 @@ function UserForm({
     resolver: zodResolver(editing ? editSchema : createSchema),
     defaultValues: editing
       ? { displayName: user.displayName, roles: user.roles, branchIds: user.branchIds }
-      : { username: '', displayName: '', password: '', roles: [], branchIds: [] },
+      : { username: '', displayName: '', password: '', roles: [], branchIds: [], licenseNumber: '', specialty: '' },
   })
   const {
     register,
@@ -104,8 +110,18 @@ function UserForm({
   const fieldErrors = errors as Record<string, { message?: string } | undefined>
 
   const save = useMutation({
-    mutationFn: (values: CreateValues | EditValues) =>
-      editing ? api.patch<User>(`/api/users/${user.id}`, values) : api.post<User>('/api/users', values),
+    mutationFn: async (values: CreateValues | EditValues) => {
+      if (editing) return api.patch<User>(`/api/users/${user.id}`, values)
+      const { licenseNumber, specialty, ...data } = values as CreateValues
+      const created = await api.post<User>('/api/users', data)
+      if (data.roles.includes('DENTIST')) {
+        await api.put<Professional>(`/api/professionals/${created.id}`, {
+          licenseNumber,
+          specialty: specialty ? specialty : null,
+        })
+      }
+      return created
+    },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: usersKey })
       onSaved(editing ? 'Cambios guardados.' : 'Usuario creado. Tiene que cambiar la contraseña temporal al ingresar.')
@@ -173,6 +189,17 @@ function UserForm({
             />
           )}
         />
+
+        {!editing && roles.includes('DENTIST') && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Matrícula" htmlFor="newLicenseNumber" error={fieldErrors['licenseNumber']?.message}>
+              <Input id="newLicenseNumber" {...register('licenseNumber')} aria-invalid={!!fieldErrors['licenseNumber']} />
+            </Field>
+            <Field label="Especialidad (opcional)" htmlFor="newSpecialty">
+              <Input id="newSpecialty" {...register('specialty')} />
+            </Field>
+          </div>
+        )}
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={save.isPending}>
