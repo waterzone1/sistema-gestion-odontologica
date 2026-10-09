@@ -43,6 +43,15 @@ npm run dev            # http://localhost:3000
 
 En desarrollo, Next reenvía `/api` al backend.
 
+Para cargar datos de demostración (pacientes, turnos, notas, prestaciones y pagos sintéticos) en una instalación recién configurada y vacía:
+
+```bash
+cd backend
+npm run demo:seed
+```
+
+El comando crea tres usuarios de demostración, imprime su clave al terminar y se niega a correr con `NODE_ENV=production`. La imagen de producción no incluye estos datos.
+
 ### Calidad
 
 Desde `backend/` y `frontend/`:

@@ -1,11 +1,12 @@
 import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { hashPassword } from '../../shared/password.js'
+import { isUniqueViolation } from '../../shared/prismaErrors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { SessionResponse } from '../auth/auth.schemas.js'
 import { toSessionResponse } from '../auth/auth.service.js'
 import { createSession, resolveSession, type CreatedSession } from '../auth/session.service.js'
-import { assertStrongPassword, isUniqueViolation } from '../users/users.service.js'
+import { assertStrongPassword } from '../users/users.service.js'
 import type { SetupInput } from './setup.schemas.js'
 import type { SetupTokenStore } from './setupToken.js'
 

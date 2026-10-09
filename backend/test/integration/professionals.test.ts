@@ -40,20 +40,18 @@ describe('perfil profesional', () => {
   it('crea y luego actualiza el perfil del odontologo', async () => {
     const creado = await as(app, admin).put(`/api/professionals/${dentistId}`, {
       licenseNumber: 'MP-1234',
-      specialty: 'Endodoncia',
     })
     expect(creado.status).toBe(200)
     expect(creado.body).toMatchObject({
       userId: dentistId,
       displayName: 'Dra. Ruiz',
       licenseNumber: 'MP-1234',
-      specialty: 'Endodoncia',
       active: true,
       branchIds: [seed.branchId],
     })
 
     const editado = await as(app, admin).put(`/api/professionals/${dentistId}`, { licenseNumber: 'MP-9999' })
-    expect(editado.body).toMatchObject({ licenseNumber: 'MP-9999', specialty: 'Endodoncia' })
+    expect(editado.body).toMatchObject({ licenseNumber: 'MP-9999' })
     expect(await db.professionalProfile.count()).toBe(1)
   })
 

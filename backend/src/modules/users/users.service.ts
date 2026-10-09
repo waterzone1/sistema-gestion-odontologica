@@ -1,6 +1,7 @@
 import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { hashPassword } from '../../shared/password.js'
+import { isUniqueViolation } from '../../shared/prismaErrors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { checkPassword } from '../auth/domain/passwordPolicy.js'
@@ -15,10 +16,6 @@ export function assertStrongPassword(password: string, username: string): void {
   if (problemas.length > 0) {
     throw new AppError(422, 'WEAK_PASSWORD', 'La contraseña no cumple los requisitos', { problemas })
   }
-}
-
-export function isUniqueViolation(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
 async function assertBranchesValid(

@@ -50,3 +50,85 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+.fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-today-bg-color: oklch(0.52 0.09 200 / 6%);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-button-bg-color: var(--card);
+  --fc-button-border-color: var(--border);
+  --fc-button-text-color: var(--foreground);
+  --fc-button-hover-bg-color: var(--muted);
+  --fc-button-hover-border-color: var(--border);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: var(--primary);
+  --fc-event-bg-color: var(--primary);
+  --fc-event-border-color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fc .fc-toolbar.fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fc .fc-toolbar-chunk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.fc .fc-timegrid-event .fc-event-main {
+  overflow: hidden;
+}
+
+.fc .fc-timeGridWeek-view .fc-scrollgrid {
+  min-width: 42rem;
+}
+
+@media (max-width: 639px) {
+  .fc .fc-toolbar.fc-header-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fc .fc-toolbar-chunk {
+    justify-content: center;
+  }
+}
+
+.fc .fc-button {
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: var(--primary-foreground);
+}
+
+.fc-estado-scheduled {
+  --fc-event-bg-color: var(--primary);
+  --fc-event-border-color: var(--primary);
+}
+
+.fc-estado-confirmed {
+  --fc-event-bg-color: var(--success);
+  --fc-event-border-color: var(--success);
+}
+
+.fc-estado-attended {
+  --fc-event-bg-color: oklch(0.55 0.02 250);
+  --fc-event-border-color: oklch(0.55 0.02 250);
+}
+
+.fc-estado-no_show {
+  --fc-event-bg-color: var(--destructive);
+  --fc-event-border-color: var(--destructive);
+}

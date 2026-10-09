@@ -1,7 +1,12 @@
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi'
+import { registerAppointmentsDocs } from '../modules/appointments/appointments.docs.js'
 import { registerAuthDocs } from '../modules/auth/auth.docs.js'
 import { registerBranchesDocs } from '../modules/branches/branches.docs.js'
 import { registerHealthDocs } from '../modules/health/health.docs.js'
+import { registerPatientsDocs } from '../modules/patients/patients.docs.js'
+import { registerBillingDocs } from '../modules/billing/billing.docs.js'
+import { registerClinicalDocs } from '../modules/clinical/clinical.docs.js'
+import { registerPracticesDocs } from '../modules/practices/practices.docs.js'
 import { registerProfessionalsDocs } from '../modules/professionals/professionals.docs.js'
 import { registerUsersDocs } from '../modules/users/users.docs.js'
 
@@ -12,6 +17,11 @@ export function buildOpenApiDocument() {
   registerUsersDocs(registry)
   registerBranchesDocs(registry)
   registerProfessionalsDocs(registry)
+  registerPatientsDocs(registry)
+  registerBillingDocs(registry)
+  registerClinicalDocs(registry)
+  registerPracticesDocs(registry)
+  registerAppointmentsDocs(registry)
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',
@@ -31,6 +41,9 @@ export function buildOpenApiDocument() {
       { name: 'Usuarios' },
       { name: 'Sedes' },
       { name: 'Profesionales' },
+      { name: 'Pacientes' },
+      { name: 'Prácticas' },
+      { name: 'Turnos' },
     ],
   })
 }

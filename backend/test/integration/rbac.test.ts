@@ -46,6 +46,8 @@ interface Endpoint {
 
 const SOLO_ADMIN: ActorName[] = ['admin', 'admin+odontologo']
 const TODOS: ActorName[] = ['admin', 'odontologo', 'recepcion', 'admin+odontologo']
+const SOLO_ODONTOLOGO: ActorName[] = ['odontologo', 'admin+odontologo']
+const ADMIN_Y_RECEPCION: ActorName[] = ['admin', 'recepcion', 'admin+odontologo']
 
 const ENDPOINTS: Endpoint[] = [
   { method: 'get', path: '/api/users', allowed: SOLO_ADMIN },
@@ -61,6 +63,57 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'patch', path: `/api/branches/${FANTASMA}`, body: { name: 'Otra' }, allowed: SOLO_ADMIN },
   { method: 'get', path: '/api/professionals', allowed: TODOS },
   { method: 'put', path: `/api/professionals/${FANTASMA}`, body: {}, allowed: SOLO_ADMIN },
+  { method: 'get', path: '/api/patients', allowed: TODOS },
+  { method: 'post', path: '/api/patients', body: {}, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: `/api/patients/${FANTASMA}`, allowed: TODOS },
+  { method: 'patch', path: `/api/patients/${FANTASMA}`, body: { firstName: 'X' }, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/archive`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/unarchive`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: '/api/practices', allowed: TODOS },
+  { method: 'post', path: '/api/practices', body: {}, allowed: SOLO_ADMIN },
+  { method: 'patch', path: `/api/practices/${FANTASMA}`, body: { name: 'X' }, allowed: SOLO_ADMIN },
+  { method: 'get', path: '/api/appointments', allowed: TODOS },
+  { method: 'post', path: '/api/appointments', body: {}, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: `/api/appointments/${FANTASMA}`, allowed: TODOS },
+  { method: 'patch', path: `/api/appointments/${FANTASMA}`, body: { notes: 'x' }, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/appointments/${FANTASMA}/status`, body: { status: 'ATTENDED' }, allowed: TODOS },
+  { method: 'get', path: `/api/patients/${FANTASMA}/clinical`, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/clinical`, body: { content: 'Control' }, allowed: SOLO_ODONTOLOGO },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/clinical/${FANTASMA}/corrections`,
+    body: { content: 'Correccion' },
+    allowed: SOLO_ODONTOLOGO,
+  },
+  { method: 'get', path: `/api/patients/${FANTASMA}/services`, allowed: TODOS },
+  { method: 'post', path: `/api/patients/${FANTASMA}/services`, body: {}, allowed: TODOS },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/services/${FANTASMA}/price`,
+    body: { price: '100' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/services/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
+  { method: 'get', path: `/api/patients/${FANTASMA}/account`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/payments`, body: {}, allowed: ADMIN_Y_RECEPCION },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/payments/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/credits/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
+  { method: 'get', path: '/api/debtors', allowed: ADMIN_Y_RECEPCION },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 

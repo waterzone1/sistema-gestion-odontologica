@@ -15,8 +15,11 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  branches Branch[]
-  users    User[]
+  branches     Branch[]
+  users        User[]
+  patients     Patient[]
+  practices    Practice[]
+  appointments Appointment[]
 }
 
 model Branch {
@@ -29,8 +32,9 @@ model Branch {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id])
   users        UserBranch[]
+  appointments Appointment[]
 
   @@index([organizationId])
 }
@@ -58,6 +62,9 @@ model User {
   branches            UserBranch[]
   sessions            Session[]
   professionalProfile ProfessionalProfile?
+  createdAppointments Appointment[]
+  payments            Payment[]            @relation("PaymentCreatedBy")
+  creditApplications  CreditApplication[]  @relation("CreditApplicationCreatedBy")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -104,12 +111,14 @@ model ProfessionalProfile {
   id            String   @id @default(uuid(7)) @db.Uuid
   userId        String   @unique @db.Uuid
   licenseNumber String
-  specialty     String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
+  appointments    Appointment[]
+  clinicalEntries ClinicalEntry[]
+  services        PerformedService[]
 }
 
 model AuditLog {
@@ -126,4 +135,209 @@ model AuditLog {
   @@index([createdAt])
   @@index([actorUserId])
   @@index([entityType, entityId])
+}
+
+enum DocumentType {
+  DNI
+  LE
+  LC
+  PASAPORTE
+  OTRO
+}
+
+model Patient {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  organizationId String       @db.Uuid
+  firstName      String
+  lastName       String
+  documentType   DocumentType @default(DNI)
+  documentNumber String?
+  birthDate      DateTime?    @db.Date
+  phone          String?
+  email          String?
+  address        String?
+  searchText     String
+  archivedAt     DateTime?    @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  appointments       Appointment[]
+  clinicalEntries    ClinicalEntry[]
+  services           PerformedService[]
+  payments           Payment[]
+  creditApplications CreditApplication[]
+
+  @@unique([organizationId, documentType, documentNumber])
+  @@index([organizationId, archivedAt])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Patient_searchText_trgm_idx")
+}
+
+model Practice {
+  id                     String   @id @default(uuid(7)) @db.Uuid
+  organizationId         String   @db.Uuid
+  code                   String
+  name                   String
+  defaultDurationMinutes Int      @default(30)
+  basePrice              Decimal  @db.Decimal(14, 2)
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  appointments Appointment[]
+  services     PerformedService[]
+
+  @@unique([organizationId, code])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+}
+
+model Appointment {
+  id                 String            @id @default(uuid(7)) @db.Uuid
+  organizationId     String            @db.Uuid
+  branchId           String            @db.Uuid
+  patientId          String            @db.Uuid
+  professionalId     String            @db.Uuid
+  practiceId         String?           @db.Uuid
+  startsAt           DateTime          @db.Timestamptz(3)
+  endsAt             DateTime          @db.Timestamptz(3)
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?
+  cancellationReason String?
+  createdById        String            @db.Uuid
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
+
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  branch          Branch              @relation(fields: [branchId], references: [id])
+  patient         Patient             @relation(fields: [patientId], references: [id])
+  professional    ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice        Practice?           @relation(fields: [practiceId], references: [id])
+  createdBy       User                @relation(fields: [createdById], references: [id])
+  clinicalEntries ClinicalEntry[]
+  services        PerformedService[]
+
+  @@index([organizationId, startsAt])
+  @@index([professionalId, startsAt])
+  @@index([patientId, startsAt])
+}
+
+enum ClinicalEntryType {
+  EVOLUTION
+  CORRECTION
+}
+
+model ClinicalEntry {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  patientId      String            @db.Uuid
+  professionalId String            @db.Uuid
+  appointmentId  String?           @db.Uuid
+  entryType      ClinicalEntryType
+  content        String
+  correctionOfId String?           @db.Uuid
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  correctionOf ClinicalEntry?      @relation("Correction", fields: [correctionOfId], references: [id], onDelete: Restrict)
+  corrections  ClinicalEntry[]     @relation("Correction")
+
+  @@index([patientId, createdAt])
+  @@index([correctionOfId])
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  MERCADOPAGO
+  OTHER
+}
+
+model PerformedService {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @db.Uuid
+  patientId      String    @db.Uuid
+  professionalId String    @db.Uuid
+  practiceId     String    @db.Uuid
+  appointmentId  String?   @db.Uuid
+  price          Decimal   @db.Decimal(14, 2)
+  catalogPrice   Decimal   @db.Decimal(14, 2)
+  performedAt    DateTime  @db.Timestamptz(3)
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  voidedAt       DateTime? @db.Timestamptz(3)
+  voidReason     String?
+  voidedById     String?   @db.Uuid
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice     Practice            @relation(fields: [practiceId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id])
+  allocations  PaymentAllocation[]
+
+  @@index([organizationId, patientId, performedAt])
+}
+
+model Payment {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  organizationId    String        @db.Uuid
+  patientId         String        @db.Uuid
+  amount            Decimal       @db.Decimal(14, 2)
+  method            PaymentMethod
+  externalReference String?
+  receivedAt        DateTime      @db.Timestamptz(3)
+  createdById       String        @db.Uuid
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  voidedAt          DateTime?     @db.Timestamptz(3)
+  voidReason        String?
+  voidedById        String?       @db.Uuid
+
+  patient     Patient             @relation(fields: [patientId], references: [id])
+  createdBy   User                @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([organizationId, patientId, receivedAt])
+}
+
+model PaymentAllocation {
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  paymentId           String  @db.Uuid
+  serviceId           String  @db.Uuid
+  creditApplicationId String? @db.Uuid
+  amount              Decimal @db.Decimal(14, 2)
+
+  payment           Payment            @relation(fields: [paymentId], references: [id])
+  service           PerformedService   @relation(fields: [serviceId], references: [id])
+  creditApplication CreditApplication? @relation(fields: [creditApplicationId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([serviceId])
+  @@index([creditApplicationId])
+}
+
+model CreditApplication {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @db.Uuid
+  patientId      String    @db.Uuid
+  amount         Decimal   @db.Decimal(14, 2)
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  voidedAt       DateTime? @db.Timestamptz(3)
+  voidReason     String?
+  voidedById     String?   @db.Uuid
+
+  patient     Patient             @relation(fields: [patientId], references: [id])
+  createdBy   User                @relation("CreditApplicationCreatedBy", fields: [createdById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([organizationId, patientId, createdAt])
 }

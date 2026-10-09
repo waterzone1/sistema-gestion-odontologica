@@ -9,23 +9,16 @@ export const professionalParamsSchema = z.object({ userId: z.uuid() })
 export const saveProfessionalSchema = z
   .object({
     licenseNumber: z.string().trim().min(1, 'Ingresá la matrícula').max(40),
-    specialty: z
-      .string()
-      .trim()
-      .max(120)
-      .transform((v) => (v === '' ? null : v))
-      .nullable()
-      .optional(),
     active: z.boolean().optional(),
   })
   .meta({ id: 'SaveProfessionalInput' })
 
 export const professionalSchema = z
   .object({
+    id: z.uuid(),
     userId: z.uuid(),
     displayName: z.string(),
     licenseNumber: z.string(),
-    specialty: z.string().nullable(),
     active: z.boolean(),
     branchIds: z.array(z.uuid()),
   })
@@ -42,10 +35,10 @@ type ProfileRecord = NonNullable<
 
 function toDto(profile: ProfileRecord): ProfessionalDto {
   return {
+    id: profile.id,
     userId: profile.userId,
     displayName: profile.user.displayName,
     licenseNumber: profile.licenseNumber,
-    specialty: profile.specialty,
     active: profile.active,
     branchIds: profile.user.branches.map((b) => b.branchId),
   }
@@ -81,12 +74,10 @@ export async function saveProfessional(
       create: {
         userId,
         licenseNumber: input.licenseNumber,
-        specialty: input.specialty ?? null,
         active: input.active ?? true,
       },
       update: {
         licenseNumber: input.licenseNumber,
-        ...(input.specialty !== undefined ? { specialty: input.specialty } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
       },
       include,

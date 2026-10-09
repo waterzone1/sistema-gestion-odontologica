@@ -43,5 +43,5 @@ export function DialogContent({ title, description, children, className }: Dialo
 }
 
 export function DialogFooter({ children }: { children: ReactNode }) {
-  return <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{children}</div>
+  return <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">{children}</div>
 }
