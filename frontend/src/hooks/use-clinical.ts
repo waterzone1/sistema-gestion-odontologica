@@ -18,7 +18,7 @@ export function useAddClinicalEntry(patientId: string, correctionOfId?: string) 
   const client = useQueryClient()
   const path = `/api/patients/${patientId}/clinical${correctionOfId ? `/${correctionOfId}/corrections` : ''}`
   return useMutation({
-    mutationFn: (content: string) => api.post<ClinicalEntry>(path, { content }),
+    mutationFn: (input: { content: string; appointmentId?: string }) => api.post<ClinicalEntry>(path, input),
     onSuccess: () => client.invalidateQueries({ queryKey: clinicalKey(patientId) }),
   })
 }

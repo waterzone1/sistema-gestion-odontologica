@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Building2, CalendarDays, ClipboardList, UserRound, Users } from 'lucide-react'
 import Link from 'next/link'
 import { Debtors } from '@/components/billing/debtors'
+import { ConfirmTomorrow } from '@/components/dashboard/confirm-tomorrow'
+import { DentistPanel } from '@/components/dashboard/dentist-panel'
 import { TodayAppointments } from '@/components/appointments/today-appointments'
 import { PageHeader } from '@/components/page-header'
 import { Alert } from '@/components/ui/alert'
@@ -58,7 +60,9 @@ export default function DashboardPage() {
         </Alert>
       )}
 
+      {can(user, 'clinical:read') && <DentistPanel />}
       {can(user, 'appointments:read') && <TodayAppointments user={user} />}
+      {can(user, 'appointments:manage') && <ConfirmTomorrow />}
       {can(user, 'account:read') && <Debtors />}
 
       {shortcuts.length > 0 ? (

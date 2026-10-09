@@ -7,13 +7,16 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { FormError } from '@/components/form-error'
 import { PatientPicker, type PickedPatient } from '@/components/patient-picker'
+import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input, MaskedInput, Select } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
-import { api, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
-import { maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
+import { useSession } from '@/hooks/use-session'
+import { api, ApiError, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
+import { fullName, maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
+import { can } from '@/lib/permissions'
 
 const schema = z.object({
   branchId: z.string().min(1, 'Elegí la sede'),
@@ -87,6 +90,11 @@ function AppointmentForm({
     appointment ? { id: appointment.patient.id, fullName: appointment.patient.fullName } : (defaults?.patient ?? null),
   )
   const [patientError, setPatientError] = useState<string | null>(null)
+  const [creatingPatient, setCreatingPatient] = useState(false)
+  const [overrideReason, setOverrideReason] = useState('')
+  const [outsideAvailability, setOutsideAvailability] = useState(false)
+  const session = useSession()
+  const canOverride = can(session.data?.user, 'appointments:override')
 
   const startDate = appointment ? new Date(appointment.startsAt) : (defaults?.start ?? new Date())
   const duration = appointment
@@ -112,7 +120,10 @@ function AppointmentForm({
     },
   })
   const branchId = useWatch({ control, name: 'branchId' })
+  const professionalId = useWatch({ control, name: 'professionalId' })
   const availableProfessionals = professionals.filter((p) => p.active && p.branchIds.includes(branchId))
+  const offered = professionals.find((p) => p.id === professionalId)?.practiceIds ?? []
+  const availablePractices = offered.length > 0 ? practices.filter((p) => offered.includes(p.id)) : practices
 
   const save = useMutation({
     mutationFn: (values: Values) => {
@@ -125,10 +136,14 @@ function AppointmentForm({
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         notes: values.notes || null,
+        ...(outsideAvailability && overrideReason.trim() ? { override: { reason: overrideReason.trim() } } : {}),
       }
       return appointment
         ? api.patch<Appointment>(`/api/appointments/${appointment.id}`, body)
         : api.post<Appointment>('/api/appointments', { ...body, patientId: patient?.id })
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === 'OUTSIDE_AVAILABILITY') setOutsideAvailability(true)
     },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: appointmentsKey })
@@ -157,6 +172,20 @@ function AppointmentForm({
           disabled={editing || defaults?.lockPatient === true}
         />
       </Field>
+      {!patient && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setCreatingPatient(true)}>
+          Paciente nuevo
+        </Button>
+      )}
+      <PatientFormDialog
+        open={creatingPatient}
+        onOpenChange={setCreatingPatient}
+        patient={null}
+        onSaved={(created) => {
+          setPatient({ id: created.id, fullName: fullName(created) })
+          setCreatingPatient(false)
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Sede" htmlFor="branchId" error={errors.branchId?.message}>
@@ -194,7 +223,7 @@ function AppointmentForm({
           })}
         >
           <option value="">Sin práctica</option>
-          {practices.map((practice) => (
+          {availablePractices.map((practice) => (
             <option key={practice.id} value={practice.id}>
               {practice.name} ({practice.defaultDurationMinutes} min)
             </option>
@@ -225,6 +254,22 @@ function AppointmentForm({
       <Field label="Notas administrativas" htmlFor="notes" error={errors.notes?.message} hint="No uses este campo para datos clínicos.">
         <Input id="notes" {...register('notes')} />
       </Field>
+
+      {outsideAvailability && canOverride && (
+        <Field
+          label="Dar el turno igual (fuera de horario)"
+          htmlFor="override-reason"
+          hint="Solo administración. Explicá el motivo: queda registrado en la auditoría. Nunca permite superponer turnos."
+        >
+          <Input
+            id="override-reason"
+            maxLength={300}
+            placeholder="Por ejemplo, urgencia por dolor agudo"
+            value={overrideReason}
+            onChange={(event) => setOverrideReason(event.target.value)}
+          />
+        </Field>
+      )}
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={save.isPending}>

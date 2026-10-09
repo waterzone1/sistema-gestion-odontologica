@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { PatientAppointments } from '@/components/appointments/patient-appointments'
 import { AccountTab } from '@/components/billing/account-tab'
@@ -19,7 +19,7 @@ import { ApiError } from '@/lib/api'
 import { ageFrom, documentLabel, formatDate, fullName } from '@/lib/format'
 import { can } from '@/lib/permissions'
 import { ArchivePatientDialog } from '../archive-patient-dialog'
-import { PatientFormDialog } from '../patient-form-dialog'
+import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
 
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +30,8 @@ export default function PatientPage() {
   const canWrite = can(user, 'patients:write')
   const patient = usePatient(id)
 
-  const [tab, setTab] = useState('resumen')
+  const searchParams = useSearchParams()
+  const [tab, setTab] = useState(() => searchParams.get('tab') ?? 'resumen')
   const [editing, setEditing] = useState(false)
   const [archiving, setArchiving] = useState(false)
 
@@ -99,6 +100,7 @@ export default function PatientPage() {
         {tab === 'historia' && (
           <ClinicalHistory
             patientId={data.id}
+            userId={user.id}
             canWrite={can(user, 'clinical:write')}
             archived={data.archivedAt !== null}
           />

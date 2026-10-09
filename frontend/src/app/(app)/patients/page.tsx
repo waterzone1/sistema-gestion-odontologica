@@ -15,7 +15,7 @@ import { usePatients } from '@/hooks/use-patients'
 import { useSession } from '@/hooks/use-session'
 import { ageFrom, documentLabel, fullName } from '@/lib/format'
 import { can } from '@/lib/permissions'
-import { PatientFormDialog } from './patient-form-dialog'
+import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
 
 type Status = 'active' | 'archived' | 'all'
 

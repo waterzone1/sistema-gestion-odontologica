@@ -132,3 +132,18 @@
   --fc-event-bg-color: var(--destructive);
   --fc-event-border-color: var(--destructive);
 }
+
+.fc .fc-bg-event.fc-disponible {
+  background: oklch(0.55 0.13 155 / 10%);
+  opacity: 1;
+}
+
+.fc .fc-bg-event.fc-bloqueado {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.55 0.02 250 / 22%) 0 6px,
+    oklch(0.55 0.02 250 / 8%) 6px 12px
+  );
+  opacity: 1;
+  color: var(--foreground);
+}
