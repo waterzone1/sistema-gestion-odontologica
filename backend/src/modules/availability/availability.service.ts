@@ -3,7 +3,7 @@ import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
-import { availabilityProblem, expandRules, rulesProblem, type Rule } from './domain/availability.js'
+import { checkAvailability, expandRules, rulesProblem, type AvailabilityResult, type Rule } from './domain/availability.js'
 import type {
   AgendaAvailabilityDto,
   AgendaAvailabilityQuery,
@@ -253,14 +253,11 @@ interface Slot {
   endsAt: Date
 }
 
-export async function assertAvailable(tx: Tx, organizationId: string, slot: Slot): Promise<void> {
-  const [timeZone, rules, exceptions] = await Promise.all([
-    organizationTimeZone(tx, organizationId),
-    tx.availabilityRule.findMany({ where: { professionalId: slot.professionalId } }),
-    tx.availabilityException.findMany({
-      where: activeExceptionsWhere(slot.professionalId, slot.startsAt, slot.endsAt),
-    }),
-  ])
-  const problem = availabilityProblem({ ...slot, rules, exceptions, timeZone })
-  if (problem) throw new AppError(422, 'OUTSIDE_AVAILABILITY', problem)
+export async function slotAvailability(tx: Tx, organizationId: string, slot: Slot): Promise<AvailabilityResult> {
+  const timeZone = await organizationTimeZone(tx, organizationId)
+  const rules = await tx.availabilityRule.findMany({ where: { professionalId: slot.professionalId } })
+  const exceptions = await tx.availabilityException.findMany({
+    where: activeExceptionsWhere(slot.professionalId, slot.startsAt, slot.endsAt),
+  })
+  return checkAvailability({ ...slot, rules, exceptions, timeZone })
 }

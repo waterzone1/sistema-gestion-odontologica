@@ -10,7 +10,7 @@ import {
   writeSecurity,
 } from '../../openapi/common.js'
 import { setupResponseSchema, setupSchema, setupStatusSchema } from '../organizations/setup.schemas.js'
-import { changePasswordSchema, loginSchema, sessionResponseSchema } from './auth.schemas.js'
+import { changePasswordSchema, loginSchema, preferencesSchema, sessionResponseSchema } from './auth.schemas.js'
 
 export function registerAuthDocs(registry: OpenAPIRegistry): void {
   const body = (schema: typeof loginSchema) => ({ content: { 'application/json': { schema } } })
@@ -101,6 +101,16 @@ export function registerAuthDocs(registry: OpenAPIRegistry): void {
       403: forbidden,
       422: errorResponse('Contraseña actual incorrecta, igual a la actual o que no cumple los requisitos'),
     },
+  })
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/auth/preferences',
+    tags: ['Auth'],
+    summary: 'Guarda las preferencias del usuario (tema claro, oscuro o del sistema)',
+    security: writeSecurity,
+    request: { body: { content: { 'application/json': { schema: preferencesSchema } } } },
+    responses: { 204: noContent('Guardado'), 400: invalidInput, 401: unauthenticated, 403: forbidden },
   })
 
   registry.registerPath({

@@ -40,6 +40,45 @@
   --success: oklch(0.55 0.13 155);
   --border: oklch(0.92 0.005 250);
   --ring: oklch(0.52 0.09 200 / 40%);
+  --pro-teal: oklch(0.55 0.1 195);
+  --pro-blue: oklch(0.55 0.15 250);
+  --pro-indigo: oklch(0.5 0.17 275);
+  --pro-violet: oklch(0.55 0.17 300);
+  --pro-pink: oklch(0.6 0.18 350);
+  --pro-red: oklch(0.57 0.19 25);
+  --pro-orange: oklch(0.65 0.16 50);
+  --pro-amber: oklch(0.72 0.15 80);
+  --pro-green: oklch(0.58 0.14 150);
+  --pro-slate: oklch(0.52 0.03 250);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.17 0.01 250);
+  --foreground: oklch(0.93 0.01 250);
+  --card: oklch(0.21 0.012 250);
+  --card-foreground: oklch(0.93 0.01 250);
+  --primary: oklch(0.68 0.1 200);
+  --primary-foreground: oklch(0.16 0.02 250);
+  --secondary: oklch(0.27 0.012 250);
+  --secondary-foreground: oklch(0.9 0.01 250);
+  --muted: oklch(0.26 0.012 250);
+  --muted-foreground: oklch(0.7 0.015 250);
+  --destructive: oklch(0.68 0.19 25);
+  --success: oklch(0.7 0.14 155);
+  --border: oklch(0.32 0.012 250);
+  --ring: oklch(0.68 0.1 200 / 45%);
+  --pro-teal: oklch(0.68 0.1 195);
+  --pro-blue: oklch(0.68 0.13 250);
+  --pro-indigo: oklch(0.65 0.14 275);
+  --pro-violet: oklch(0.68 0.14 300);
+  --pro-pink: oklch(0.72 0.15 350);
+  --pro-red: oklch(0.68 0.17 25);
+  --pro-orange: oklch(0.74 0.14 50);
+  --pro-amber: oklch(0.8 0.13 80);
+  --pro-green: oklch(0.72 0.13 150);
+  --pro-slate: oklch(0.68 0.03 250);
+  color-scheme: dark;
 }
 
 @layer base {
@@ -113,24 +152,57 @@
   color: var(--primary-foreground);
 }
 
-.fc-estado-scheduled {
-  --fc-event-bg-color: var(--primary);
-  --fc-event-border-color: var(--primary);
+.fc-pro-teal { --pro: var(--pro-teal); }
+.fc-pro-blue { --pro: var(--pro-blue); }
+.fc-pro-indigo { --pro: var(--pro-indigo); }
+.fc-pro-violet { --pro: var(--pro-violet); }
+.fc-pro-pink { --pro: var(--pro-pink); }
+.fc-pro-red { --pro: var(--pro-red); }
+.fc-pro-orange { --pro: var(--pro-orange); }
+.fc-pro-amber { --pro: var(--pro-amber); }
+.fc-pro-green { --pro: var(--pro-green); }
+.fc-pro-slate { --pro: var(--pro-slate); }
+
+.fc .fc-turno.fc-event {
+  --fc-event-bg-color: color-mix(in oklch, var(--pro, var(--primary)) 16%, var(--card));
+  --fc-event-border-color: var(--pro, var(--primary));
+  --fc-event-text-color: var(--foreground);
+  border-left-width: 4px;
 }
 
-.fc-estado-confirmed {
-  --fc-event-bg-color: var(--success);
-  --fc-event-border-color: var(--success);
+.fc .fc-turno.fc-estado-confirmed,
+.fc .fc-turno.fc-estado-attended {
+  --fc-event-bg-color: var(--pro, var(--primary));
+  --fc-event-text-color: white;
 }
 
-.fc-estado-attended {
-  --fc-event-bg-color: oklch(0.55 0.02 250);
-  --fc-event-border-color: oklch(0.55 0.02 250);
+.fc .fc-turno.fc-estado-attended {
+  opacity: 0.55;
 }
 
-.fc-estado-no_show {
-  --fc-event-bg-color: var(--destructive);
-  --fc-event-border-color: var(--destructive);
+.fc .fc-turno.fc-estado-no_show {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.fc .fc-turno.fc-estado-cancelled {
+  --fc-event-bg-color: transparent;
+  --fc-event-border-color: var(--muted-foreground);
+  --fc-event-text-color: var(--muted-foreground);
+  border-style: dashed;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.fc .fc-list-event.fc-turno .fc-list-event-dot {
+  border-color: var(--pro, var(--primary));
+}
+
+.fc .fc-aviso.fc-event {
+  --fc-event-bg-color: color-mix(in oklch, var(--pro, var(--muted-foreground)) 14%, var(--card));
+  --fc-event-border-color: color-mix(in oklch, var(--pro, var(--muted-foreground)) 45%, var(--card));
+  --fc-event-text-color: var(--foreground);
+  font-size: 0.72rem;
 }
 
 .fc .fc-bg-event.fc-disponible {

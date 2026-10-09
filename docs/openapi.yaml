@@ -139,6 +139,8 @@ components:
           type: boolean
         onboardingCompleted:
           type: boolean
+        theme:
+          $ref: "#/components/schemas/ThemePreference"
       required:
         - id
         - username
@@ -148,12 +150,19 @@ components:
         - branchIds
         - mustChangePassword
         - onboardingCompleted
+        - theme
     Role:
       type: string
       enum:
         - ADMIN
         - DENTIST
         - RECEPTIONIST
+    ThemePreference:
+      type: string
+      enum:
+        - SYSTEM
+        - LIGHT
+        - DARK
     SetupInput:
       type: object
       properties:
@@ -243,6 +252,13 @@ components:
       required:
         - currentPassword
         - newPassword
+    PreferencesInput:
+      type: object
+      properties:
+        theme:
+          $ref: "#/components/schemas/ThemePreference"
+      required:
+        - theme
     User:
       type: object
       properties:
@@ -436,6 +452,8 @@ components:
           type:
             - string
             - "null"
+        color:
+          $ref: "#/components/schemas/ProfessionalColor"
         practiceIds:
           type: array
           items:
@@ -455,9 +473,27 @@ components:
         - licenseNumber
         - phone
         - email
+        - color
         - practiceIds
         - active
         - branchIds
+    ProfessionalColor:
+      type:
+        - string
+        - "null"
+      enum:
+        - teal
+        - blue
+        - indigo
+        - violet
+        - pink
+        - red
+        - orange
+        - amber
+        - green
+        - slate
+        - null
+      description: Color con el que se lo identifica en la agenda
     SaveProfessionalInput:
       type: object
       properties:
@@ -475,6 +511,8 @@ components:
             - string
             - "null"
           maxLength: 120
+        color:
+          $ref: "#/components/schemas/ProfessionalColor"
         practiceIds:
           type: array
           items:
@@ -1445,8 +1483,13 @@ components:
               maxLength: 300
           required:
             - reason
-          description: "Solo administración: permite dar el turno fuera de la
-            disponibilidad del profesional. Nunca permite superponer turnos"
+          description: "Solo administración: permite dar el turno aunque el profesional
+            esté de vacaciones, ausente o bloqueado. Nunca permite superponer
+            turnos"
+        acknowledgeWarnings:
+          type: boolean
+          description: Confirma que se da el turno aunque esté fuera del horario del
+            profesional o con una práctica que no tiene habilitada
       required:
         - patientId
         - professionalId
@@ -1487,8 +1530,13 @@ components:
               maxLength: 300
           required:
             - reason
-          description: "Solo administración: permite dar el turno fuera de la
-            disponibilidad del profesional. Nunca permite superponer turnos"
+          description: "Solo administración: permite dar el turno aunque el profesional
+            esté de vacaciones, ausente o bloqueado. Nunca permite superponer
+            turnos"
+        acknowledgeWarnings:
+          type: boolean
+          description: Confirma que se da el turno aunque esté fuera del horario del
+            profesional o con una práctica que no tiene habilitada
     ChangeAppointmentStatusInput:
       type: object
       properties:
@@ -1707,6 +1755,38 @@ paths:
         "422":
           description: Contraseña actual incorrecta, igual a la actual o que no cumple los
             requisitos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/auth/preferences:
+    put:
+      tags:
+        - Auth
+      summary: Guarda las preferencias del usuario (tema claro, oscuro o del sistema)
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesInput"
+      responses:
+        "204":
+          description: Guardado
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
           content:
             application/json:
               schema:

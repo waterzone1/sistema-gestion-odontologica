@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { FormError } from '@/components/form-error'
 import { Alert } from '@/components/ui/alert'
@@ -11,6 +11,8 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useSaveProfessional } from '@/hooks/use-catalog'
 import type { Professional } from '@/lib/api'
+import { colorVar, PROFESSIONAL_COLORS, type ProfessionalColor } from '@/lib/professional-colors'
+import { cn } from '@/lib/utils'
 
 const schema = z.object({
   licenseNumber: z.string().trim().min(1, 'Ingresá la matrícula').max(40),
@@ -23,6 +25,7 @@ const schema = z.object({
     .trim()
     .refine((value) => value === '' || z.email().safeParse(value).success, 'Email inválido'),
   active: z.boolean(),
+  color: z.string().nullable(),
 })
 type Values = z.infer<typeof schema>
 
@@ -31,6 +34,7 @@ export function ProfileForm({ professional, editable }: { professional: Professi
   const [saved, setSaved] = useState(false)
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<Values>({
@@ -40,6 +44,7 @@ export function ProfileForm({ professional, editable }: { professional: Professi
       phone: professional.phone ?? '',
       email: professional.email ?? '',
       active: professional.active,
+      color: professional.color,
     },
   })
 
@@ -48,7 +53,12 @@ export function ProfileForm({ professional, editable }: { professional: Professi
       onSubmit={handleSubmit((values) => {
         setSaved(false)
         save.mutate(
-          { ...values, phone: values.phone || null, email: values.email || null },
+          {
+            ...values,
+            phone: values.phone || null,
+            email: values.email || null,
+            color: values.color as ProfessionalColor | null,
+          },
           { onSuccess: () => setSaved(true) },
         )
       })}
@@ -67,6 +77,33 @@ export function ProfileForm({ professional, editable }: { professional: Professi
         <Field label="Email" htmlFor="email" error={errors.email?.message} className="sm:col-span-2">
           <Input id="email" type="email" {...register('email')} aria-invalid={!!errors.email} />
         </Field>
+        <Controller
+          control={control}
+          name="color"
+          render={({ field }) => (
+            <div role="radiogroup" aria-label="Color en la agenda" className="space-y-2 sm:col-span-2">
+              <p className="text-sm font-medium">Color en la agenda</p>
+              <div className="flex flex-wrap gap-2">
+                {PROFESSIONAL_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={field.value === color.value}
+                    aria-label={color.label}
+                    title={color.label}
+                    onClick={() => field.onChange(color.value)}
+                    className={cn(
+                      'size-8 rounded-full border-2 border-transparent transition-transform hover:scale-110',
+                      field.value === color.value && 'border-foreground ring-2 ring-ring',
+                    )}
+                    style={{ backgroundColor: colorVar(color.value) }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        />
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox" {...register('active')} />
           Activo: puede recibir turnos

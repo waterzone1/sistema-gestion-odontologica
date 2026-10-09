@@ -26,6 +26,7 @@ export interface ProfessionalInput {
   licenseNumber: string
   phone?: string | null
   email?: string | null
+  color?: Professional['color']
   practiceIds?: string[]
   active?: boolean
 }

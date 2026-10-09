@@ -83,10 +83,9 @@ describe('horario semanal', () => {
     expect(await db.auditLog.count({ where: { action: 'AVAILABILITY_RULES_CHANGED' } })).toBe(1)
   })
 
-  it('solo administracion edita el horario', async () => {
-    for (const cliente of [recepcion, odontologo]) {
-      expect((await as(app, cliente).put(reglas(), horarioBase())).status).toBe(403)
-    }
+  it('administracion y recepcion editan el horario; el odontologo no', async () => {
+    expect((await as(app, odontologo).put(reglas(), horarioBase())).status).toBe(403)
+    expect((await as(app, recepcion).put(reglas(), horarioBase())).status).toBe(200)
   })
 
   it('rechaza franjas superpuestas, invertidas o en sedes ajenas', async () => {
@@ -112,12 +111,20 @@ describe('turnos y disponibilidad', () => {
     await as(app, admin).put(reglas(), horarioBase()).expect(200)
   })
 
-  it('acepta turnos dentro del horario y rechaza los de afuera', async () => {
+  it('fuera del horario advierte y, si se confirma, da el turno y lo audita', async () => {
     expect((await as(app, recepcion).post('/api/appointments', turno(LUNES, 10))).status).toBe(201)
     const almuerzo = await as(app, recepcion).post('/api/appointments', turno(LUNES, 13))
-    expect([almuerzo.status, codigo(almuerzo)]).toEqual([422, 'OUTSIDE_AVAILABILITY'])
+    expect([almuerzo.status, codigo(almuerzo)]).toEqual([422, 'SCHEDULE_WARNINGS'])
+    expect(almuerzo.body).toMatchObject({
+      error: { details: { warnings: ['Fuera del horario de atención del profesional en esa sede'] } },
+    })
+    const confirmado = await as(app, recepcion).post('/api/appointments', turno(LUNES, 13, { acknowledgeWarnings: true }))
+    expect(confirmado.status).toBe(201)
+    expect(confirmado.body).toMatchObject({ availabilityOverride: false })
+    const auditoria = await db.auditLog.findFirstOrThrow({ where: { action: 'APPOINTMENT_WARNINGS_ACCEPTED' } })
+    expect(auditoria.metadata).toMatchObject({ advertencias: ['Fuera del horario de atención del profesional en esa sede'] })
     const otraSede = await as(app, admin).post('/api/appointments', turno(LUNES, 10, { branchId: seed.secondBranchId }))
-    expect(otraSede.status).toBe(422)
+    expect(codigo(otraSede)).toBe('SCHEDULE_WARNINGS')
   })
 
   it('reprogramar tambien respeta el horario', async () => {
@@ -126,7 +133,7 @@ describe('turnos y disponibilidad', () => {
       startsAt: hora(LUNES, 19),
       endsAt: hora(LUNES, 19, 30),
     })
-    expect(codigo(fuera)).toBe('OUTSIDE_AVAILABILITY')
+    expect(codigo(fuera)).toBe('SCHEDULE_WARNINGS')
     const notas = await as(app, recepcion).patch(`/api/appointments/${creado.id}`, { notes: 'Trae estudios' })
     expect(notas.status).toBe(200)
   })
@@ -226,7 +233,7 @@ describe('agenda: franjas por sede', () => {
 })
 
 describe('practicas por profesional', () => {
-  it('guarda telefono, email y practicas, y restringe los turnos a esas practicas', async () => {
+  it('guarda telefono, email, color y practicas, y advierte si el turno es de otra practica', async () => {
     await as(app, admin).put(reglas(), horarioBase()).expect(200)
     const consulta = await seedPractice(db, seed, { code: 'CON' })
     const blanqueo = await seedPractice(db, seed, { code: 'BLA' })
@@ -238,13 +245,25 @@ describe('practicas por profesional', () => {
       licenseNumber: 'MP-77',
       phone: '11 4000-1234',
       email: 'paz@consultorio.test',
+      color: 'violet',
       practiceIds: [consulta.id],
     })
     expect(guardado.status).toBe(200)
-    expect(guardado.body).toMatchObject({ phone: '11 4000-1234', email: 'paz@consultorio.test', practiceIds: [consulta.id] })
+    expect(guardado.body).toMatchObject({
+      phone: '11 4000-1234',
+      email: 'paz@consultorio.test',
+      color: 'violet',
+      practiceIds: [consulta.id],
+    })
 
     const noRealiza = await as(app, recepcion).post('/api/appointments', turno(LUNES, 10, { practiceId: blanqueo.id }))
-    expect([noRealiza.status, codigo(noRealiza)]).toEqual([422, 'PRACTICE_NOT_OFFERED'])
+    expect([noRealiza.status, codigo(noRealiza)]).toEqual([422, 'SCHEDULE_WARNINGS'])
+    expect(noRealiza.body).toMatchObject({ error: { details: { warnings: ['El profesional no tiene habilitada esa práctica'] } } })
+    const confirmado = await as(app, recepcion).post(
+      '/api/appointments',
+      turno(LUNES, 12, { practiceId: blanqueo.id, acknowledgeWarnings: true }),
+    )
+    expect(confirmado.status).toBe(201)
     expect((await as(app, recepcion).post('/api/appointments', turno(LUNES, 10, { practiceId: consulta.id }))).status).toBe(201)
     expect((await as(app, recepcion).post('/api/appointments', turno(LUNES, 11))).status).toBe(201)
   })
@@ -253,6 +272,8 @@ describe('practicas por profesional', () => {
     const usuario = await db.professionalProfile.findUniqueOrThrow({ where: { id: perfilId } })
     const email = await as(app, admin).put(`/api/professionals/${usuario.userId}`, { licenseNumber: 'MP-1', email: 'no-es-email' })
     expect(email.status).toBe(400)
+    const color = await as(app, admin).put(`/api/professionals/${usuario.userId}`, { licenseNumber: 'MP-1', color: 'fucsia' })
+    expect(color.status).toBe(400)
     const practica = await as(app, admin).put(`/api/professionals/${usuario.userId}`, {
       licenseNumber: 'MP-1',
       practiceIds: ['00000000-0000-7000-8000-000000000000'],

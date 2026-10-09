@@ -119,7 +119,12 @@ interface AvailabilityCheck {
   timeZone: string
 }
 
-export function availabilityProblem(check: AvailabilityCheck): string | null {
+export interface AvailabilityResult {
+  blocked: string | null
+  warning: string | null
+}
+
+export function checkAvailability(check: AvailabilityCheck): AvailabilityResult {
   const { startsAt, endsAt, branchId, rules, exceptions, timeZone } = check
   const start = startsAt.getTime()
   const end = endsAt.getTime()
@@ -130,11 +135,11 @@ export function availabilityProblem(check: AvailabilityCheck): string | null {
       (e.branchId === null || e.branchId === branchId) &&
       overlaps(start, end, e.startsAt.getTime(), e.endsAt.getTime()),
   )
-  if (blocking) return `El profesional no atiende en ese horario: ${EXCEPTION_LABELS[blocking.type]}`
+  if (blocking) return { blocked: `El profesional no atiende en ese horario: ${EXCEPTION_LABELS[blocking.type]}`, warning: null }
 
   const from = toLocal(startsAt, timeZone)
   const to = toLocal(new Date(end - 1), timeZone)
-  if (from.day !== to.day) return 'El turno debe empezar y terminar el mismo día'
+  if (from.day !== to.day) return { blocked: null, warning: 'El turno pasa de un día a otro' }
 
   const windows = mergeIntervals([
     ...rules
@@ -151,7 +156,7 @@ export function availabilityProblem(check: AvailabilityCheck): string | null {
   ])
   const endMinute = to.minute + 1
   const covered = windows.some(([windowStart, windowEnd]) => windowStart <= from.minute && endMinute <= windowEnd)
-  return covered ? null : 'Fuera del horario de atención del profesional en esa sede'
+  return { blocked: null, warning: covered ? null : 'Fuera del horario de atención del profesional en esa sede' }
 }
 
 export interface Interval {

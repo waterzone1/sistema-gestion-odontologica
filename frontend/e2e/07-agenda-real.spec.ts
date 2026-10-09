@@ -64,32 +64,33 @@ test('el administrador carga el horario semanal de la profesional', async ({ pag
   await expect(page.getByText('Horario guardado.')).toBeVisible()
 })
 
-test('recepción no puede dar un turno fuera del horario, sí dentro', async ({ page }) => {
+test('fuera del horario avisa y recepción puede dar el turno igual', async ({ page }) => {
   await ingresar(page, RECEPCION)
-  const fuera = await turnoParaGomez(page, '15:00')
-  await expect(fuera.getByText('Fuera del horario de atención del profesional en esa sede')).toBeVisible()
-  await expect(fuera.getByLabel('Dar el turno igual (fuera de horario)')).toHaveCount(0)
-  await page.screenshot({ path: captura('28-fuera-de-horario') })
-  await fuera.getByLabel('Hora', { exact: true }).fill('10:00')
-  await fuera.getByRole('button', { name: 'Crear turno' }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-})
-
-test('el administrador puede forzar un turno fuera de horario con motivo', async ({ page }) => {
-  await ingresar(page, ADMIN)
-  const dialogo = await turnoParaGomez(page, '18:00')
+  const dialogo = await turnoParaGomez(page, '15:00')
   await expect(dialogo.getByText('Fuera del horario de atención del profesional en esa sede')).toBeVisible()
-  await dialogo.getByLabel('Dar el turno igual (fuera de horario)').fill('Urgencia por dolor agudo')
-  await page.screenshot({ path: captura('29-override') })
-  await dialogo.getByRole('button', { name: 'Crear turno' }).click()
+  const crear = dialogo.getByRole('button', { name: 'Crear turno' })
+  await expect(crear).toBeDisabled()
+  await page.screenshot({ path: captura('28-advertencia-fuera-de-horario') })
+  await dialogo.getByLabel('Hora', { exact: true }).fill('10:00')
+  await expect(dialogo.getByText('Fuera del horario de atención del profesional en esa sede')).toHaveCount(0)
+  await crear.click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  const otro = await turnoParaGomez(page, '15:00')
+  await otro.getByLabel('Dar el turno igual').check()
+  await otro.getByRole('button', { name: 'Crear turno' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('recepción carga vacaciones y ve los turnos afectados', async ({ page }) => {
+test('recepción administra el horario y carga vacaciones', async ({ page }) => {
   await ingresar(page, RECEPCION)
   await page.goto('/professionals')
   await page.getByRole('link', { name: new RegExp(GOMEZ.displayName) }).click()
-  await expect(page.getByRole('button', { name: 'Guardar horario' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Guardar horario' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Datos' }).click()
+  await page.getByRole('radio', { name: 'Violeta' }).click()
+  await page.getByRole('button', { name: 'Guardar datos' }).click()
+  await expect(page.getByText('Datos guardados.')).toBeVisible()
   await page.getByRole('tab', { name: 'Excepciones' }).click()
   await page.getByRole('button', { name: 'Nueva excepción' }).click()
   const dialogo = page.getByRole('dialog')
@@ -101,6 +102,28 @@ test('recepción carga vacaciones y ve los turnos afectados', async ({ page }) =
   await expect(page.getByText('Hay turnos dentro de ese período')).toBeVisible()
   await expect(page.getByText('Congreso de odontología')).toBeVisible()
   await page.screenshot({ path: captura('30-excepciones'), fullPage: true })
+})
+
+test('durante las vacaciones solo el administrador puede forzar un turno, con motivo', async ({ page }) => {
+  await ingresar(page, RECEPCION)
+  const deRecepcion = await turnoParaGomez(page, '11:00')
+  await expect(deRecepcion.getByText(/El profesional no atiende en ese horario: vacaciones/)).toBeVisible()
+  await expect(deRecepcion.getByLabel('Dar el turno igual aunque el profesional no atienda')).toHaveCount(0)
+  await page.context().clearCookies()
+
+  await ingresar(page, ADMIN)
+  const dialogo = await turnoParaGomez(page, '11:00')
+  await expect(dialogo.getByText(/El profesional no atiende en ese horario: vacaciones/)).toBeVisible()
+  await dialogo.getByLabel('Dar el turno igual aunque el profesional no atienda').fill('Urgencia por dolor agudo')
+  await page.screenshot({ path: captura('29-override') })
+  await dialogo.getByRole('button', { name: 'Crear turno' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.goto('/agenda')
+  await page.getByLabel('Ir a la fecha').fill(fechaTexto(proximoLunes))
+  await page.getByRole('button', { name: 'Ir', exact: true }).click()
+  await expect(page.getByText(`${GOMEZ.displayName} · Vacaciones`)).toBeVisible()
+  await page.screenshot({ path: captura('31b-agenda-avisos-y-colores'), fullPage: true })
 })
 
 test('el inicio de recepción lista los turnos de mañana para confirmar', async ({ page }) => {

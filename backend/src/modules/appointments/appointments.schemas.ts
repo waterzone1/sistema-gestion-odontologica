@@ -16,10 +16,15 @@ const notesSchema = z
 
 export const appointmentIdParamsSchema = z.object({ id: z.uuid() })
 
+const acknowledgeSchema = z
+  .boolean()
+  .optional()
+  .meta({ description: 'Confirma que se da el turno aunque esté fuera del horario del profesional o con una práctica que no tiene habilitada' })
+
 const overrideSchema = z
   .object({ reason: z.string().trim().min(5, 'Explicá por qué se da el turno fuera de horario').max(300) })
   .optional()
-  .meta({ description: 'Solo administración: permite dar el turno fuera de la disponibilidad del profesional. Nunca permite superponer turnos' })
+  .meta({ description: 'Solo administración: permite dar el turno aunque el profesional esté de vacaciones, ausente o bloqueado. Nunca permite superponer turnos' })
 
 export const createAppointmentSchema = z
   .object({
@@ -31,6 +36,7 @@ export const createAppointmentSchema = z
     endsAt: instantSchema,
     notes: notesSchema,
     override: overrideSchema,
+    acknowledgeWarnings: acknowledgeSchema,
   })
   .meta({ id: 'CreateAppointmentInput' })
 
@@ -43,6 +49,7 @@ export const updateAppointmentSchema = z
     endsAt: instantSchema,
     notes: notesSchema,
     override: overrideSchema,
+    acknowledgeWarnings: acknowledgeSchema,
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'No hay cambios para guardar' })

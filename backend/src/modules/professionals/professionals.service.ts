@@ -7,11 +7,16 @@ import type { AuthContext } from '../auth/auth.types.js'
 
 export const professionalParamsSchema = z.object({ userId: z.uuid() })
 
+const PROFESSIONAL_COLORS = ['teal', 'blue', 'indigo', 'violet', 'pink', 'red', 'orange', 'amber', 'green', 'slate'] as const
+
+const colorSchema = z.enum(PROFESSIONAL_COLORS).meta({ id: 'ProfessionalColor', description: 'Color con el que se lo identifica en la agenda' })
+
 export const saveProfessionalSchema = z
   .object({
     licenseNumber: z.string().trim().min(1, 'Ingresá la matrícula').max(40),
     phone: phoneSchema,
     email: emailSchema,
+    color: colorSchema.nullable().optional(),
     practiceIds: z
       .array(z.uuid())
       .max(200)
@@ -29,6 +34,7 @@ export const professionalSchema = z
     licenseNumber: z.string(),
     phone: z.string().nullable(),
     email: z.string().nullable(),
+    color: colorSchema.nullable(),
     practiceIds: z.array(z.uuid()),
     active: z.boolean(),
     branchIds: z.array(z.uuid()),
@@ -52,6 +58,7 @@ function toDto(profile: ProfileRecord): ProfessionalDto {
     licenseNumber: profile.licenseNumber,
     phone: profile.phone,
     email: profile.email,
+    color: (PROFESSIONAL_COLORS as readonly string[]).includes(profile.color ?? '') ? (profile.color as ProfessionalDto['color']) : null,
     practiceIds: profile.practices.map((p) => p.practiceId),
     active: profile.active,
     branchIds: profile.user.branches.map((b) => b.branchId),
@@ -98,12 +105,14 @@ export async function saveProfessional(
         licenseNumber: input.licenseNumber,
         phone: input.phone ?? null,
         email: input.email ?? null,
+        color: input.color ?? null,
         active: input.active ?? true,
       },
       update: {
         licenseNumber: input.licenseNumber,
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.color !== undefined ? { color: input.color } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
       },
     })
