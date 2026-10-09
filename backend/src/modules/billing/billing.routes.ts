@@ -5,6 +5,7 @@ import {
   adjustPriceSchema,
   billingPatientParamsSchema,
   createChargeSchema,
+  creditParamsSchema,
   createServiceSchema,
   paymentParamsSchema,
   serviceParamsSchema,
@@ -53,6 +54,12 @@ export function patientBillingRouter(db: Db): Router {
     const { patientId, paymentId } = paymentParamsSchema.parse(req.params)
     const { reason } = voidSchema.parse(req.body)
     res.json(await billing.voidPayment(db, authOf(req), patientId, paymentId, reason))
+  })
+
+  router.post('/credits/:creditId/void', requirePermission('payments:void'), async (req: Request, res: Response) => {
+    const { patientId, creditId } = creditParamsSchema.parse(req.params)
+    const { reason } = voidSchema.parse(req.body)
+    res.json(await billing.voidCreditApplication(db, authOf(req), patientId, creditId, reason))
   })
 
   return router

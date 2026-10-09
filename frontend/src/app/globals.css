@@ -85,6 +85,10 @@
   gap: 0.25rem;
 }
 
+.fc .fc-timegrid-event .fc-event-main {
+  overflow: hidden;
+}
+
 .fc .fc-timeGridWeek-view .fc-scrollgrid {
   min-width: 42rem;
 }

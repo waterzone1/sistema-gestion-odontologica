@@ -107,6 +107,12 @@ const ENDPOINTS: Endpoint[] = [
     body: { reason: 'Error de carga' },
     allowed: ADMIN_Y_RECEPCION,
   },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/credits/${FANTASMA}/void`,
+    body: { reason: 'Error de carga' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
   { method: 'get', path: '/api/debtors', allowed: ADMIN_Y_RECEPCION },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]

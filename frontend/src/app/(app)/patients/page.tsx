@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FormError } from '@/components/form-error'
+import { Pagination } from '@/components/pagination'
 import { EmptyState, LoadingBlock, PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -124,20 +125,12 @@ export default function PatientsPage() {
             </table>
           </div>
 
-          <nav aria-label="Paginación" className="mt-4 flex items-center justify-between text-sm">
-            <p className="text-muted-foreground">
-              {patients.data.total} {patients.data.total === 1 ? 'paciente' : 'pacientes'} · Página {page} de{' '}
-              {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                Anterior
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                Siguiente
-              </Button>
-            </div>
-          </nav>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            summary={`${patients.data.total} ${patients.data.total === 1 ? 'paciente' : 'pacientes'}`}
+            onChange={setPage}
+          />
         </>
       )}
 

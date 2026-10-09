@@ -6,6 +6,7 @@ import { PriceField } from '@/components/billing/price-field'
 import { ReasonDialog } from '@/components/billing/reason-dialog'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
+import { Pagination, usePagedList } from '@/components/pagination'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
@@ -30,6 +31,7 @@ export function ServicesTab({ patientId, canRecord, canPrice, archived }: Props)
   const [adjusting, setAdjusting] = useState<PerformedService | null>(null)
   const [voiding, setVoiding] = useState<PerformedService | null>(null)
   const voidService = useVoid(patientId, 'services')
+  const paged = usePagedList(services.data ?? [])
 
   if (services.isPending) return <LoadingBlock />
   if (services.isError) return <FormError error={services.error} />
@@ -50,7 +52,7 @@ export function ServicesTab({ patientId, canRecord, canPrice, archived }: Props)
           <EmptyState title="Todavía no tiene prestaciones registradas" />
         ) : (
           <ul className="divide-y rounded-lg border bg-card shadow-sm">
-            {services.data.map((service) => (
+            {paged.items.map((service) => (
               <li key={service.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 text-sm">
                   <p className="font-medium">
@@ -93,6 +95,15 @@ export function ServicesTab({ patientId, canRecord, canPrice, archived }: Props)
               </li>
             ))}
           </ul>
+        )}
+        {paged.totalPages > 1 && (
+          <Pagination
+            label="Paginación de prestaciones"
+            page={paged.page}
+            totalPages={paged.totalPages}
+            summary={`${services.data.length} prestaciones`}
+            onChange={paged.setPage}
+          />
         )}
       </section>
 

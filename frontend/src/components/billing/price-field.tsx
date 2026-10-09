@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { adjustByPercent, isValidAmount, PRICE_PRESETS } from '@/lib/billing'
+import { adjustByPercent, isValidAmount, normalizeAmount, PRICE_PRESETS } from '@/lib/billing'
 import { formatMoney } from '@/lib/format'
 
 interface Props {
@@ -15,6 +15,23 @@ interface Props {
 
 export function PriceField({ id, value, onChange, catalogPrice }: Props) {
   const invalid = value !== '' && !isValidAmount(value)
+  const current = isValidAmount(value) ? Number(normalizeAmount(value)).toFixed(2) : null
+  const preset = (percent: number) => {
+    const target = adjustByPercent(catalogPrice, percent)
+    const active = current === target
+    return (
+      <Button
+        key={percent}
+        type="button"
+        variant={active ? 'default' : 'outline'}
+        size="sm"
+        aria-pressed={active}
+        onClick={() => onChange(target)}
+      >
+        {percent === 0 ? 'Catálogo' : `${percent > 0 ? '+' : ''}${percent} %`}
+      </Button>
+    )
+  }
   return (
     <Field
       label="Precio"
@@ -31,20 +48,7 @@ export function PriceField({ id, value, onChange, catalogPrice }: Props) {
         aria-invalid={invalid}
       />
       <div className="flex flex-wrap gap-1.5">
-        {PRICE_PRESETS.map((percent) => (
-          <Button
-            key={percent}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onChange(adjustByPercent(catalogPrice, percent))}
-          >
-            {percent > 0 ? `+${percent}` : percent} %
-          </Button>
-        ))}
-        <Button type="button" variant="outline" size="sm" onClick={() => onChange(adjustByPercent(catalogPrice, 0))}>
-          Catálogo
-        </Button>
+        {[...PRICE_PRESETS, 0].map(preset)}
       </div>
     </Field>
   )

@@ -33,7 +33,6 @@ const createSchema = z
       .regex(/^[a-z0-9._-]+$/, 'Solo letras, números, punto, guion y guion bajo'),
     password: z.string().min(10, 'Debe tener al menos 10 caracteres'),
     licenseNumber: z.string().trim(),
-    specialty: z.string().trim(),
   })
   .refine((v) => !requiresBranch(v.roles) || v.branchIds.length > 0, {
     path: ['branchIds'],
@@ -98,7 +97,7 @@ function UserForm({
     resolver: zodResolver(editing ? editSchema : createSchema),
     defaultValues: editing
       ? { displayName: user.displayName, roles: user.roles, branchIds: user.branchIds }
-      : { username: '', displayName: '', password: '', roles: [], branchIds: [], licenseNumber: '', specialty: '' },
+      : { username: '', displayName: '', password: '', roles: [], branchIds: [], licenseNumber: '' },
   })
   const {
     register,
@@ -112,13 +111,10 @@ function UserForm({
   const save = useMutation({
     mutationFn: async (values: CreateValues | EditValues) => {
       if (editing) return api.patch<User>(`/api/users/${user.id}`, values)
-      const { licenseNumber, specialty, ...data } = values as CreateValues
+      const { licenseNumber, ...data } = values as CreateValues
       const created = await api.post<User>('/api/users', data)
       if (data.roles.includes('DENTIST')) {
-        await api.put<Professional>(`/api/professionals/${created.id}`, {
-          licenseNumber,
-          specialty: specialty ? specialty : null,
-        })
+        await api.put<Professional>(`/api/professionals/${created.id}`, { licenseNumber })
       }
       return created
     },
@@ -191,14 +187,9 @@ function UserForm({
         />
 
         {!editing && roles.includes('DENTIST') && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Matrícula" htmlFor="newLicenseNumber" error={fieldErrors['licenseNumber']?.message}>
-              <Input id="newLicenseNumber" {...register('licenseNumber')} aria-invalid={!!fieldErrors['licenseNumber']} />
-            </Field>
-            <Field label="Especialidad (opcional)" htmlFor="newSpecialty">
-              <Input id="newSpecialty" {...register('specialty')} />
-            </Field>
-          </div>
+          <Field label="Matrícula" htmlFor="newLicenseNumber" error={fieldErrors['licenseNumber']?.message}>
+            <Input id="newLicenseNumber" {...register('licenseNumber')} aria-invalid={!!fieldErrors['licenseNumber']} />
+          </Field>
         )}
 
         <DialogFooter>
@@ -226,7 +217,6 @@ function UserForm({
 
 const professionalSchema = z.object({
   licenseNumber: z.string().trim().min(1, 'Ingresá la matrícula'),
-  specialty: z.string().trim().optional(),
 })
 type ProfessionalValues = z.infer<typeof professionalSchema>
 
@@ -240,7 +230,6 @@ function ProfessionalSection({ user, onSaved }: { user: User; onSaved: () => voi
     resolver: zodResolver(professionalSchema),
     defaultValues: {
       licenseNumber: user.professional?.licenseNumber ?? '',
-      specialty: user.professional?.specialty ?? '',
     },
   })
 
@@ -248,7 +237,6 @@ function ProfessionalSection({ user, onSaved }: { user: User; onSaved: () => voi
     mutationFn: (v: ProfessionalValues) =>
       api.put<Professional>(`/api/professionals/${user.id}`, {
         licenseNumber: v.licenseNumber,
-        specialty: v.specialty ? v.specialty : null,
       }),
     onSuccess: () => {
       setSaved(true)
@@ -271,14 +259,9 @@ function ProfessionalSection({ user, onSaved }: { user: User; onSaved: () => voi
       >
         <FormError error={save.error} />
         {saved && <Alert variant="info">Perfil profesional guardado.</Alert>}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Matrícula" htmlFor="licenseNumber" error={errors.licenseNumber?.message}>
-            <Input id="licenseNumber" {...register('licenseNumber')} aria-invalid={!!errors.licenseNumber} />
-          </Field>
-          <Field label="Especialidad (opcional)" htmlFor="specialty">
-            <Input id="specialty" {...register('specialty')} />
-          </Field>
-        </div>
+        <Field label="Matrícula" htmlFor="licenseNumber" error={errors.licenseNumber?.message}>
+          <Input id="licenseNumber" {...register('licenseNumber')} aria-invalid={!!errors.licenseNumber} />
+        </Field>
         <div className="flex justify-end">
           <Button type="submit" variant="secondary" size="sm" disabled={save.isPending}>
             {save.isPending ? 'Guardando…' : 'Guardar perfil'}

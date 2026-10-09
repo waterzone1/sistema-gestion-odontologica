@@ -41,7 +41,6 @@ export const resetPasswordSchema = z
 const professionalSummarySchema = z
   .object({
     licenseNumber: z.string(),
-    specialty: z.string().nullable(),
     active: z.boolean(),
   })
   .meta({ id: 'ProfessionalSummary' })

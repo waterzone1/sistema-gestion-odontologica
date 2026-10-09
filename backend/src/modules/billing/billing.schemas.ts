@@ -12,6 +12,7 @@ const PAYMENT_METHODS = ['CASH', 'TRANSFER', 'CARD', 'MERCADOPAGO', 'OTHER'] as 
 export const billingPatientParamsSchema = z.object({ patientId: z.uuid() })
 export const serviceParamsSchema = z.object({ patientId: z.uuid(), serviceId: z.uuid() })
 export const paymentParamsSchema = z.object({ patientId: z.uuid(), paymentId: z.uuid() })
+export const creditParamsSchema = z.object({ patientId: z.uuid(), creditId: z.uuid() })
 
 export const createServiceSchema = z
   .object({
@@ -78,7 +79,9 @@ export const paymentSchema = z
   .object({
     id: z.uuid(),
     amount: z.string().meta({ example: '10000.00' }),
-    method: paymentMethodSchema,
+    method: z
+      .enum([...PAYMENT_METHODS, 'CREDIT'])
+      .meta({ id: 'MovementMethod', description: 'CREDIT es un uso de saldo a favor, no un ingreso de dinero' }),
     externalReference: z.string().nullable(),
     receivedAt: z.iso.datetime(),
     allocated: z.string(),
@@ -99,7 +102,7 @@ export const accountSchema = z
   .object({
     balance: z.string().meta({
       example: '15000.00',
-      description: 'Prestaciones vigentes menos pagos vigentes. Negativo si el paciente tiene saldo a favor',
+      description: 'Saldo a cobrar: lo que falta pagar de las prestaciones vigentes. El saldo a favor no se descuenta hasta usarlo',
     }),
     totalServices: z.string(),
     totalPayments: z.string(),

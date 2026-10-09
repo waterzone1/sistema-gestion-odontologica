@@ -100,7 +100,6 @@ erDiagram
   ProfessionalProfile { uuid id PK
     uuid userId FK,UK
     string licenseNumber
-    string specialty
     bool active }
   AvailabilityRule { uuid id PK
     uuid professionalId FK
