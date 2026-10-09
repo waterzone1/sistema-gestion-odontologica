@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays,
-  availabilityProblem,
+  checkAvailability,
   expandRules,
   fromLocal,
   rulesProblem,
@@ -19,8 +19,8 @@ const manana: Rule = { branchId: SEDE, weekday: 1, startMinute: 9 * 60, endMinut
 const tarde: Rule = { branchId: SEDE, weekday: 1, startMinute: 12 * 60, endMinute: 18 * 60 }
 const martesOtraSede: Rule = { branchId: OTRA, weekday: 2, startMinute: 8 * 60, endMinute: 13 * 60 }
 
-const chequear = (inicio: string, fin: string, extra: Partial<Parameters<typeof availabilityProblem>[0]> = {}) =>
-  availabilityProblem({
+const resultado = (inicio: string, fin: string, extra: Partial<Parameters<typeof checkAvailability>[0]> = {}) =>
+  checkAvailability({
     startsAt: at(inicio),
     endsAt: at(fin),
     branchId: SEDE,
@@ -62,7 +62,22 @@ describe('rulesProblem', () => {
   })
 })
 
-describe('availabilityProblem', () => {
+const chequear = (...args: Parameters<typeof resultado>) => {
+  const { blocked, warning } = resultado(...args)
+  return blocked ?? warning
+}
+
+describe('checkAvailability', () => {
+  it('separa lo que bloquea (ausencias) de lo que solo advierte (fuera de horario)', () => {
+    const vacaciones: Exception = { type: 'VACATION', branchId: null, startsAt: at('2026-10-12T00:00:00Z'), endsAt: at('2026-10-13T00:00:00Z') }
+    expect(resultado('2026-10-12T21:30:00Z', '2026-10-12T22:00:00Z')).toEqual({
+      blocked: null,
+      warning: 'Fuera del horario de atención del profesional en esa sede',
+    })
+    expect(resultado('2026-10-12T12:00:00Z', '2026-10-12T12:30:00Z', { exceptions: [vacaciones] }).blocked).toMatch(/vacaciones/)
+    expect(resultado('2026-10-12T12:00:00Z', '2026-10-12T12:30:00Z')).toEqual({ blocked: null, warning: null })
+  })
+
   it('permite un turno dentro del horario', () => {
     expect(chequear('2026-10-12T12:00:00Z', '2026-10-12T12:30:00Z')).toBeNull()
   })
@@ -88,7 +103,7 @@ describe('availabilityProblem', () => {
     const martes: Rule = { branchId: SEDE, weekday: 2, startMinute: 0, endMinute: 1440 }
     expect(
       chequear('2026-10-13T02:30:00Z', '2026-10-13T03:30:00Z', { rules: [veinticuatro, martes] }),
-    ).toBe('El turno debe empezar y terminar el mismo día')
+    ).toBe('El turno pasa de un día a otro')
   })
 
   it('un turno que termina justo a la medianoche entra en la franja hasta las 24', () => {

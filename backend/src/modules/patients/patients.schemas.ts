@@ -6,7 +6,6 @@ const documentTypeSchema = z.enum(['DNI', 'LE', 'LC', 'PASAPORTE', 'OTRO']).meta
 
 const nameSchema = (label: string) => z.string().trim().min(1, `Ingresá ${label}`).max(80)
 
-
 const documentNumberSchema = z
   .string()
   .trim()

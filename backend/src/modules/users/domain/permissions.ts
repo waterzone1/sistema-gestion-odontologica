@@ -67,9 +67,11 @@ export const ROLE_PERMISSIONS: RolePermissions = {
   ],
   RECEPTIONIST: [
     'professionals:read',
+    'professionals:manage',
     'patients:read',
     'patients:write',
     'practices:read',
+    'practices:manage',
     'appointments:read',
     'appointments:manage',
     'appointments:attend',

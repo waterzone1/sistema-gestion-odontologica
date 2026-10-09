@@ -48,16 +48,17 @@ enum Role {
 }
 
 model User {
-  id                  String   @id @default(uuid(7)) @db.Uuid
-  organizationId      String   @db.Uuid
+  id                  String          @id @default(uuid(7)) @db.Uuid
+  organizationId      String          @db.Uuid
   username            String
   displayName         String
   passwordHash        String
-  active              Boolean  @default(true)
-  mustChangePassword  Boolean  @default(false)
-  onboardingCompleted Boolean  @default(false)
-  createdAt           DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+  active              Boolean         @default(true)
+  mustChangePassword  Boolean         @default(false)
+  onboardingCompleted Boolean         @default(false)
+  theme               ThemePreference @default(SYSTEM)
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime        @updatedAt @db.Timestamptz(3)
 
   organization        Organization         @relation(fields: [organizationId], references: [id])
   roles               UserRole[]
@@ -113,6 +114,7 @@ model ProfessionalProfile {
   id            String   @id @default(uuid(7)) @db.Uuid
   userId        String   @unique @db.Uuid
   licenseNumber String
+  color         String?
   phone         String?
   email         String?
   active        Boolean  @default(true)
@@ -402,4 +404,10 @@ model ProfessionalPractice {
   practice     Practice            @relation(fields: [practiceId], references: [id])
 
   @@id([professionalId, practiceId])
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
 }

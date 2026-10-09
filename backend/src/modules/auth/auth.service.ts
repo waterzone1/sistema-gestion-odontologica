@@ -4,7 +4,7 @@ import { hashPassword, verifyAgainstDecoy, verifyPassword } from '../../shared/p
 import { recordAudit } from '../audit/audit.service.js'
 import { assertStrongPassword } from '../users/users.service.js'
 import type { AuthContext } from './auth.types.js'
-import type { ChangePasswordInput, LoginInput, SessionResponse } from './auth.schemas.js'
+import type { ChangePasswordInput, LoginInput, PreferencesInput, SessionResponse } from './auth.schemas.js'
 import {
   createSession,
   resolveSession,
@@ -29,6 +29,7 @@ export function toSessionResponse(auth: AuthContext): SessionResponse {
       branchIds: auth.branchIds,
       mustChangePassword: auth.mustChangePassword,
       onboardingCompleted: auth.onboardingCompleted,
+      theme: auth.theme,
     },
     csrfToken: auth.csrfToken,
   }
@@ -113,6 +114,10 @@ export async function changePassword(
       actorUserId: auth.userId,
     })
   })
+}
+
+export async function savePreferences(db: Db, auth: AuthContext, input: PreferencesInput): Promise<void> {
+  await db.user.update({ where: { id: auth.userId }, data: { theme: input.theme } })
 }
 
 export async function completeOnboarding(db: Db, auth: AuthContext): Promise<void> {

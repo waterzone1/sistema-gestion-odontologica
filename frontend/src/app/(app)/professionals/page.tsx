@@ -10,6 +10,7 @@ import { useBranches } from '@/hooks/use-admin'
 import { useProfessionals } from '@/hooks/use-catalog'
 import { useSession } from '@/hooks/use-session'
 import { can } from '@/lib/permissions'
+import { colorVar } from '@/lib/professional-colors'
 
 export default function ProfessionalsPage() {
   const router = useRouter()
@@ -48,7 +49,14 @@ export default function ProfessionalsPage() {
                 className="flex flex-col gap-1 px-4 py-3 hover:bg-muted sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="min-w-0 text-sm">
-                  <span className="font-medium">{professional.displayName}</span>
+                  <span className="flex items-center gap-2 font-medium">
+                    <span
+                      aria-hidden
+                      className="size-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: colorVar(professional.color) }}
+                    />
+                    {professional.displayName}
+                  </span>
                   <span className="block text-xs text-muted-foreground">
                     Matrícula {professional.licenseNumber}
                     {' · '}

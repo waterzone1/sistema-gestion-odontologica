@@ -8,7 +8,7 @@ import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Ban, Check, Plus, UserX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -26,11 +26,12 @@ import { useAgendaAvailability } from '@/hooks/use-availability'
 import { usePractices, useProfessionals } from '@/hooks/use-catalog'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSession } from '@/hooks/use-session'
-import { api, errorMessage, type Appointment, type AppointmentStatus } from '@/lib/api'
-import { isEditable, STATUS_LABELS } from '@/lib/appointments'
-import { EXCEPTION_LABELS } from '@/lib/availability'
+import { api, ApiError, errorMessage, type Appointment } from '@/lib/api'
+import { appointmentEvents, availabilityEvents, noticeEvents, type StatusFilter } from '@/lib/agenda'
+import { STATUS_LABELS } from '@/lib/appointments'
 import { formatDateTime, formatTime, maskDate, parseDateText } from '@/lib/format'
 import { can, visibleBranches } from '@/lib/permissions'
+import { colorVar } from '@/lib/professional-colors'
 import { Button } from '@/components/ui/button'
 
 function nextSlot(): Date {
@@ -58,7 +59,7 @@ export default function AgendaPage() {
   const [creating, setCreating] = useState<AppointmentDefaults | null>(null)
   const [editing, setEditing] = useState<Appointment | null>(null)
   const [selected, setSelected] = useState<Appointment | null>(null)
-  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | 'ACTIVE' | ''>('ACTIVE')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE')
   const [jumpTo, setJumpTo] = useState('')
   const calendar = useRef<FullCalendar>(null)
   const client = useQueryClient()
@@ -69,10 +70,11 @@ export default function AgendaPage() {
     end: Date
   } | null>(null)
   const move = useMutation({
-    mutationFn: ({ appointment, start, end }: { appointment: Appointment; start: Date; end: Date }) =>
+    mutationFn: ({ appointment, start, end, acknowledge }: { appointment: Appointment; start: Date; end: Date; acknowledge: boolean }) =>
       api.patch<Appointment>(`/api/appointments/${appointment.id}`, {
         startsAt: start.toISOString(),
         endsAt: end.toISOString(),
+        ...(acknowledge ? { acknowledgeWarnings: true } : {}),
       }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: appointmentsKey })
@@ -101,37 +103,11 @@ export default function AgendaPage() {
 
   if (!user || !allowed || branches.isPending || professionals.isPending) return <LoadingBlock />
 
-  const background = (availability.data ?? []).flatMap((professional) => [
-    ...professional.available.map((interval) => ({
-      start: interval.start,
-      end: interval.end,
-      display: 'background' as const,
-      classNames: ['fc-disponible'],
-    })),
-    ...(availabilityFor
-      ? professional.blocked.map((interval) => ({
-          start: interval.start,
-          end: interval.end,
-          display: 'background' as const,
-          classNames: ['fc-bloqueado'],
-          title: `${EXCEPTION_LABELS[interval.type]}: ${interval.reason}`,
-        }))
-      : []),
-  ])
-
-  const events = (appointments.data ?? [])
-    .filter((a) =>
-      statusFilter === 'ACTIVE' ? a.status !== 'CANCELLED' : statusFilter === '' ? true : a.status === statusFilter,
-    )
-    .map((a) => ({
-      id: a.id,
-      start: a.startsAt,
-      end: a.endsAt,
-      title: a.patient.fullName,
-      classNames: [`fc-estado-${a.status.toLowerCase()}`],
-      editable: canManage && isEditable(a),
-      extendedProps: { appointment: a },
-    }))
+  const professionalList = professionals.data ?? []
+  const background = availabilityFor ? availabilityEvents(availability.data ?? []) : []
+  const notices = noticeEvents(availability.data ?? [], professionalList)
+  const events = appointmentEvents(appointments.data ?? [], professionalList, statusFilter, canManage)
+  const legend = professionalId ? [] : professionalOptions
 
   const onDatesSet = (arg: DatesSetArg) => {
     const next = { from: arg.start.toISOString(), to: arg.end.toISOString() }
@@ -149,6 +125,8 @@ export default function AgendaPage() {
     move.reset()
     setMoving({ revert: arg.revert, appointment, start: arg.event.start, end: arg.event.end })
   }
+
+  const moveWarned = move.error instanceof ApiError && move.error.code === 'SCHEDULE_WARNINGS'
 
   const cancelMove = () => {
     moving?.revert()
@@ -210,7 +188,7 @@ export default function AgendaPage() {
           aria-label="Estado"
           className="sm:w-52"
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as AppointmentStatus | 'ACTIVE' | '')}
+          onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
         >
           <option value="ACTIVE">Sin cancelados</option>
           <option value="">Todos los estados</option>
@@ -263,7 +241,8 @@ export default function AgendaPage() {
           }}
           buttonText={{ today: 'Hoy', week: 'Semana', day: 'Día', list: 'Lista' }}
           firstDay={1}
-          allDaySlot={false}
+          allDaySlot={notices.length > 0}
+          allDayText="Avisos"
           nowIndicator
           slotEventOverlap={false}
           height="auto"
@@ -279,10 +258,19 @@ export default function AgendaPage() {
           select={onSelect}
           eventClick={onEventClick}
           datesSet={onDatesSet}
-          events={[...background, ...events]}
+          events={[...background, ...notices, ...events]}
           eventContent={(arg) => {
             const appointment = arg.event.extendedProps['appointment'] as Appointment | undefined
-            if (!appointment) return arg.event.title ? <span className="px-1 text-xs">{arg.event.title}</span> : null
+            if (!appointment) {
+              const notice = arg.event.extendedProps['notice'] as string | undefined
+              return arg.event.title ? (
+                <span className="block truncate px-1 text-xs" title={notice ? `${arg.event.title}: ${notice}` : arg.event.title}>
+                  {arg.event.title}
+                </span>
+              ) : null
+            }
+            const StatusIcon =
+              appointment.status === 'ATTENDED' ? Check : appointment.status === 'NO_SHOW' ? UserX : appointment.status === 'CANCELLED' ? Ban : null
             const detail = [appointment.practice?.name, professionalId ? null : appointment.professional.displayName]
               .filter(Boolean)
               .join(' · ')
@@ -291,14 +279,27 @@ export default function AgendaPage() {
                 className="h-full min-w-0 overflow-hidden px-1 py-0.5 text-xs leading-tight"
                 title={[`${formatTime(appointment.startsAt)} ${appointment.patient.fullName}`, detail].filter(Boolean).join(' · ')}
               >
-                <p className="truncate font-semibold">
-                  {formatTime(appointment.startsAt)} {appointment.patient.fullName}
+                <p className="flex items-center gap-1 truncate font-semibold">
+                  {StatusIcon && <StatusIcon className="size-3 shrink-0" aria-label={STATUS_LABELS[appointment.status]} />}
+                  <span className="truncate">
+                    {formatTime(appointment.startsAt)} {appointment.patient.fullName}
+                  </span>
                 </p>
                 <p className="truncate opacity-90">{detail}</p>
               </div>
             )
           }}
         />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="Referencias">
+        {legend.map((professional) => (
+          <span key={professional.id} className="flex items-center gap-1.5">
+            <span aria-hidden className="size-2.5 rounded-full" style={{ backgroundColor: colorVar(professional.color) }} />
+            {professional.displayName}
+          </span>
+        ))}
+        <span>Borde: pendiente · Lleno: confirmado · Atenuado con ✓: atendido · Tachado: ausente o cancelado</span>
       </div>
 
       <ConfirmDialog
@@ -310,10 +311,10 @@ export default function AgendaPage() {
             ? `${moving.appointment.patient.fullName}: pasa al ${formatDateTime(moving.start.toISOString())} hasta las ${formatTime(moving.end.toISOString())}. Si estaba confirmado, vuelve a quedar pendiente.`
             : ''
         }
-        confirmLabel="Reprogramar"
+        confirmLabel={moveWarned ? 'Reprogramar igual' : 'Reprogramar'}
         pending={move.isPending}
         error={move.error ? errorMessage(move.error) ?? undefined : undefined}
-        onConfirm={() => moving && move.mutate(moving)}
+        onConfirm={() => moving && move.mutate({ ...moving, acknowledge: moveWarned })}
       />
       <AppointmentDialog
         appointment={selected}

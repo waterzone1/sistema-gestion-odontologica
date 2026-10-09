@@ -183,4 +183,14 @@ describe('cambio de contraseña', () => {
     const me = await as(app, client).get('/api/auth/me')
     expect((me.body as { user: { onboardingCompleted: boolean } }).user.onboardingCompleted).toBe(true)
   })
+
+  it('guarda el tema elegido por cada usuario', async () => {
+    const app = buildApp(db)
+    const client = await loginAs(app, 'admin')
+    const tema = async () => ((await as(app, client).get('/api/auth/me')).body as { user: { theme: string } }).user.theme
+    expect(await tema()).toBe('SYSTEM')
+    expect((await as(app, client).put('/api/auth/preferences', { theme: 'DARK' })).status).toBe(204)
+    expect(await tema()).toBe('DARK')
+    expect((await as(app, client).put('/api/auth/preferences', { theme: 'ROSA' })).status).toBe(400)
+  })
 })

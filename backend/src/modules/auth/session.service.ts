@@ -68,6 +68,7 @@ export async function resolveSession(
     branchIds: session.user.branches.map((b) => b.branchId),
     mustChangePassword: session.user.mustChangePassword,
     onboardingCompleted: session.user.onboardingCompleted,
+    theme: session.user.theme,
   }
 }
 

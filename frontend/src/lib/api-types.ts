@@ -381,6 +381,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PreferencesInput"];
+                };
+            };
+            responses: {
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/onboarding/complete": {
         parameters: {
             query?: never;
@@ -3386,8 +3446,10 @@ export interface components {
             branchIds: string[];
             mustChangePassword: boolean;
             onboardingCompleted: boolean;
+            theme: components["schemas"]["ThemePreference"];
         };
         Role: "ADMIN" | "DENTIST" | "RECEPTIONIST";
+        ThemePreference: "SYSTEM" | "LIGHT" | "DARK";
         SetupInput: {
             setupToken: string;
             organization: {
@@ -3412,6 +3474,9 @@ export interface components {
         ChangePasswordInput: {
             currentPassword: string;
             newPassword: string;
+        };
+        PreferencesInput: {
+            theme: components["schemas"]["ThemePreference"];
         };
         User: {
             id: string;
@@ -3468,14 +3533,17 @@ export interface components {
             licenseNumber: string;
             phone: string | null;
             email: string | null;
+            color: components["schemas"]["ProfessionalColor"];
             practiceIds: string[];
             active: boolean;
             branchIds: string[];
         };
+        ProfessionalColor: "teal" | "blue" | "indigo" | "violet" | "pink" | "red" | "orange" | "amber" | "green" | "slate" | null;
         SaveProfessionalInput: {
             licenseNumber: string;
             phone?: string | null;
             email?: string | null;
+            color?: components["schemas"]["ProfessionalColor"];
             practiceIds?: string[];
             active?: boolean;
         };
@@ -3741,6 +3809,7 @@ export interface components {
             override?: {
                 reason: string;
             };
+            acknowledgeWarnings?: boolean;
         };
         UpdateAppointmentInput: {
             professionalId?: string;
@@ -3752,6 +3821,7 @@ export interface components {
             override?: {
                 reason: string;
             };
+            acknowledgeWarnings?: boolean;
         };
         ChangeAppointmentStatusInput: {
             status: "CONFIRMED" | "ATTENDED" | "NO_SHOW" | "CANCELLED";
