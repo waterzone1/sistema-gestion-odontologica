@@ -2135,6 +2135,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/patients/{patientId}/credits/{creditId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    patientId: string;
+                    creditId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VoidInput"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Payment"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/debtors": {
         parameters: {
             query?: never;
@@ -3003,7 +3084,6 @@ export interface components {
         };
         ProfessionalSummary: {
             licenseNumber: string;
-            specialty: string | null;
             active: boolean;
         } | null;
         CreateUserInput: {
@@ -3044,13 +3124,11 @@ export interface components {
             userId: string;
             displayName: string;
             licenseNumber: string;
-            specialty: string | null;
             active: boolean;
             branchIds: string[];
         };
         SaveProfessionalInput: {
             licenseNumber: string;
-            specialty?: string | null;
             active?: boolean;
         };
         PatientList: {
@@ -3142,7 +3220,7 @@ export interface components {
         Payment: {
             id: string;
             amount: string;
-            method: components["schemas"]["PaymentMethod"];
+            method: components["schemas"]["MovementMethod"];
             externalReference: string | null;
             receivedAt: string;
             allocated: string;
@@ -3153,7 +3231,7 @@ export interface components {
             voidable: boolean;
             createdAt: string;
         };
-        PaymentMethod: "CASH" | "TRANSFER" | "CARD" | "MERCADOPAGO" | "OTHER";
+        MovementMethod: "CASH" | "TRANSFER" | "CARD" | "MERCADOPAGO" | "OTHER" | "CREDIT";
         ChargeResult: {
             payments: components["schemas"]["Payment"][];
             creditApplied: string;
@@ -3168,6 +3246,7 @@ export interface components {
             receivedAt?: string;
             serviceIds?: string[];
         };
+        PaymentMethod: "CASH" | "TRANSFER" | "CARD" | "MERCADOPAGO" | "OTHER";
         Debtor: {
             patientId: string;
             fullName: string;

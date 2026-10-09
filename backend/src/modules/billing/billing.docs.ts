@@ -16,6 +16,7 @@ import {
   billingPatientParamsSchema,
   chargeResultSchema,
   createChargeSchema,
+  creditParamsSchema,
   createServiceSchema,
   debtorSchema,
   paymentParamsSchema,
@@ -112,7 +113,7 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
     tags,
     summary: 'Registra un cobro',
     description:
-      'Un cobro puede combinar varios medios de pago y usar saldo a favor. Primero se aplica el saldo a favor y después cada medio, a las prestaciones indicadas o a las pendientes más antiguas. Admite pagos parciales; lo que excede lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago con referencia opcional.',
+      'Un cobro puede combinar varios medios de pago y usar saldo a favor si quien cobra lo elige; ese uso queda registrado como un movimiento propio. Primero se aplica el saldo a favor y después cada medio, a las prestaciones indicadas o a las pendientes más antiguas. Admite pagos parciales; lo que excede lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago con referencia opcional.',
     security: writeSecurity,
     request: { ...patientParams, ...bodyOf(createChargeSchema) },
     responses: {
@@ -137,6 +138,23 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
       400: invalidInput,
       404: notFound,
       409: errorResponse('El pago ya estaba anulado'),
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/patients/{patientId}/credits/{creditId}/void',
+    tags,
+    summary: 'Anula un uso de saldo a favor',
+    description: 'Recepción solo lo cargado en el día; administración siempre. El saldo a favor vuelve a quedar disponible.',
+    security: writeSecurity,
+    request: { params: creditParamsSchema, ...bodyOf(voidSchema) },
+    responses: {
+      200: json(paymentSchema, 'Uso de saldo a favor anulado'),
+      400: invalidInput,
+      404: notFound,
+      409: errorResponse('Ya estaba anulado'),
       ...common,
     },
   })

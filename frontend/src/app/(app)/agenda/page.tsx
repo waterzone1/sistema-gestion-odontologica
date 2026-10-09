@@ -163,6 +163,7 @@ export default function AgendaPage() {
           firstDay={1}
           allDaySlot={false}
           nowIndicator
+          slotEventOverlap={false}
           height="auto"
           slotMinTime="07:00:00"
           slotMaxTime="21:00:00"
@@ -177,16 +178,18 @@ export default function AgendaPage() {
           events={events}
           eventContent={(arg) => {
             const appointment = arg.event.extendedProps['appointment'] as Appointment
+            const detail = [appointment.practice?.name, professionalId ? null : appointment.professional.displayName]
+              .filter(Boolean)
+              .join(' · ')
             return (
-              <div className="overflow-hidden px-1 py-0.5 text-xs leading-tight">
+              <div
+                className="h-full min-w-0 overflow-hidden px-1 py-0.5 text-xs leading-tight"
+                title={[`${formatTime(appointment.startsAt)} ${appointment.patient.fullName}`, detail].filter(Boolean).join(' · ')}
+              >
                 <p className="truncate font-semibold">
                   {formatTime(appointment.startsAt)} {appointment.patient.fullName}
                 </p>
-                <p className="truncate opacity-90">
-                  {[appointment.practice?.name, professionalId ? null : appointment.professional.displayName]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
+                <p className="truncate opacity-90">{detail}</p>
               </div>
             )
           }}

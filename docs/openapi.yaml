@@ -286,15 +286,10 @@ components:
       properties:
         licenseNumber:
           type: string
-        specialty:
-          type:
-            - string
-            - "null"
         active:
           type: boolean
       required:
         - licenseNumber
-        - specialty
         - active
     CreateUserInput:
       type: object
@@ -431,10 +426,6 @@ components:
           type: string
         licenseNumber:
           type: string
-        specialty:
-          type:
-            - string
-            - "null"
         active:
           type: boolean
         branchIds:
@@ -447,7 +438,6 @@ components:
         - userId
         - displayName
         - licenseNumber
-        - specialty
         - active
         - branchIds
     SaveProfessionalInput:
@@ -457,11 +447,6 @@ components:
           type: string
           minLength: 1
           maxLength: 40
-        specialty:
-          type:
-            - string
-            - "null"
-          maxLength: 120
         active:
           type: boolean
       required:
@@ -767,8 +752,8 @@ components:
         balance:
           type: string
           example: "15000.00"
-          description: Prestaciones vigentes menos pagos vigentes. Negativo si el paciente
-            tiene saldo a favor
+          description: "Saldo a cobrar: lo que falta pagar de las prestaciones vigentes.
+            El saldo a favor no se descuenta hasta usarlo"
         totalServices:
           type: string
         totalPayments:
@@ -801,7 +786,7 @@ components:
           type: string
           example: "10000.00"
         method:
-          $ref: "#/components/schemas/PaymentMethod"
+          $ref: "#/components/schemas/MovementMethod"
         externalReference:
           type:
             - string
@@ -844,7 +829,7 @@ components:
         - voidReason
         - voidable
         - createdAt
-    PaymentMethod:
+    MovementMethod:
       type: string
       enum:
         - CASH
@@ -852,6 +837,8 @@ components:
         - CARD
         - MERCADOPAGO
         - OTHER
+        - CREDIT
+      description: CREDIT es un uso de saldo a favor, no un ingreso de dinero
     ChargeResult:
       type: object
       properties:
@@ -900,6 +887,14 @@ components:
             format: uuid
           minItems: 1
           maxItems: 100
+    PaymentMethod:
+      type: string
+      enum:
+        - CASH
+        - TRANSFER
+        - CARD
+        - MERCADOPAGO
+        - OTHER
     Debtor:
       type: object
       properties:
@@ -2549,8 +2544,9 @@ paths:
     post:
       tags: *a7
       summary: Registra un cobro
-      description: Un cobro puede combinar varios medios de pago y usar saldo a favor.
-        Primero se aplica el saldo a favor y después cada medio, a las
+      description: Un cobro puede combinar varios medios de pago y usar saldo a favor
+        si quien cobra lo elige; ese uso queda registrado como un movimiento
+        propio. Primero se aplica el saldo a favor y después cada medio, a las
         prestaciones indicadas o a las pendientes más antiguas. Admite pagos
         parciales; lo que excede lo pendiente queda como saldo a favor. Mercado
         Pago es un medio de pago con referencia opcional.
@@ -2664,6 +2660,68 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "409":
           description: El pago ya estaba anulado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/credits/{creditId}/void:
+    post:
+      tags: *a7
+      summary: Anula un uso de saldo a favor
+      description: Recepción solo lo cargado en el día; administración siempre. El
+        saldo a favor vuelve a quedar disponible.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: creditId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidInput"
+      responses:
+        "200":
+          description: Uso de saldo a favor anulado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya estaba anulado
           content:
             application/json:
               schema:

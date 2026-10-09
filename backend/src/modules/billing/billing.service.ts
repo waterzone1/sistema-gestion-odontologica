@@ -4,7 +4,7 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { hasPermission } from '../users/domain/permissions.js'
-import { allocatePayment, balanceCents, fromCents, localDay, toCents, type PendingService } from './domain/balance.js'
+import { allocatePayment, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
 import type {
   AccountDto,
   ChargeResultDto,
@@ -21,16 +21,31 @@ const DEBTORS_LIMIT = 20
 const serviceInclude = {
   practice: { select: { id: true, code: true, name: true } },
   professional: { select: { id: true, user: { select: { displayName: true } } } },
-  allocations: { select: { amount: true, payment: { select: { voidedAt: true } } } },
+  allocations: {
+    select: {
+      amount: true,
+      payment: { select: { voidedAt: true } },
+      creditApplication: { select: { voidedAt: true } },
+    },
+  },
 } as const
 
 const paymentInclude = {
   createdBy: { select: { displayName: true } },
-  allocations: { select: { amount: true, service: { select: { voidedAt: true } } } },
+  allocations: {
+    select: {
+      amount: true,
+      service: { select: { voidedAt: true } },
+      creditApplication: { select: { voidedAt: true } },
+    },
+  },
 } as const
+
+const creditInclude = { createdBy: { select: { displayName: true } } } as const
 
 type ServiceRecord = Prisma.PerformedServiceGetPayload<{ include: typeof serviceInclude }>
 type PaymentRecord = Prisma.PaymentGetPayload<{ include: typeof paymentInclude }>
+type CreditRecord = Prisma.CreditApplicationGetPayload<{ include: typeof creditInclude }>
 type Tx = Prisma.TransactionClient
 
 interface Viewer {
@@ -40,7 +55,12 @@ interface Viewer {
   timeZone: string
 }
 
+type VoidPermission = 'services:void' | 'payments:void'
+
 const cents = (value: Prisma.Decimal) => toCents(value.toFixed(2))
+
+const creditIsActive = (allocation: { creditApplication: { voidedAt: Date | null } | null }) =>
+  !allocation.creditApplication?.voidedAt
 
 async function viewerOf(db: Pick<Db, 'organization'>, actor: AuthContext): Promise<Viewer> {
   const organization = await db.organization.findUniqueOrThrow({
@@ -55,7 +75,7 @@ async function viewerOf(db: Pick<Db, 'organization'>, actor: AuthContext): Promi
   }
 }
 
-function canVoid(viewer: Viewer, permission: 'services:void' | 'payments:void', createdAt: Date): boolean {
+function canVoid(viewer: Viewer, permission: VoidPermission, createdAt: Date): boolean {
   if (!hasPermission(viewer.actor.permissions, permission)) return false
   if (hasPermission(viewer.actor.permissions, 'billing:void-any-day')) return true
   return localDay(createdAt, viewer.timeZone) === viewer.today
@@ -65,7 +85,9 @@ function serviceCents(service: ServiceRecord) {
   const price = cents(service.price)
   const paid = service.voidedAt
     ? 0
-    : service.allocations.filter((a) => !a.payment.voidedAt).reduce((total, a) => total + cents(a.amount), 0)
+    : service.allocations
+        .filter((a) => !a.payment.voidedAt && creditIsActive(a))
+        .reduce((total, a) => total + cents(a.amount), 0)
   return { price, paid, pending: service.voidedAt ? 0 : price - paid }
 }
 
@@ -73,7 +95,9 @@ function paymentCents(payment: PaymentRecord) {
   const amount = cents(payment.amount)
   const allocated = payment.voidedAt
     ? 0
-    : payment.allocations.filter((a) => !a.service.voidedAt).reduce((total, a) => total + cents(a.amount), 0)
+    : payment.allocations
+        .filter((a) => !a.service.voidedAt && creditIsActive(a))
+        .reduce((total, a) => total + cents(a.amount), 0)
   return { amount, allocated, unallocated: payment.voidedAt ? 0 : amount - allocated }
 }
 
@@ -115,6 +139,24 @@ function toPaymentDto(payment: PaymentRecord, viewer: Viewer): PaymentDto {
   }
 }
 
+function toCreditDto(credit: CreditRecord, viewer: Viewer): PaymentDto {
+  const amount = credit.voidedAt ? 0 : cents(credit.amount)
+  return {
+    id: credit.id,
+    amount: credit.amount.toFixed(2),
+    method: 'CREDIT',
+    externalReference: null,
+    receivedAt: credit.createdAt.toISOString(),
+    allocated: fromCents(amount),
+    unallocated: '0.00',
+    createdBy: credit.createdBy.displayName,
+    status: credit.voidedAt ? 'VOIDED' : 'ACTIVE',
+    voidReason: credit.voidReason,
+    voidable: !credit.voidedAt && canVoid(viewer, 'payments:void', credit.createdAt),
+    createdAt: credit.createdAt.toISOString(),
+  }
+}
+
 async function lockPatient(tx: Tx, actor: AuthContext, patientId: string) {
   const rows = await tx.$queryRaw<{ archivedAt: Date | null }[]>`
     SELECT "archivedAt" FROM "Patient"
@@ -139,7 +181,7 @@ function assertNotFuture(iso: string | undefined, label: string): Date {
   return date
 }
 
-function assertVoidAllowed(viewer: Viewer, permission: 'services:void' | 'payments:void', createdAt: Date): void {
+function assertVoidAllowed(viewer: Viewer, permission: VoidPermission, createdAt: Date): void {
   if (!canVoid(viewer, permission, createdAt)) {
     throw new AppError(
       403,
@@ -315,9 +357,13 @@ export async function voidService(
   })
 }
 
-async function loadLedger(db: Pick<Db, 'performedService' | 'payment'>, actor: AuthContext, patientId: string) {
+async function loadLedger(
+  db: Pick<Db, 'performedService' | 'payment' | 'creditApplication'>,
+  actor: AuthContext,
+  patientId: string,
+) {
   const where = { patientId, organizationId: actor.organizationId }
-  const [services, payments] = await Promise.all([
+  const [services, payments, credits] = await Promise.all([
     db.performedService.findMany({
       where,
       include: serviceInclude,
@@ -328,8 +374,9 @@ async function loadLedger(db: Pick<Db, 'performedService' | 'payment'>, actor: A
       include: paymentInclude,
       orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
     }),
+    db.creditApplication.findMany({ where, include: creditInclude }),
   ])
-  return { services, payments }
+  return { services, payments, credits }
 }
 
 const availableCredit = (payments: PaymentRecord[]) =>
@@ -338,16 +385,20 @@ const availableCredit = (payments: PaymentRecord[]) =>
 export async function getAccount(db: Db, actor: AuthContext, patientId: string): Promise<AccountDto> {
   await findPatientOrFail(db, actor, patientId)
   const viewer = await viewerOf(db, actor)
-  const { services, payments } = await loadLedger(db, actor, patientId)
+  const { services, payments, credits } = await loadLedger(db, actor, patientId)
   const activeServices = services.filter((s) => !s.voidedAt).map((s) => cents(s.price))
   const activePayments = payments.filter((p) => !p.voidedAt).map((p) => cents(p.amount))
+  const movements = [
+    ...payments.map((payment) => toPaymentDto(payment, viewer)),
+    ...credits.map((credit) => toCreditDto(credit, viewer)),
+  ].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id.localeCompare(a.id))
   return {
-    balance: fromCents(balanceCents(activeServices, activePayments)),
-    totalServices: fromCents(balanceCents(activeServices, [])),
-    totalPayments: fromCents(balanceCents(activePayments, [])),
+    balance: fromCents(sum(services.map((service) => serviceCents(service).pending))),
+    totalServices: fromCents(sum(activeServices)),
+    totalPayments: fromCents(sum(activePayments)),
     availableCredit: fromCents(availableCredit(payments)),
     services: services.map((service) => toServiceDto(service, viewer)),
-    payments: payments.map((payment) => toPaymentDto(payment, viewer)),
+    payments: movements,
   }
 }
 
@@ -393,6 +444,14 @@ export async function createCharge(
       if (creditCents > targets.reduce((total, t) => total + t.pendingCents, 0)) {
         throw new AppError(422, 'CREDIT_EXCEEDS_PENDING', 'El saldo a favor aplicado supera lo que falta pagar')
       }
+      const application = await tx.creditApplication.create({
+        data: {
+          organizationId: actor.organizationId,
+          patientId,
+          amount: fromCents(creditCents),
+          createdById: actor.userId,
+        },
+      })
       let left = creditCents
       for (const source of sources) {
         if (left === 0) break
@@ -400,18 +459,23 @@ export async function createCharge(
         if (take === 0) continue
         const result = allocatePayment(take, targets)
         await tx.paymentAllocation.createMany({
-          data: result.allocations.map((a) => ({ paymentId: source.id, serviceId: a.serviceId, amount: fromCents(a.cents) })),
+          data: result.allocations.map((a) => ({
+            paymentId: source.id,
+            serviceId: a.serviceId,
+            creditApplicationId: application.id,
+            amount: fromCents(a.cents),
+          })),
         })
         targets = result.remaining
         left -= take
       }
       await recordAudit(tx, {
         action: 'CREDIT_APPLIED',
-        entityType: 'Patient',
-        entityId: patientId,
+        entityType: 'CreditApplication',
+        entityId: application.id,
         organizationId: actor.organizationId,
         actorUserId: actor.userId,
-        metadata: { amount: fromCents(creditCents) },
+        metadata: { patientId, amount: fromCents(creditCents) },
       })
     }
 
@@ -481,29 +545,60 @@ export async function voidPayment(
   })
 }
 
-export async function listDebtors(db: Db, actor: AuthContext): Promise<DebtorDto[]> {
-  const where = { organizationId: actor.organizationId, voidedAt: null }
-  const [services, payments] = await Promise.all([
-    db.performedService.groupBy({ by: ['patientId'], where, _sum: { price: true } }),
-    db.payment.groupBy({ by: ['patientId'], where, _sum: { amount: true } }),
-  ])
-  const paid = new Map(payments.map((p) => [p.patientId, p._sum.amount ? cents(p._sum.amount) : 0]))
-  const debts = services
-    .map((s) => ({
-      patientId: s.patientId,
-      balance: (s._sum.price ? cents(s._sum.price) : 0) - (paid.get(s.patientId) ?? 0),
-    }))
-    .filter((debt) => debt.balance > 0)
-    .sort((a, b) => b.balance - a.balance)
-    .slice(0, DEBTORS_LIMIT)
-  const patients = await db.patient.findMany({
-    where: { id: { in: debts.map((d) => d.patientId) } },
-    select: { id: true, firstName: true, lastName: true },
+export async function voidCreditApplication(
+  db: Db,
+  actor: AuthContext,
+  patientId: string,
+  creditId: string,
+  reason: string,
+): Promise<PaymentDto> {
+  const viewer = await viewerOf(db, actor)
+  return db.$transaction(async (tx) => {
+    await lockPatient(tx, actor, patientId)
+    const credit = await tx.creditApplication.findFirst({
+      where: { id: creditId, patientId, organizationId: actor.organizationId },
+    })
+    if (!credit) throw new AppError(404, 'NOT_FOUND', 'El uso de saldo a favor no existe')
+    if (credit.voidedAt) throw new AppError(409, 'ALREADY_VOIDED', 'Ya está anulado')
+    assertVoidAllowed(viewer, 'payments:void', credit.createdAt)
+    const voided = await tx.creditApplication.update({
+      where: { id: creditId },
+      data: { voidedAt: new Date(), voidReason: reason, voidedById: actor.userId },
+      include: creditInclude,
+    })
+    await recordAudit(tx, {
+      action: 'CREDIT_VOIDED',
+      entityType: 'CreditApplication',
+      entityId: creditId,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+      metadata: { patientId, amount: credit.amount.toFixed(2), reason },
+    })
+    return toCreditDto(voided, viewer)
   })
-  const names = new Map(patients.map((p) => [p.id, `${p.lastName}, ${p.firstName}`]))
-  return debts.map((debt) => ({
-    patientId: debt.patientId,
-    fullName: names.get(debt.patientId) ?? '',
-    balance: fromCents(debt.balance),
+}
+
+export async function listDebtors(db: Db, actor: AuthContext): Promise<DebtorDto[]> {
+  const rows = await db.$queryRaw<{ patientId: string; firstName: string; lastName: string; pending: Prisma.Decimal }[]>`
+    SELECT s."patientId", p."firstName", p."lastName", SUM(s.price - COALESCE(a.paid, 0)) AS pending
+    FROM "PerformedService" s
+    JOIN "Patient" p ON p.id = s."patientId"
+    LEFT JOIN (
+      SELECT pa."serviceId", SUM(pa.amount) AS paid
+      FROM "PaymentAllocation" pa
+      JOIN "Payment" pay ON pay.id = pa."paymentId" AND pay."voidedAt" IS NULL
+      LEFT JOIN "CreditApplication" c ON c.id = pa."creditApplicationId"
+      WHERE c."voidedAt" IS NULL
+      GROUP BY pa."serviceId"
+    ) a ON a."serviceId" = s.id
+    WHERE s."organizationId" = ${actor.organizationId}::uuid AND s."voidedAt" IS NULL
+    GROUP BY s."patientId", p."firstName", p."lastName"
+    HAVING SUM(s.price - COALESCE(a.paid, 0)) > 0
+    ORDER BY pending DESC, s."patientId"
+    LIMIT ${DEBTORS_LIMIT}`
+  return rows.map((row) => ({
+    patientId: row.patientId,
+    fullName: `${row.lastName}, ${row.firstName}`,
+    balance: fromCents(cents(row.pending)),
   }))
 }

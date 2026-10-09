@@ -69,7 +69,7 @@ export function useRecordCharge(patientId: string) {
   return useBillingMutation(patientId, (input: ChargeInput) => api.post(`/api/patients/${patientId}/payments`, input))
 }
 
-export function useVoid(patientId: string, kind: 'services' | 'payments') {
+export function useVoid(patientId: string, kind: 'services' | 'payments' | 'credits') {
   return useBillingMutation(patientId, ({ id, reason }: { id: string; reason: string }) =>
     api.post(`/api/patients/${patientId}/${kind}/${id}/void`, { reason }),
   )

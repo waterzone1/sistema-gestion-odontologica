@@ -42,9 +42,8 @@ export function allocatePayment(paymentCents: number, services: readonly Pending
   return { allocations, unallocatedCents: left, remaining }
 }
 
-export function balanceCents(serviceCents: readonly number[], paymentCents: readonly number[]): number {
-  const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0)
-  return sum(serviceCents) - sum(paymentCents)
+export function sum(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0)
 }
 
 export function localDay(date: Date, timeZone: string): string {

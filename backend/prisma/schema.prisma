@@ -64,6 +64,7 @@ model User {
   professionalProfile ProfessionalProfile?
   createdAppointments Appointment[]
   payments            Payment[]            @relation("PaymentCreatedBy")
+  creditApplications  CreditApplication[]  @relation("CreditApplicationCreatedBy")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -110,7 +111,6 @@ model ProfessionalProfile {
   id            String   @id @default(uuid(7)) @db.Uuid
   userId        String   @unique @db.Uuid
   licenseNumber String
-  specialty     String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
@@ -161,11 +161,12 @@ model Patient {
   createdAt      DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
 
-  organization    Organization       @relation(fields: [organizationId], references: [id])
-  appointments    Appointment[]
-  clinicalEntries ClinicalEntry[]
-  services        PerformedService[]
-  payments        Payment[]
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  appointments       Appointment[]
+  clinicalEntries    ClinicalEntry[]
+  services           PerformedService[]
+  payments           Payment[]
+  creditApplications CreditApplication[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -308,14 +309,35 @@ model Payment {
 }
 
 model PaymentAllocation {
-  id        String  @id @default(uuid(7)) @db.Uuid
-  paymentId String  @db.Uuid
-  serviceId String  @db.Uuid
-  amount    Decimal @db.Decimal(14, 2)
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  paymentId           String  @db.Uuid
+  serviceId           String  @db.Uuid
+  creditApplicationId String? @db.Uuid
+  amount              Decimal @db.Decimal(14, 2)
 
-  payment Payment          @relation(fields: [paymentId], references: [id])
-  service PerformedService @relation(fields: [serviceId], references: [id])
+  payment           Payment            @relation(fields: [paymentId], references: [id])
+  service           PerformedService   @relation(fields: [serviceId], references: [id])
+  creditApplication CreditApplication? @relation(fields: [creditApplicationId], references: [id], onDelete: Restrict)
 
   @@index([paymentId])
   @@index([serviceId])
+  @@index([creditApplicationId])
+}
+
+model CreditApplication {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @db.Uuid
+  patientId      String    @db.Uuid
+  amount         Decimal   @db.Decimal(14, 2)
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  voidedAt       DateTime? @db.Timestamptz(3)
+  voidReason     String?
+  voidedById     String?   @db.Uuid
+
+  patient     Patient             @relation(fields: [patientId], references: [id])
+  createdBy   User                @relation("CreditApplicationCreatedBy", fields: [createdById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([organizationId, patientId, createdAt])
 }

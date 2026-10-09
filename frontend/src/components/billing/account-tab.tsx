@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ReasonDialog } from '@/components/billing/reason-dialog'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
+import { Pagination, usePagedList } from '@/components/pagination'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckboxGroup } from '@/components/ui/checkbox-group'
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input, Select } from '@/components/ui/input'
 import { useAccount, useRecordCharge, useVoid, type ChargeInput } from '@/hooks/use-billing'
-import type { Account, Payment, PaymentMethod } from '@/lib/api'
+import type { Account, MovementMethod, Payment, PaymentMethod } from '@/lib/api'
 import { isValidAmount, normalizeAmount, PAYMENT_METHOD_LABELS } from '@/lib/billing'
 import { formatDateTime, formatMoney } from '@/lib/format'
 
@@ -26,30 +27,23 @@ export function AccountTab({ patientId, canCollect }: Props) {
   const [collecting, setCollecting] = useState(false)
   const [voiding, setVoiding] = useState<Payment | null>(null)
   const voidPayment = useVoid(patientId, 'payments')
+  const voidCredit = useVoid(patientId, 'credits')
+  const voidAction = voiding?.method === 'CREDIT' ? voidCredit : voidPayment
+  const paged = usePagedList(account.data?.payments ?? [])
 
   if (account.isPending) return <LoadingBlock />
   if (account.isError) return <FormError error={account.error} />
 
   const { balance, totalServices, totalPayments, availableCredit, payments } = account.data
-  const owes = Number(balance) > 0
-  const inFavor = Number(balance) < 0
 
   return (
     <div className="space-y-6">
-      <section aria-label="Resumen de cuenta" className="grid gap-3 sm:grid-cols-3">
+      <section aria-label="Resumen de cuenta" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Figure label="Prestaciones" value={formatMoney(totalServices)} />
         <Figure label="Pagos" value={formatMoney(totalPayments)} />
-        <Figure
-          label={inFavor ? 'Saldo a favor' : 'Saldo a cobrar'}
-          value={formatMoney(inFavor ? String(Math.abs(Number(balance))) : balance)}
-          emphasis={owes}
-        />
+        <Figure label="Saldo a cobrar" value={formatMoney(balance)} emphasis={Number(balance) > 0} />
+        <Figure label="Saldo a favor" value={formatMoney(availableCredit)} />
       </section>
-      {owes && Number(availableCredit) > 0 && (
-        <p className="text-sm text-muted-foreground">
-          Tiene {formatMoney(availableCredit)} de saldo a favor sin aplicar: podés usarlo al registrar el pago.
-        </p>
-      )}
 
       {canCollect && (
         <div className="flex justify-end">
@@ -66,7 +60,7 @@ export function AccountTab({ patientId, canCollect }: Props) {
           <EmptyState title="Todavía no registró pagos" />
         ) : (
           <ul className="divide-y rounded-lg border bg-card shadow-sm">
-            {payments.map((payment) => (
+            {paged.items.map((payment) => (
               <li key={payment.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 text-sm">
                   <p className="font-medium">
@@ -100,6 +94,15 @@ export function AccountTab({ patientId, canCollect }: Props) {
             ))}
           </ul>
         )}
+        {paged.totalPages > 1 && (
+          <Pagination
+            label="Paginación de pagos"
+            page={paged.page}
+            totalPages={paged.totalPages}
+            summary={`${payments.length} movimientos`}
+            onChange={paged.setPage}
+          />
+        )}
       </section>
 
       <Dialog open={collecting} onOpenChange={setCollecting}>
@@ -117,13 +120,17 @@ export function AccountTab({ patientId, canCollect }: Props) {
         key={voiding?.id}
         open={voiding !== null}
         onOpenChange={(open) => !open && setVoiding(null)}
-        title="Anular pago"
-        description="El pago se conserva marcado como anulado y deja de contar en el saldo."
-        confirmLabel="Anular pago"
-        pending={voidPayment.isPending}
-        error={voidPayment.error}
+        title={voiding?.method === 'CREDIT' ? 'Anular uso de saldo a favor' : 'Anular pago'}
+        description={
+          voiding?.method === 'CREDIT'
+            ? 'El saldo a favor vuelve a quedar disponible y la prestación vuelve a quedar pendiente.'
+            : 'El pago se conserva marcado como anulado y deja de contar en el saldo.'
+        }
+        confirmLabel="Anular"
+        pending={voidAction.isPending}
+        error={voidAction.error}
         onConfirm={(reason) =>
-          voiding && voidPayment.mutate({ id: voiding.id, reason }, { onSuccess: () => setVoiding(null) })
+          voiding && voidAction.mutate({ id: voiding.id, reason }, { onSuccess: () => setVoiding(null) })
         }
       />
     </div>
@@ -142,32 +149,34 @@ function Figure({ label, value, emphasis }: { label: string; value: string; emph
 interface Line {
   key: number
   amount: string
-  method: PaymentMethod
+  method: MovementMethod
   reference: string
 }
 
 const toCents = (amount: string) => Math.round(Number(normalizeAmount(amount)) * 100)
+const centsText = (cents: number) => (cents / 100).toFixed(2)
 
 function ChargeForm({ patientId, account, onClose }: { patientId: string; account: Account; onClose: () => void }) {
   const record = useRecordCharge(patientId)
   const [lines, setLines] = useState<Line[]>([{ key: 0, amount: '', method: 'CASH', reference: '' }])
-  const [credit, setCredit] = useState('')
   const [serviceIds, setServiceIds] = useState<string[]>([])
 
   const pending = account.services.filter((s) => s.status === 'ACTIVE' && s.pending !== null && Number(s.pending) > 0)
-  const creditCents = toCents(account.availableCredit)
   const pendingCents = pending
     .filter((s) => serviceIds.length === 0 || serviceIds.includes(s.id))
     .reduce((total, s) => total + toCents(s.pending ?? '0'), 0)
-  const creditLimit = Math.min(creditCents, pendingCents)
+  const creditLimit = Math.min(toCents(account.availableCredit), pendingCents)
+  const methods = (Object.keys(PAYMENT_METHOD_LABELS) as MovementMethod[]).filter(
+    (method) => method !== 'CREDIT' || toCents(account.availableCredit) > 0,
+  )
 
-  const filledLines = lines.filter((line) => line.amount.trim() !== '')
-  const linesValid = filledLines.every((line) => isValidAmount(line.amount))
-  const creditValid = credit.trim() === '' || (isValidAmount(credit) && toCents(credit) <= creditLimit)
-  const total =
-    filledLines.reduce((sum, line) => sum + (isValidAmount(line.amount) ? toCents(line.amount) : 0), 0) +
-    (credit.trim() && isValidAmount(credit) ? toCents(credit) : 0)
-  const valid = linesValid && creditValid && total > 0
+  const filled = lines.filter((line) => line.amount.trim() !== '')
+  const creditCents = filled
+    .filter((line) => line.method === 'CREDIT' && isValidAmount(line.amount))
+    .reduce((total, line) => total + toCents(line.amount), 0)
+  const creditError = creditCents > creditLimit ? `El saldo a favor aplicable es hasta ${formatMoney(centsText(creditLimit))}` : null
+  const total = filled.reduce((sum, line) => sum + (isValidAmount(line.amount) ? toCents(line.amount) : 0), 0)
+  const valid = filled.length > 0 && filled.every((line) => isValidAmount(line.amount)) && !creditError
 
   const update = (key: number, patch: Partial<Line>) =>
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)))
@@ -175,12 +184,14 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     const input: ChargeInput = {
-      lines: filledLines.map((line) => ({
-        amount: normalizeAmount(line.amount),
-        method: line.method,
-        ...(line.reference.trim() ? { externalReference: line.reference.trim() } : {}),
-      })),
-      ...(credit.trim() ? { credit: normalizeAmount(credit) } : {}),
+      lines: filled
+        .filter((line) => line.method !== 'CREDIT')
+        .map((line) => ({
+          amount: normalizeAmount(line.amount),
+          method: line.method as PaymentMethod,
+          ...(line.reference.trim() ? { externalReference: line.reference.trim() } : {}),
+        })),
+      ...(creditCents > 0 ? { credit: centsText(creditCents) } : {}),
       ...(serviceIds.length > 0 ? { serviceIds } : {}),
     }
     record.mutate(input, { onSuccess: onClose })
@@ -209,11 +220,13 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
               <Select
                 id={`line-method-${line.key}`}
                 value={line.method}
-                onChange={(event) => update(line.key, { method: event.target.value as PaymentMethod })}
+                onChange={(event) => update(line.key, { method: event.target.value as MovementMethod })}
               >
-                {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {methods.map((method) => (
+                  <option key={method} value={method}>
+                    {method === 'CREDIT'
+                      ? `Saldo a favor (disponible ${formatMoney(account.availableCredit)})`
+                      : PAYMENT_METHOD_LABELS[method]}
                   </option>
                 ))}
               </Select>
@@ -231,7 +244,7 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
             ) : (
               <span />
             )}
-            {line.method !== 'CASH' && (
+            {line.method !== 'CASH' && line.method !== 'CREDIT' && (
               <Field label="Referencia (opcional)" htmlFor={`line-reference-${line.key}`} className="sm:col-span-3">
                 <Input
                   id={`line-reference-${line.key}`}
@@ -244,6 +257,11 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
             )}
           </div>
         ))}
+        {creditError && (
+          <p role="alert" className="text-xs text-destructive">
+            {creditError}
+          </p>
+        )}
         {lines.length < 10 && (
           <Button
             type="button"
@@ -262,23 +280,6 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
         )}
       </fieldset>
 
-      {creditCents > 0 && (
-        <Field
-          label="Usar saldo a favor"
-          htmlFor="charge-credit"
-          hint={`Disponible: ${formatMoney(account.availableCredit)}. Se aplica antes que los demás medios.`}
-          error={credit && !creditValid ? `Hasta ${formatMoney((creditLimit / 100).toFixed(2))}` : undefined}
-        >
-          <Input
-            id="charge-credit"
-            inputMode="decimal"
-            autoComplete="off"
-            value={credit}
-            onChange={(event) => setCredit(event.target.value)}
-          />
-        </Field>
-      )}
-
       {pending.length > 0 && (
         <CheckboxGroup
           legend="Cubrir solo estas prestaciones (opcional)"
@@ -294,7 +295,7 @@ function ChargeForm({ patientId, account, onClose }: { patientId: string; accoun
       )}
 
       <p className="text-sm">
-        Total del cobro: <span className="font-semibold">{formatMoney((total / 100).toFixed(2))}</span>
+        Total del cobro: <span className="font-semibold">{formatMoney(centsText(total))}</span>
       </p>
       <FormError error={record.error} />
       <DialogFooter>

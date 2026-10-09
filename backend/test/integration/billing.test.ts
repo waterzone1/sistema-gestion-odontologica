@@ -269,7 +269,7 @@ describe('anulaciones', () => {
     await pagar('10000')
     await as(app, admin).post(`${servicios()}/${servicio}/void`, { reason: 'No se hizo' }).expect(200)
     const final = await leerCuenta()
-    expect(final).toMatchObject({ balance: '-10000.00', availableCredit: '10000.00' })
+    expect(final).toMatchObject({ balance: '0.00', availableCredit: '10000.00' })
     expect(final.payments[0]).toMatchObject({ allocated: '0.00', unallocated: '10000.00' })
   })
 })
@@ -354,7 +354,7 @@ describe('cobros', () => {
     expect(respuestas.every((r) => r.status === 201)).toBe(true)
     const final = await leerCuenta()
     expect(final.services.find((s) => s.id === id)).toMatchObject({ paid: '10000.00', pending: '0.00' })
-    expect(final).toMatchObject({ balance: '-8000.00', availableCredit: '8000.00' })
+    expect(final).toMatchObject({ balance: '0.00', availableCredit: '8000.00' })
     const asignado = await db.paymentAllocation.aggregate({ _sum: { amount: true } })
     expect(asignado._sum.amount?.toFixed(2)).toBe('10000.00')
   })
@@ -365,9 +365,10 @@ describe('saldo a favor', () => {
     await registrar(consulta)
     const pago = await pagar('15000')
     expect(pago).toMatchObject({ allocated: '10000.00', unallocated: '5000.00' })
-    expect(await leerCuenta()).toMatchObject({ balance: '-5000.00', availableCredit: '5000.00' })
+    expect(await leerCuenta()).toMatchObject({ balance: '0.00', availableCredit: '5000.00' })
 
     const nueva = await registrar(limpieza)
+    expect(await leerCuenta()).toMatchObject({ balance: '25000.50', availableCredit: '5000.00' })
     expect((await leerCuenta()).services.find((s) => s.id === nueva)?.pending).toBe('25000.50')
     const res = await cobrar([{ amount: '20000.50', method: 'TRANSFER' }], { credit: '5000' })
     expect(res.status).toBe(201)
@@ -375,6 +376,12 @@ describe('saldo a favor', () => {
     const final = await leerCuenta()
     expect(final).toMatchObject({ balance: '0.00', availableCredit: '0.00', totalPayments: '35000.50' })
     expect(final.services.find((s) => s.id === nueva)).toMatchObject({ paid: '25000.50', pending: '0.00' })
+    expect(final.payments.map((p) => [p.method, p.amount])).toEqual(
+      expect.arrayContaining([
+        ['CREDIT', '5000.00'],
+        ['TRANSFER', '20000.50'],
+      ]),
+    )
     expect(await db.auditLog.count({ where: { action: 'CREDIT_APPLIED' } })).toBe(1)
   })
 
@@ -403,8 +410,28 @@ describe('saldo a favor', () => {
     await pagar('12000')
     await as(app, recepcion).post(`${servicios()}/${id}/price`, { price: '11000' }).expect(200)
     await as(app, recepcion).post(pagos(), { credit: '1000' }).expect(201)
-    expect(await leerCuenta()).toMatchObject({ balance: '-1000.00', availableCredit: '1000.00' })
+    expect(await leerCuenta()).toMatchObject({ balance: '0.00', availableCredit: '1000.00' })
     expect((await leerCuenta()).services[0]).toMatchObject({ paid: '11000.00', pending: '0.00' })
+  })
+})
+
+describe('anular un uso de saldo a favor', () => {
+  it('devuelve el saldo a favor y la prestacion vuelve a quedar pendiente', async () => {
+    await registrar(consulta)
+    await pagar('12000')
+    const nueva = await registrar(consulta)
+    await as(app, recepcion).post(pagos(), { credit: '2000' }).expect(201)
+    const uso = (await leerCuenta()).payments.find((p) => p.method === 'CREDIT') as Pago
+    expect(uso).toMatchObject({ amount: '2000.00', status: 'ACTIVE', voidable: true })
+    expect((await as(app, odontologo).post(`/api/patients/${pacienteId}/credits/${uso.id}/void`, { reason: 'Error' })).status).toBe(403)
+    const res = await as(app, recepcion).post(`/api/patients/${pacienteId}/credits/${uso.id}/void`, { reason: 'No correspondia' })
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ method: 'CREDIT', status: 'VOIDED', voidReason: 'No correspondia' })
+    const final = await leerCuenta()
+    expect(final).toMatchObject({ availableCredit: '2000.00', balance: '10000.00' })
+    expect(final.services.find((s) => s.id === nueva)?.pending).toBe('10000.00')
+    expect(await db.auditLog.count({ where: { action: 'CREDIT_VOIDED' } })).toBe(1)
+    await expect(db.creditApplication.delete({ where: { id: uso.id } })).rejects.toThrow()
   })
 })
 
@@ -472,12 +499,19 @@ describe('saldos pendientes', () => {
     await registrarA(otro.id, limpieza)
     await registrarA(alDia.id, consulta)
     await cobrar([{ amount: '10000' }], {}, recepcion, alDia.id).expect(201)
+    const conSaldoAFavor = await seedPatient(db, seed, { firstName: 'Ceci', lastName: 'Bravo' })
+    await registrarA(conSaldoAFavor.id, consulta)
+    await cobrar([{ amount: '15000' }], {}, recepcion, conSaldoAFavor.id).expect(201)
+    await registrarA(conSaldoAFavor.id, consulta)
 
     const res = await as(app, recepcion).get('/api/debtors')
     expect(res.status).toBe(200)
     expect(res.body).toEqual([
       { patientId: otro.id, fullName: 'Zapata, Ana', balance: '25000.50' },
-      { patientId: pacienteId, fullName: expect.any(String) as string, balance: '10000.00' },
+      ...[
+        { patientId: pacienteId, fullName: expect.any(String) as string, balance: '10000.00' },
+        { patientId: conSaldoAFavor.id, fullName: 'Bravo, Ceci', balance: '10000.00' },
+      ].sort((a, b) => a.patientId.localeCompare(b.patientId)),
     ])
   })
 

@@ -1,11 +1,12 @@
-import type { PaymentMethod } from './api'
+import type { MovementMethod } from './api'
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+export const PAYMENT_METHOD_LABELS: Record<MovementMethod, string> = {
   CASH: 'Efectivo',
   TRANSFER: 'Transferencia',
   CARD: 'Tarjeta',
   MERCADOPAGO: 'Mercado Pago',
   OTHER: 'Otro',
+  CREDIT: 'Saldo a favor',
 }
 
 export function normalizeAmount(input: string): string {

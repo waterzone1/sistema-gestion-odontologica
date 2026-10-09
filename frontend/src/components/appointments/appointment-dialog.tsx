@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { FormError } from '@/components/form-error'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
@@ -130,35 +130,44 @@ function Detail({
             </Button>
           </div>
         </div>
-      ) : (
-        <DialogFooter>
-          {editable && canManage && (
-            <Button variant="outline" onClick={() => setCancelling(true)} disabled={change.isPending}>
-              Cancelar turno
-            </Button>
-          )}
-          {editable && canManage && onEdit && (
-            <Button variant="outline" onClick={() => onEdit(appointment)} disabled={change.isPending}>
-              Editar o reprogramar
-            </Button>
-          )}
-          {editable && canAttend && (
-            <Button variant="outline" onClick={() => mark('NO_SHOW')} disabled={change.isPending}>
-              Marcar ausente
-            </Button>
-          )}
-          {editable && canAttend && (
-            <Button variant="outline" onClick={() => mark('ATTENDED')} disabled={change.isPending}>
-              Marcar atendido
-            </Button>
-          )}
+      ) : editable && (canManage || canAttend) ? (
+        <div className="grid gap-2 border-t pt-4 sm:grid-cols-2">
           {appointment.status === 'SCHEDULED' && canManage && (
-            <Button onClick={() => change.mutate({ status: 'CONFIRMED' })} disabled={change.isPending}>
+            <Button
+              className="w-full sm:col-span-2"
+              onClick={() => change.mutate({ status: 'CONFIRMED' })}
+              disabled={change.isPending}
+            >
               Confirmar
             </Button>
           )}
-        </DialogFooter>
-      )}
+          {canAttend && (
+            <Button variant="outline" className="w-full" onClick={() => mark('ATTENDED')} disabled={change.isPending}>
+              Marcar atendido
+            </Button>
+          )}
+          {canAttend && (
+            <Button variant="outline" className="w-full" onClick={() => mark('NO_SHOW')} disabled={change.isPending}>
+              Marcar ausente
+            </Button>
+          )}
+          {canManage && onEdit && (
+            <Button variant="outline" className="w-full" onClick={() => onEdit(appointment)} disabled={change.isPending}>
+              Editar o reprogramar
+            </Button>
+          )}
+          {canManage && (
+            <Button
+              variant="outline"
+              className="w-full text-destructive"
+              onClick={() => setCancelling(true)}
+              disabled={change.isPending}
+            >
+              Cancelar turno
+            </Button>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

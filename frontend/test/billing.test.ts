@@ -14,8 +14,8 @@ describe('importes de pago', () => {
 })
 
 describe('medios de pago', () => {
-  it('tienen etiqueta en español para los cinco medios', () => {
-    expect(Object.values(PAYMENT_METHOD_LABELS)).toEqual(['Efectivo', 'Transferencia', 'Tarjeta', 'Mercado Pago', 'Otro'])
+  it('tienen etiqueta en español, incluido el saldo a favor', () => {
+    expect(Object.values(PAYMENT_METHOD_LABELS)).toEqual(['Efectivo', 'Transferencia', 'Tarjeta', 'Mercado Pago', 'Otro', 'Saldo a favor'])
   })
 })
 

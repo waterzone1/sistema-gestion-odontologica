@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { ADMIN_PASSWORD, ADMIN_USERNAME, ODONTOLOGO, RECEPCION } from './api'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import { ADMIN_PASSWORD, ADMIN_USERNAME, apiLogin, ODONTOLOGO, RECEPCION } from './api'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -12,6 +12,9 @@ async function ingresar(page: Page, usuario: { username: string; password: strin
   await page.getByRole('button', { name: 'Ingresar' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
 }
+
+const figura = (resumen: Locator, etiqueta: string) =>
+  resumen.locator('div').filter({ has: resumen.page().getByText(etiqueta, { exact: true }) }).last()
 
 async function abrirFichaDeRossi(page: Page) {
   await page.goto('/patients')
@@ -51,6 +54,8 @@ test('recepción ajusta el precio y cobra con dos medios de pago', async ({ page
   await lista.getByRole('button', { name: 'Ajustar precio' }).click()
   await page.getByRole('dialog').getByRole('button', { name: '-10 %' }).click()
   await expect(page.getByRole('dialog').getByLabel('Precio')).toHaveValue('9000.00')
+  await expect(page.getByRole('dialog').getByRole('button', { name: '-10 %' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Catálogo' })).toHaveAttribute('aria-pressed', 'false')
   await page.screenshot({ path: captura('22-ajustar-precio') })
   await page.getByRole('dialog').getByRole('button', { name: 'Guardar precio' }).click()
   await expect(lista.getByText('Consulta · $ 9.000,00')).toBeVisible()
@@ -88,8 +93,8 @@ test('un pago de más queda a favor y se usa para cobrar la prestación siguient
   await page.getByRole('button', { name: 'Registrar pago' }).click()
   await page.getByRole('dialog').getByLabel('Importe').fill('6000')
   await page.getByRole('dialog').getByRole('button', { name: 'Registrar pago' }).click()
-  await expect(resumen.getByText('Saldo a favor')).toBeVisible()
-  await expect(resumen.getByText('$ 1.000,50')).toBeVisible()
+  await expect(figura(resumen, 'Saldo a cobrar')).toContainText('$ 0,00')
+  await expect(figura(resumen, 'Saldo a favor')).toContainText('$ 1.000,50')
 
   await page.getByRole('tab', { name: 'Prestaciones' }).click()
   await page.getByRole('button', { name: 'Registrar prestación' }).click()
@@ -99,14 +104,20 @@ test('un pago de más queda a favor y se usa para cobrar la prestación siguient
   await alta.getByRole('button', { name: 'Registrar' }).click()
 
   await page.getByRole('tab', { name: 'Cuenta' }).click()
-  await expect(page.getByText('Tiene $ 1.000,50 de saldo a favor sin aplicar')).toBeVisible()
+  await expect(figura(resumen, 'Saldo a cobrar')).toContainText('$ 10.000,00')
+  await expect(figura(resumen, 'Saldo a favor')).toContainText('$ 1.000,50')
   await page.getByRole('button', { name: 'Registrar pago' }).click()
   const cobro = page.getByRole('dialog')
-  await cobro.getByLabel('Usar saldo a favor').fill('1000,50')
-  await cobro.getByLabel('Importe').fill('8999,50')
+  await cobro.getByLabel('Importe').fill('1000,50')
+  await cobro.getByLabel('Medio de pago', { exact: true }).selectOption({ label: 'Saldo a favor (disponible $ 1.000,50)' })
+  await cobro.getByRole('button', { name: 'Agregar otro medio de pago' }).click()
+  await cobro.getByLabel('Importe').nth(1).fill('8999,50')
+  await cobro.getByLabel('Medio de pago', { exact: true }).nth(1).selectOption({ label: 'Efectivo' })
   await page.screenshot({ path: captura('25-cobro-con-saldo-a-favor') })
   await cobro.getByRole('button', { name: 'Registrar pago' }).click()
-  await expect(resumen.getByText('$ 0,00')).toBeVisible()
+  await expect(figura(resumen, 'Saldo a cobrar')).toContainText('$ 0,00')
+  await expect(figura(resumen, 'Saldo a favor')).toContainText('$ 0,00')
+  await expect(page.getByRole('region', { name: 'Pagos', exact: true }).getByText('$ 1.000,50 · Saldo a favor')).toBeVisible()
 })
 
 test('administración anula un pago con motivo y el saldo vuelve a subir', async ({ page }) => {
@@ -116,10 +127,32 @@ test('administración anula un pago con motivo y el saldo vuelve a subir', async
   const pagos = page.getByRole('region', { name: 'Pagos', exact: true })
   await pagos.getByRole('listitem').filter({ hasText: '$ 3.000,00 · Efectivo' }).getByRole('button', { name: 'Anular' }).click()
   await page.getByLabel('Motivo').fill('Importe cargado dos veces')
-  await page.getByRole('dialog').getByRole('button', { name: 'Anular pago' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Anular', exact: true }).click()
 
   await expect(pagos.getByText('Anulado')).toBeVisible()
   await expect(pagos.getByText('Motivo de la anulación: Importe cargado dos veces')).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Resumen de cuenta' }).getByText('$ 3.000,00').last()).toBeVisible()
+  await expect(figura(page.getByRole('region', { name: 'Resumen de cuenta' }), 'Saldo a cobrar')).toContainText('$ 3.000,00')
   await page.screenshot({ path: captura('26-pago-anulado'), fullPage: true })
+})
+
+test('los pagos se muestran de a 10 por página', async ({ page }) => {
+  const recepcion = await apiLogin(RECEPCION.username, RECEPCION.password)
+  const pacientes = (await (await recepcion.get('/api/patients?q=rossi')).json()) as { items: { id: string }[] }
+  const id = pacientes.items[0]?.id ?? ''
+  for (let i = 0; i < 6; i += 1) {
+    const res = await recepcion.post(`/api/patients/${id}/payments`, { lines: [{ amount: '100', method: 'CASH' }] })
+    expect(res.status()).toBe(201)
+  }
+  await recepcion.dispose()
+
+  await ingresar(page, RECEPCION)
+  await abrirFichaDeRossi(page)
+  await page.getByRole('tab', { name: 'Cuenta' }).click()
+  const pagos = page.getByRole('region', { name: 'Pagos', exact: true })
+  await expect(pagos.getByRole('listitem')).toHaveCount(10)
+  const paginacion = page.getByRole('navigation', { name: 'Paginación de pagos' })
+  await expect(paginacion.getByText('Página 1 de 2')).toBeVisible()
+  await paginacion.getByRole('button', { name: 'Siguiente' }).click()
+  await expect(paginacion.getByText('Página 2 de 2')).toBeVisible()
+  await expect(pagos.getByRole('listitem')).toHaveCount(1)
 })

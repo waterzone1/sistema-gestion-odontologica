@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocatePayment, balanceCents, fromCents, localDay, toCents } from '../../src/modules/billing/domain/balance.js'
+import { allocatePayment, fromCents, localDay, sum, toCents } from '../../src/modules/billing/domain/balance.js'
 
 describe('importes en centavos', () => {
   it('convierte sin errores de punto flotante', () => {
@@ -111,16 +111,9 @@ describe('localDay', () => {
   })
 })
 
-describe('balanceCents', () => {
-  it('es prestaciones menos pagos', () => {
-    expect(balanceCents([10000, 5000], [4000])).toBe(11000)
-  })
-
-  it('queda negativo cuando hay saldo a favor', () => {
-    expect(balanceCents([10000], [15000])).toBe(-5000)
-  })
-
-  it('sin movimientos es cero', () => {
-    expect(balanceCents([], [])).toBe(0)
+describe('sum', () => {
+  it('suma centavos y da cero sin valores', () => {
+    expect(sum([10000, 5000, 1])).toBe(15001)
+    expect(sum([])).toBe(0)
   })
 })

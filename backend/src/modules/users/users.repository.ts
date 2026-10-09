@@ -40,7 +40,6 @@ export function toUserDto(user: UserRecord): UserDto {
     professional: user.professionalProfile
       ? {
           licenseNumber: user.professionalProfile.licenseNumber,
-          specialty: user.professionalProfile.specialty,
           active: user.professionalProfile.active,
         }
       : null,
