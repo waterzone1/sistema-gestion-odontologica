@@ -128,6 +128,8 @@ components:
               - payments:void
               - services:price
               - billing:void-any-day
+              - availability:manage
+              - appointments:override
         branchIds:
           type: array
           items:
@@ -426,6 +428,19 @@ components:
           type: string
         licenseNumber:
           type: string
+        phone:
+          type:
+            - string
+            - "null"
+        email:
+          type:
+            - string
+            - "null"
+        practiceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
         active:
           type: boolean
         branchIds:
@@ -438,6 +453,9 @@ components:
         - userId
         - displayName
         - licenseNumber
+        - phone
+        - email
+        - practiceIds
         - active
         - branchIds
     SaveProfessionalInput:
@@ -447,6 +465,24 @@ components:
           type: string
           minLength: 1
           maxLength: 40
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 40
+        email:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+        practiceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 200
+          description: "Prácticas que realiza. Vacío: puede recibir turnos de cualquier
+            práctica"
         active:
           type: boolean
       required:
@@ -615,6 +651,217 @@ components:
         cancelActiveAppointments:
           type: boolean
           default: false
+    ProfessionalAvailability:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailabilityRule"
+        exceptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailabilityException"
+      required:
+        - rules
+        - exceptions
+    AvailabilityRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        branchId:
+          type: string
+          format: uuid
+        weekday:
+          type: integer
+        start:
+          type: string
+          example: 09:00
+        end:
+          type: string
+          example: 13:00
+      required:
+        - id
+        - branchId
+        - weekday
+        - start
+        - end
+    AvailabilityException:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/AvailabilityExceptionType"
+        branchId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+      required:
+        - id
+        - type
+        - branchId
+        - startsAt
+        - endsAt
+        - reason
+    AvailabilityExceptionType:
+      type: string
+      enum:
+        - BLOCK
+        - VACATION
+        - ABSENCE
+        - EXTRA
+    ReplaceAvailabilityRulesInput:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              branchId:
+                type: string
+                format: uuid
+              weekday:
+                type: integer
+                minimum: 1
+                maximum: 7
+                description: 1 = lunes … 7 = domingo
+              start:
+                type: string
+                pattern: ^(([01]\d|2[0-3]):[0-5]\d|24:00)$
+              end:
+                type: string
+                pattern: ^(([01]\d|2[0-3]):[0-5]\d|24:00)$
+            required:
+              - branchId
+              - weekday
+              - start
+              - end
+          maxItems: 100
+      required:
+        - rules
+    AvailabilityExceptionResult:
+      type: object
+      properties:
+        exception:
+          $ref: "#/components/schemas/AvailabilityException"
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              startsAt:
+                type: string
+                format: date-time
+              patient:
+                type: string
+            required:
+              - id
+              - startsAt
+              - patient
+          description: Turnos activos que quedan dentro de un bloqueo y conviene reprogramar
+      required:
+        - exception
+        - conflicts
+    CreateAvailabilityExceptionInput:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/AvailabilityExceptionType"
+        branchId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 200
+      required:
+        - type
+        - startsAt
+        - endsAt
+        - reason
+    AgendaAvailability:
+      type: array
+      items:
+        type: object
+        properties:
+          professionalId:
+            type: string
+            format: uuid
+          available:
+            type: array
+            items:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: date-time
+                end:
+                  type: string
+                  format: date-time
+                branchId:
+                  type:
+                    - string
+                    - "null"
+                  format: uuid
+              required:
+                - start
+                - end
+                - branchId
+          blocked:
+            type: array
+            items:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: date-time
+                end:
+                  type: string
+                  format: date-time
+                branchId:
+                  type:
+                    - string
+                    - "null"
+                  format: uuid
+                type:
+                  $ref: "#/components/schemas/AvailabilityExceptionType"
+                reason:
+                  type: string
+              required:
+                - start
+                - end
+                - branchId
+                - type
+                - reason
+        required:
+          - professionalId
+          - available
+          - blocked
     PerformedService:
       type: object
       properties:
@@ -1084,9 +1331,14 @@ components:
               format: uuid
             fullName:
               type: string
+            phone:
+              type:
+                - string
+                - "null"
           required:
             - id
             - fullName
+            - phone
         professional:
           type: object
           properties:
@@ -1118,6 +1370,18 @@ components:
             - id
             - code
             - name
+        hasClinicalNote:
+          type:
+            - boolean
+            - "null"
+          description: Si el turno tiene una nota clínica. Nulo para quien no accede a
+            datos clínicos
+        availabilityOverride:
+          type: boolean
+        overrideReason:
+          type:
+            - string
+            - "null"
         createdAt:
           type: string
           format: date-time
@@ -1132,6 +1396,9 @@ components:
         - patient
         - professional
         - practice
+        - hasClinicalNote
+        - availabilityOverride
+        - overrideReason
         - createdAt
     AppointmentStatus:
       type: string
@@ -1169,6 +1436,17 @@ components:
             - string
             - "null"
           maxLength: 500
+        override:
+          type: object
+          properties:
+            reason:
+              type: string
+              minLength: 5
+              maxLength: 300
+          required:
+            - reason
+          description: "Solo administración: permite dar el turno fuera de la
+            disponibilidad del profesional. Nunca permite superponer turnos"
       required:
         - patientId
         - professionalId
@@ -1200,6 +1478,17 @@ components:
             - string
             - "null"
           maxLength: 500
+        override:
+          type: object
+          properties:
+            reason:
+              type: string
+              minLength: 5
+              maxLength: 300
+          required:
+            - reason
+          description: "Solo administración: permite dar el turno fuera de la
+            disponibilidad del profesional. Nunca permite superponer turnos"
     ChangeAppointmentStatusInput:
       type: object
       properties:
@@ -2273,9 +2562,255 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/patients/{patientId}/services:
+  /api/professionals/{professionalId}/availability:
     get:
       tags: &a7
+        - Disponibilidad
+      summary: Horario semanal y excepciones vigentes de un profesional
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: professionalId
+          in: path
+      responses:
+        "200":
+          description: Disponibilidad
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfessionalAvailability"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{professionalId}/availability/rules:
+    put:
+      tags: *a7
+      summary: Reemplaza el horario semanal
+      description: Solo administración. Las franjas son por sede y en la hora del
+        consultorio; no pueden superponerse el mismo día aunque sean de sedes
+        distintas.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: professionalId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceAvailabilityRulesInput"
+      responses:
+        "200":
+          description: Disponibilidad actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfessionalAvailability"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Franjas inválidas o sede donde el profesional no trabaja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{professionalId}/exceptions:
+    post:
+      tags: *a7
+      summary: Registra un bloqueo, vacaciones, ausencia u horario extraordinario
+      description: Administración y recepción. Devuelve los turnos activos que quedan
+        dentro del período para reprogramarlos; no los cancela.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: professionalId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAvailabilityExceptionInput"
+      responses:
+        "201":
+          description: Excepción registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityExceptionResult"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Sede donde el profesional no trabaja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{professionalId}/exceptions/{exceptionId}/revoke:
+    post:
+      tags: *a7
+      summary: Deja sin efecto una excepción
+      description: "La excepción no se borra: queda registrada como revocada."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: professionalId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: exceptionId
+          in: path
+      responses:
+        "204":
+          description: Excepción revocada
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/availability:
+    get:
+      tags: *a7
+      summary: Franjas disponibles y bloqueadas de una sede para mostrar en la agenda
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: to
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: branchId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: professionalId
+          in: query
+      responses:
+        "200":
+          description: Franjas por profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaAvailability"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/services:
+    get:
+      tags: &a8
         - Prestaciones y cobros
       summary: Prestaciones realizadas al paciente
       security: *a2
@@ -2314,7 +2849,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a7
+      tags: *a8
       summary: Registra una prestación realizada
       description: La registra un odontólogo (siempre a su nombre), recepción o
         administración (eligiendo el profesional). El precio es el del catálogo
@@ -2373,7 +2908,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/price:
     post:
-      tags: *a7
+      tags: *a8
       summary: Ajusta el precio de una prestación
       description: Recepción y administración. No puede quedar por debajo de lo ya
         pagado. Queda auditado con el precio anterior.
@@ -2441,7 +2976,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/void:
     post:
-      tags: *a7
+      tags: *a8
       summary: Anula una prestación
       description: Recepción solo lo cargado en el día; administración siempre. La
         prestación se conserva marcada como anulada, con el motivo.
@@ -2503,7 +3038,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/account:
     get:
-      tags: *a7
+      tags: *a8
       summary: Cuenta corriente del paciente
       description: El saldo se calcula siempre como prestaciones vigentes menos pagos
         vigentes; no se guarda. Un saldo negativo es saldo a favor.
@@ -2542,7 +3077,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments:
     post:
-      tags: *a7
+      tags: *a8
       summary: Registra un cobro
       description: Un cobro puede combinar varios medios de pago y usar saldo a favor
         si quien cobra lo elige; ese uso queda registrado como un movimiento
@@ -2603,7 +3138,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments/{paymentId}/void:
     post:
-      tags: *a7
+      tags: *a8
       summary: Anula un pago
       description: Recepción solo lo cargado en el día; administración siempre. El
         pago se conserva marcado como anulado, con el motivo, y deja de contar
@@ -2666,7 +3201,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/credits/{creditId}/void:
     post:
-      tags: *a7
+      tags: *a8
       summary: Anula un uso de saldo a favor
       description: Recepción solo lo cargado en el día; administración siempre. El
         saldo a favor vuelve a quedar disponible.
@@ -2728,7 +3263,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/debtors:
     get:
-      tags: *a7
+      tags: *a8
       summary: Pacientes con saldo pendiente
       description: Los 20 mayores saldos a cobrar.
       security: *a2
@@ -2755,7 +3290,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical:
     get:
-      tags: &a8
+      tags: &a9
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -2796,7 +3331,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a8
+      tags: *a9
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige agregando una corrección."
@@ -2853,7 +3388,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a8
+      tags: *a9
       summary: Agrega una corrección a una nota
       description: La nota original se conserva intacta; la corrección queda vinculada
         a ella.
@@ -2916,7 +3451,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a9
+      tags: &a10
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -2958,7 +3493,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a9
+      tags: *a10
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -3000,7 +3535,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a9
+      tags: *a10
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -3056,7 +3591,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a10
+      tags: &a11
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -3127,7 +3662,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a10
+      tags: *a11
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -3184,7 +3719,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a10
+      tags: *a11
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -3220,7 +3755,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a10
+      tags: *a11
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -3282,7 +3817,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a10
+      tags: *a11
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar

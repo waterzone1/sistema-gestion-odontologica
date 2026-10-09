@@ -114,6 +114,11 @@ const ENDPOINTS: Endpoint[] = [
     allowed: ADMIN_Y_RECEPCION,
   },
   { method: 'get', path: '/api/debtors', allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: `/api/professionals/${FANTASMA}/availability`, allowed: TODOS },
+  { method: 'put', path: `/api/professionals/${FANTASMA}/availability/rules`, body: { rules: [] }, allowed: SOLO_ADMIN },
+  { method: 'post', path: `/api/professionals/${FANTASMA}/exceptions`, body: {}, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/professionals/${FANTASMA}/exceptions/${FANTASMA}/revoke`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'get', path: '/api/availability', allowed: TODOS },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 

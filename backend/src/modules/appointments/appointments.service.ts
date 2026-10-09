@@ -3,6 +3,7 @@ import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { isExclusionViolation } from '../../shared/prismaErrors.js'
 import { recordAudit } from '../audit/audit.service.js'
+import { assertAvailable } from '../availability/availability.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { hasPermission } from '../users/domain/permissions.js'
 import {
@@ -21,14 +22,15 @@ import type {
 
 const include = {
   branch: { select: { id: true, name: true } },
-  patient: { select: { id: true, firstName: true, lastName: true } },
+  patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
   professional: { select: { id: true, user: { select: { id: true, displayName: true } } } },
   practice: { select: { id: true, code: true, name: true } },
+  _count: { select: { clinicalEntries: true } },
 } as const
 
 type AppointmentRecord = Prisma.AppointmentGetPayload<{ include: typeof include }>
 
-function toDto(appointment: AppointmentRecord): AppointmentDto {
+function toDto(appointment: AppointmentRecord, actor: AuthContext): AppointmentDto {
   return {
     id: appointment.id,
     status: appointment.status,
@@ -40,6 +42,7 @@ function toDto(appointment: AppointmentRecord): AppointmentDto {
     patient: {
       id: appointment.patient.id,
       fullName: `${appointment.patient.lastName}, ${appointment.patient.firstName}`,
+      phone: appointment.patient.phone,
     },
     professional: {
       id: appointment.professional.id,
@@ -47,6 +50,9 @@ function toDto(appointment: AppointmentRecord): AppointmentDto {
       displayName: appointment.professional.user.displayName,
     },
     practice: appointment.practice,
+    hasClinicalNote: hasPermission(actor.permissions, 'clinical:read') ? appointment._count.clinicalEntries > 0 : null,
+    availabilityOverride: appointment.availabilityOverride,
+    overrideReason: appointment.overrideReason,
     createdAt: appointment.createdAt.toISOString(),
   }
 }
@@ -93,7 +99,7 @@ interface References {
 }
 
 async function assertReferences(
-  tx: Pick<Db, 'patient' | 'branch' | 'professionalProfile' | 'practice'>,
+  tx: Pick<Db, 'patient' | 'branch' | 'professionalProfile' | 'practice' | 'professionalPractice'>,
   actor: AuthContext,
   refs: References,
   checkPatient: boolean,
@@ -133,7 +139,51 @@ async function assertReferences(
       where: { id: refs.practiceId, organizationId: actor.organizationId, active: true },
     })
     if (!practice) throw new AppError(422, 'INVALID_PRACTICE', 'La práctica no existe o está inactiva')
+    const offered = await tx.professionalPractice.findMany({
+      where: { professionalId: refs.professionalId },
+      select: { practiceId: true },
+    })
+    if (offered.length > 0 && !offered.some((o) => o.practiceId === refs.practiceId)) {
+      throw new AppError(422, 'PRACTICE_NOT_OFFERED', 'El profesional no realiza esa práctica')
+    }
   }
+}
+
+interface SlotCheck {
+  professionalId: string
+  branchId: string
+  startsAt: Date
+  endsAt: Date
+  override: { reason: string } | undefined
+}
+
+async function checkAvailability(tx: Prisma.TransactionClient, actor: AuthContext, slot: SlotCheck) {
+  if (!slot.override) {
+    await assertAvailable(tx, actor.organizationId, slot)
+    return { availabilityOverride: false, overrideReason: null }
+  }
+  if (!hasPermission(actor.permissions, 'appointments:override')) {
+    throw new AppError(403, 'FORBIDDEN', 'Solo un administrador puede dar turnos fuera de horario')
+  }
+  return { availabilityOverride: true, overrideReason: slot.override.reason }
+}
+
+async function auditOverride(
+  tx: Prisma.TransactionClient,
+  actor: AuthContext,
+  appointmentId: string,
+  branchId: string,
+  reason: string,
+) {
+  await recordAudit(tx, {
+    action: 'APPOINTMENT_AVAILABILITY_OVERRIDE',
+    entityType: 'Appointment',
+    entityId: appointmentId,
+    organizationId: actor.organizationId,
+    actorUserId: actor.userId,
+    branchId,
+    metadata: { motivo: reason },
+  })
 }
 
 async function conflictError(
@@ -179,11 +229,11 @@ export async function listAppointments(
     orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
     take: 1000,
   })
-  return appointments.map(toDto)
+  return appointments.map((appointment) => toDto(appointment, actor))
 }
 
 export async function getAppointment(db: Db, actor: AuthContext, id: string): Promise<AppointmentDto> {
-  return toDto(await findVisibleOrFail(db, actor, id))
+  return toDto(await findVisibleOrFail(db, actor, id), actor)
 }
 
 export async function createAppointment(
@@ -199,6 +249,7 @@ export async function createAppointment(
   try {
     return await db.$transaction(async (tx) => {
       await assertReferences(tx, actor, { ...input, practiceId: input.practiceId ?? null }, true)
+      const availability = await checkAvailability(tx, actor, { ...input, startsAt, endsAt, override: input.override })
       const created = await tx.appointment.create({
         data: {
           organizationId: actor.organizationId,
@@ -210,9 +261,11 @@ export async function createAppointment(
           endsAt,
           notes: input.notes ?? null,
           createdById: actor.userId,
+          ...availability,
         },
         include,
       })
+      if (input.override) await auditOverride(tx, actor, created.id, input.branchId, input.override.reason)
       await recordAudit(tx, {
         action: 'APPOINTMENT_CREATED',
         entityType: 'Appointment',
@@ -221,7 +274,7 @@ export async function createAppointment(
         actorUserId: actor.userId,
         branchId: input.branchId,
       })
-      return toDto(created)
+      return toDto(created, actor)
     })
   } catch (err) {
     if (isExclusionViolation(err)) {
@@ -260,6 +313,10 @@ export async function updateAppointment(
         startsAt.getTime() !== current.startsAt.getTime() ||
         endsAt.getTime() !== current.endsAt.getTime() ||
         professionalId !== current.professional.id
+      const slotChanged = rescheduled || branchId !== current.branch.id
+      const availability = slotChanged
+        ? await checkAvailability(tx, actor, { professionalId, branchId, startsAt, endsAt, override: input.override })
+        : {}
 
       const updated = await tx.appointment.update({
         where: { id },
@@ -271,9 +328,11 @@ export async function updateAppointment(
           endsAt,
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(rescheduled && current.status === 'CONFIRMED' ? { status: 'SCHEDULED' } : {}),
+          ...availability,
         },
         include,
       })
+      if (slotChanged && input.override) await auditOverride(tx, actor, id, branchId, input.override.reason)
       await recordAudit(tx, {
         action: 'APPOINTMENT_UPDATED',
         entityType: 'Appointment',
@@ -281,9 +340,9 @@ export async function updateAppointment(
         organizationId: actor.organizationId,
         actorUserId: actor.userId,
         branchId,
-        metadata: { campos: Object.keys(input), reprogramado: rescheduled },
+        metadata: { campos: Object.keys(input).filter((campo) => campo !== 'override'), reprogramado: rescheduled },
       })
-      return toDto(updated)
+      return toDto(updated, actor)
     })
   } catch (err) {
     const tried = attempt as { professionalId: string; startsAt: Date; endsAt: Date } | null
@@ -329,6 +388,6 @@ export async function changeAppointmentStatus(
       branchId: current.branch.id,
       metadata: { desde: from, hacia: input.status },
     })
-    return toDto(updated)
+    return toDto(updated, actor)
   })
 }

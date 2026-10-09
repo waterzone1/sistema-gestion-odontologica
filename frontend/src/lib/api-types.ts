@@ -1620,6 +1620,348 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/professionals/{professionalId}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    professionalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProfessionalAvailability"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/professionals/{professionalId}/availability/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    professionalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReplaceAvailabilityRulesInput"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProfessionalAvailability"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/professionals/{professionalId}/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    professionalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateAvailabilityExceptionInput"];
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AvailabilityExceptionResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/professionals/{professionalId}/exceptions/{exceptionId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    professionalId: string;
+                    exceptionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    from: string;
+                    to: string;
+                    branchId: string;
+                    professionalId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgendaAvailability"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/patients/{patientId}/services": {
         parameters: {
             query?: never;
@@ -3040,7 +3382,7 @@ export interface components {
             username: string;
             displayName: string;
             roles: components["schemas"]["Role"][];
-            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void" | "services:price" | "billing:void-any-day")[];
+            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void" | "services:price" | "billing:void-any-day" | "availability:manage" | "appointments:override")[];
             branchIds: string[];
             mustChangePassword: boolean;
             onboardingCompleted: boolean;
@@ -3124,11 +3466,17 @@ export interface components {
             userId: string;
             displayName: string;
             licenseNumber: string;
+            phone: string | null;
+            email: string | null;
+            practiceIds: string[];
             active: boolean;
             branchIds: string[];
         };
         SaveProfessionalInput: {
             licenseNumber: string;
+            phone?: string | null;
+            email?: string | null;
+            practiceIds?: string[];
             active?: boolean;
         };
         PatientList: {
@@ -3174,6 +3522,64 @@ export interface components {
         ArchivePatientInput: {
             cancelActiveAppointments: boolean;
         };
+        ProfessionalAvailability: {
+            rules: components["schemas"]["AvailabilityRule"][];
+            exceptions: components["schemas"]["AvailabilityException"][];
+        };
+        AvailabilityRule: {
+            id: string;
+            branchId: string;
+            weekday: number;
+            start: string;
+            end: string;
+        };
+        AvailabilityException: {
+            id: string;
+            type: components["schemas"]["AvailabilityExceptionType"];
+            branchId: string | null;
+            startsAt: string;
+            endsAt: string;
+            reason: string;
+        };
+        AvailabilityExceptionType: "BLOCK" | "VACATION" | "ABSENCE" | "EXTRA";
+        ReplaceAvailabilityRulesInput: {
+            rules: {
+                branchId: string;
+                weekday: number;
+                start: string;
+                end: string;
+            }[];
+        };
+        AvailabilityExceptionResult: {
+            exception: components["schemas"]["AvailabilityException"];
+            conflicts: {
+                id: string;
+                startsAt: string;
+                patient: string;
+            }[];
+        };
+        CreateAvailabilityExceptionInput: {
+            type: components["schemas"]["AvailabilityExceptionType"];
+            branchId?: string | null;
+            startsAt: string;
+            endsAt: string;
+            reason: string;
+        };
+        AgendaAvailability: {
+            professionalId: string;
+            available: {
+                start: string;
+                end: string;
+                branchId: string | null;
+            }[];
+            blocked: {
+                start: string;
+                end: string;
+                branchId: string | null;
+                type: components["schemas"]["AvailabilityExceptionType"];
+                reason: string;
+            }[];
+        }[];
         PerformedService: {
             id: string;
             practice: {
@@ -3306,6 +3712,7 @@ export interface components {
             patient: {
                 id: string;
                 fullName: string;
+                phone: string | null;
             };
             professional: {
                 id: string;
@@ -3317,6 +3724,9 @@ export interface components {
                 code: string;
                 name: string;
             } | null;
+            hasClinicalNote: boolean | null;
+            availabilityOverride: boolean;
+            overrideReason: string | null;
             createdAt: string;
         };
         AppointmentStatus: "SCHEDULED" | "CONFIRMED" | "ATTENDED" | "NO_SHOW" | "CANCELLED";
@@ -3328,6 +3738,9 @@ export interface components {
             startsAt: string;
             endsAt: string;
             notes?: string | null;
+            override?: {
+                reason: string;
+            };
         };
         UpdateAppointmentInput: {
             professionalId?: string;
@@ -3336,6 +3749,9 @@ export interface components {
             startsAt?: string;
             endsAt?: string;
             notes?: string | null;
+            override?: {
+                reason: string;
+            };
         };
         ChangeAppointmentStatusInput: {
             status: "CONFIRMED" | "ATTENDED" | "NO_SHOW" | "CANCELLED";

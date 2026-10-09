@@ -16,6 +16,11 @@ const notesSchema = z
 
 export const appointmentIdParamsSchema = z.object({ id: z.uuid() })
 
+const overrideSchema = z
+  .object({ reason: z.string().trim().min(5, 'Explicá por qué se da el turno fuera de horario').max(300) })
+  .optional()
+  .meta({ description: 'Solo administración: permite dar el turno fuera de la disponibilidad del profesional. Nunca permite superponer turnos' })
+
 export const createAppointmentSchema = z
   .object({
     patientId: z.uuid(),
@@ -25,6 +30,7 @@ export const createAppointmentSchema = z
     startsAt: instantSchema,
     endsAt: instantSchema,
     notes: notesSchema,
+    override: overrideSchema,
   })
   .meta({ id: 'CreateAppointmentInput' })
 
@@ -36,6 +42,7 @@ export const updateAppointmentSchema = z
     startsAt: instantSchema,
     endsAt: instantSchema,
     notes: notesSchema,
+    override: overrideSchema,
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'No hay cambios para guardar' })
@@ -86,9 +93,15 @@ export const appointmentSchema = z
     notes: z.string().nullable(),
     cancellationReason: z.string().nullable(),
     branch: z.object({ id: z.uuid(), name: z.string() }),
-    patient: z.object({ id: z.uuid(), fullName: z.string() }),
+    patient: z.object({ id: z.uuid(), fullName: z.string(), phone: z.string().nullable() }),
     professional: z.object({ id: z.uuid(), userId: z.uuid(), displayName: z.string() }),
     practice: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+    hasClinicalNote: z
+      .boolean()
+      .nullable()
+      .meta({ description: 'Si el turno tiene una nota clínica. Nulo para quien no accede a datos clínicos' }),
+    availabilityOverride: z.boolean(),
+    overrideReason: z.string().nullable(),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'Appointment' })

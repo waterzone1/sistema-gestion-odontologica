@@ -22,6 +22,13 @@ test('el administrador prepara usuarios, práctica y un paciente para los escena
     licenseNumber: 'MP-100',
   })
 
+  const profesionales = (await (await admin.get('/api/professionals')).json()) as { id: string; displayName: string }[]
+  const perfil = profesionales.find((p) => p.displayName === ODONTOLOGO.displayName)
+  const horario = await admin.put(`/api/professionals/${perfil?.id}/availability/rules`, {
+    rules: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ branchId: branchIds[0], weekday, start: '00:00', end: '24:00' })),
+  })
+  expect(horario.status()).toBe(200)
+
   const practica = await admin.post('/api/practices', {
     code: 'CON',
     name: 'Consulta',
