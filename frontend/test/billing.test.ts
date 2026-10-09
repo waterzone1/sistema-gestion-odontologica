@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isValidAmount, normalizeAmount, PAYMENT_METHOD_LABELS } from '@/lib/billing'
+import { adjustByPercent, isValidAmount, normalizeAmount, PAYMENT_METHOD_LABELS } from '@/lib/billing'
 
 describe('importes de pago', () => {
   it('acepta coma o punto decimal', () => {
@@ -16,5 +16,14 @@ describe('importes de pago', () => {
 describe('medios de pago', () => {
   it('tienen etiqueta en español para los cinco medios', () => {
     expect(Object.values(PAYMENT_METHOD_LABELS)).toEqual(['Efectivo', 'Transferencia', 'Tarjeta', 'Mercado Pago', 'Otro'])
+  })
+})
+
+describe('ajustes de precio por porcentaje', () => {
+  it('aplica el porcentaje sobre el precio de catálogo y redondea al centavo', () => {
+    expect(adjustByPercent('10000.00', 25)).toBe('12500.00')
+    expect(adjustByPercent('10000.00', -10)).toBe('9000.00')
+    expect(adjustByPercent('999.99', -25)).toBe('749.99')
+    expect(adjustByPercent('25000.50', 0)).toBe('25000.50')
   })
 })

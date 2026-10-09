@@ -180,6 +180,7 @@ async function main() {
               practiceId: practice.id,
               appointmentId: appointment.id,
               price: practice.basePrice,
+              catalogPrice: practice.basePrice,
               performedAt: endsAt,
               createdById: dentistUsers[profileIndex]?.id ?? admin.id,
             },

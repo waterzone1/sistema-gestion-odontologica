@@ -10,22 +10,26 @@ import { PatientPicker, type PickedPatient } from '@/components/patient-picker'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
-import { Input, Select } from '@/components/ui/input'
+import { Input, MaskedInput, Select } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
 import { api, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
-import { toDateTimeInput } from '@/lib/format'
+import { maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
 
 const schema = z.object({
   branchId: z.string().min(1, 'Elegí la sede'),
   professionalId: z.string().min(1, 'Elegí el profesional'),
   practiceId: z.string(),
-  start: z.string().min(1, 'Indicá la fecha y la hora'),
+  date: z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Usá el formato dd/mm/aaaa'),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Usá el formato hh:mm (24 h)'),
   durationMinutes: z
     .number('Indicá la duración')
     .int('Indicá minutos enteros')
     .min(5, 'Mínimo 5 minutos')
     .max(480, 'Máximo 8 horas'),
   notes: z.string().trim().max(500, 'Máximo 500 caracteres'),
+}).refine((values) => parseDateTimeText(values.date, values.time) !== null, {
+  path: ['date'],
+  message: 'La fecha no es válida',
 })
 type Values = z.infer<typeof schema>
 
@@ -33,6 +37,7 @@ export interface AppointmentDefaults {
   start: Date
   durationMinutes: number
   patient?: PickedPatient | null
+  lockPatient?: boolean
   branchId?: string
   professionalId?: string
 }
@@ -100,7 +105,8 @@ function AppointmentForm({
       branchId: appointment?.branch.id ?? defaults?.branchId ?? branches[0]?.id ?? '',
       professionalId: appointment?.professional.id ?? defaults?.professionalId ?? '',
       practiceId: appointment?.practice?.id ?? '',
-      start: toDateTimeInput(startDate),
+      date: toDateText(startDate),
+      time: toTimeText(startDate),
       durationMinutes: duration,
       notes: appointment?.notes ?? '',
     },
@@ -110,7 +116,7 @@ function AppointmentForm({
 
   const save = useMutation({
     mutationFn: (values: Values) => {
-      const startsAt = new Date(values.start)
+      const startsAt = parseDateTimeText(values.date, values.time) as Date
       const endsAt = new Date(startsAt.getTime() + values.durationMinutes * 60_000)
       const body = {
         branchId: values.branchId,
@@ -144,7 +150,12 @@ function AppointmentForm({
       <FormError error={save.error} />
 
       <Field label="Paciente" htmlFor="patient-search" error={patientError ?? undefined}>
-        <PatientPicker id="patient-search" value={patient} onChange={setPatient} disabled={editing} />
+        <PatientPicker
+          id="patient-search"
+          value={patient}
+          onChange={setPatient}
+          disabled={editing || defaults?.lockPatient === true}
+        />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -191,9 +202,12 @@ function AppointmentForm({
         </Select>
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Fecha y hora de inicio" htmlFor="start" error={errors.start?.message}>
-          <Input id="start" type="datetime-local" {...register('start')} aria-invalid={!!errors.start} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Fecha" htmlFor="date" error={errors.date?.message}>
+          <MaskedInput id="date" placeholder="dd/mm/aaaa" mask={maskDate} {...register('date')} aria-invalid={!!errors.date} />
+        </Field>
+        <Field label="Hora" htmlFor="time" error={errors.time?.message}>
+          <MaskedInput id="time" placeholder="hh:mm" mask={maskTime} {...register('time')} aria-invalid={!!errors.time} />
         </Field>
         <Field label="Duración (minutos)" htmlFor="durationMinutes" error={errors.durationMinutes?.message}>
           <Input

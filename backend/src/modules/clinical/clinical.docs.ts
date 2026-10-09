@@ -44,7 +44,7 @@ export function registerClinicalDocs(registry: OpenAPIRegistry): void {
     path: '/api/patients/{patientId}/clinical',
     tags,
     summary: 'Registra una nota de evolución',
-    description: 'La nota queda a nombre del odontólogo y no se puede editar ni borrar: se corrige con una adenda.',
+    description: 'La nota queda a nombre del odontólogo y no se puede editar ni borrar: se corrige agregando una corrección.',
     security: writeSecurity,
     request: { params: clinicalPatientParamsSchema, ...bodyOf(createClinicalEntrySchema) },
     responses: {
@@ -60,8 +60,8 @@ export function registerClinicalDocs(registry: OpenAPIRegistry): void {
     method: 'post',
     path: '/api/patients/{patientId}/clinical/{entryId}/corrections',
     tags,
-    summary: 'Corrige una nota con una adenda',
-    description: 'La nota original se conserva intacta; la adenda queda vinculada a ella.',
+    summary: 'Agrega una corrección a una nota',
+    description: 'La nota original se conserva intacta; la corrección queda vinculada a ella.',
     security: writeSecurity,
     request: { params: clinicalEntryParamsSchema, ...bodyOf(correctClinicalEntrySchema) },
     responses: {

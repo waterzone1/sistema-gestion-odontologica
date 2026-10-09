@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { authOf, requirePermission } from '../../middleware/access.js'
 import type { Db } from '../../shared/db.js'
 import {
+  archivePatientSchema,
   createPatientSchema,
   listPatientsQuerySchema,
   patientIdParamsSchema,
@@ -37,7 +38,8 @@ export function patientsRouter(db: Db): Router {
 
   router.post('/:id/archive', write, async (req: Request, res: Response) => {
     const { id } = patientIdParamsSchema.parse(req.params)
-    res.json(await patients.setPatientArchived(db, authOf(req), id, true))
+    const { cancelActiveAppointments } = archivePatientSchema.parse(req.body ?? {})
+    res.json(await patients.setPatientArchived(db, authOf(req), id, true, cancelActiveAppointments))
   })
 
   router.post('/:id/unarchive', write, async (req: Request, res: Response) => {

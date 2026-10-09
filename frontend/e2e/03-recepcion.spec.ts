@@ -34,7 +34,7 @@ test('recepción da de alta un paciente y llega a su ficha', async () => {
   await dialogo.getByLabel('Nombre', { exact: true }).fill('Ana')
   await dialogo.getByLabel('Apellido').fill('Gómez')
   await dialogo.getByLabel('Número de documento').fill('30.123.456')
-  await dialogo.getByLabel('Fecha de nacimiento').fill('1985-03-10')
+  await dialogo.getByLabel('Fecha de nacimiento').fill('10031985')
   await dialogo.getByLabel('Teléfono').fill('11 5555-1234')
   await page.screenshot({ path: captura('10-paciente-alta') })
   await dialogo.getByRole('button', { name: 'Crear paciente' }).click()

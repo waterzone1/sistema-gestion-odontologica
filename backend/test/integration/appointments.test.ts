@@ -327,12 +327,12 @@ describe('estados del turno', () => {
     expect(otra.status).toBe(403)
   })
 
-  it('no se puede marcar atendido o ausente un turno futuro', async () => {
+  it('se puede marcar atendido o ausente antes de la hora: la interfaz solo advierte', async () => {
     const futuro = await seedAppointment(db, seed, { patientId: paciente.id, professionalId: perfilA, createdById: adminId, startsAt: minutesFromNow(120), endsAt: minutesFromNow(150) })
     const res = await as(app, odontologa).post(`/api/appointments/${futuro.id}/status`, { status: 'ATTENDED' })
-    expect(res.status).toBe(409)
-    expect(codigo(res)).toBe('TOO_EARLY')
-    expect((await as(app, recepcion).post(`/api/appointments/${futuro.id}/status`, { status: 'NO_SHOW' })).status).toBe(409)
+    expect(res.body).toMatchObject({ status: 'ATTENDED' })
+    const otro = await seedAppointment(db, seed, { patientId: paciente.id, professionalId: perfilA, createdById: adminId, startsAt: minutesFromNow(200), endsAt: minutesFromNow(230) })
+    expect((await as(app, recepcion).post(`/api/appointments/${otro.id}/status`, { status: 'NO_SHOW' })).status).toBe(200)
   })
 
   it('un odontologo no toca los turnos de otro', async () => {

@@ -19,7 +19,7 @@ async function abrirFichaDeRossi(page: Page) {
   await page.getByRole('link', { name: 'Rossi, Luca' }).click()
 }
 
-test('el odontólogo registra una nota y la corrige con una adenda', async ({ page }) => {
+test('el odontólogo registra una nota y le agrega una corrección', async ({ page }) => {
   await ingresar(page, ODONTOLOGO)
   await abrirFichaDeRossi(page)
   await page.getByRole('tab', { name: 'Historia clínica' }).click()
@@ -33,13 +33,14 @@ test('el odontólogo registra una nota y la corrige con una adenda', async ({ pa
   await expect(notas.getByText(ODONTOLOGO.displayName)).toBeVisible()
   await page.screenshot({ path: captura('18-historia-nota'), fullPage: true })
 
-  await notas.getByRole('button', { name: 'Corregir con adenda' }).click()
-  await page.getByLabel('Corrección (adenda)').fill('La pieza correcta es la 26.')
-  await page.getByRole('button', { name: 'Guardar adenda' }).click()
+  await notas.getByRole('button', { name: 'Agregar corrección' }).click()
+  await page.getByLabel('Corrección', { exact: true }).fill('La pieza correcta es la 26.')
+  await page.getByRole('button', { name: 'Guardar corrección' }).click()
   await expect(notas.getByText('La pieza correcta es la 26.')).toBeVisible()
-  await expect(notas.getByText('Adenda', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Guardar corrección' })).toHaveCount(0)
+  await expect(notas.getByText('Corrección', { exact: true })).toBeVisible()
   await expect(notas.getByText('Caries oclusal en pieza 16.')).toBeVisible()
-  await page.screenshot({ path: captura('19-historia-adenda'), fullPage: true })
+  await page.screenshot({ path: captura('19-historia-correccion'), fullPage: true })
 
   await page.reload()
   await page.getByRole('tab', { name: 'Historia clínica' }).click()

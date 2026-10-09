@@ -74,6 +74,32 @@
   font-weight: 600;
 }
 
+.fc .fc-toolbar.fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fc .fc-toolbar-chunk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.fc .fc-timeGridWeek-view .fc-scrollgrid {
+  min-width: 42rem;
+}
+
+@media (max-width: 639px) {
+  .fc .fc-toolbar.fc-header-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fc .fc-toolbar-chunk {
+    justify-content: center;
+  }
+}
+
 .fc .fc-button {
   font-size: 0.8rem;
   text-transform: capitalize;

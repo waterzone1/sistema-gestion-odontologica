@@ -62,15 +62,15 @@ export function ClinicalHistory({ patientId, canWrite, archived }: Props) {
                       <EntryForm
                         patientId={patientId}
                         correctionOfId={note.id}
-                        label="Corrección (adenda)"
-                        submitLabel="Guardar adenda"
+                        label="Corrección"
+                        submitLabel="Guardar corrección"
                         onDone={() => setCorrecting(null)}
                         onCancel={() => setCorrecting(null)}
                       />
                     </div>
                   ) : (
                     <Button variant="secondary" className="mt-2" onClick={() => setCorrecting(note.id)}>
-                      Corregir con adenda
+                      Agregar corrección
                     </Button>
                   ))}
               </li>
@@ -88,7 +88,7 @@ function Entry({ entry }: { entry: ClinicalEntry }) {
       <header className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{entry.professional.displayName}</span>
         <span>{formatDateTime(entry.createdAt)}</span>
-        {entry.entryType === 'CORRECTION' && <Badge variant="muted">Adenda</Badge>}
+        {entry.entryType === 'CORRECTION' && <Badge variant="muted">Corrección</Badge>}
       </header>
       <p className="whitespace-pre-wrap text-sm">{entry.content}</p>
     </article>

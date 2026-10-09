@@ -60,7 +60,7 @@ export function PatientAppointments({ patient, user }: Props) {
   const newAppointment = () => {
     const start = new Date()
     start.setMinutes(Math.ceil(start.getMinutes() / 30) * 30, 0, 0)
-    setCreating({ start, durationMinutes: 30, patient: { id: patient.id, fullName: patient.fullName } })
+    setCreating({ start, durationMinutes: 30, patient: { id: patient.id, fullName: patient.fullName }, lockPatient: true })
   }
 
   return (
@@ -139,7 +139,7 @@ function Section({
                       .join(' · ')}
                   </span>
                 </span>
-                <Badge variant={STATUS_VARIANT[appointment.status]}>{STATUS_LABELS[appointment.status]}</Badge>
+                <Badge variant={STATUS_VARIANT[appointment.status]} className="self-start sm:self-auto">{STATUS_LABELS[appointment.status]}</Badge>
               </button>
             </li>
           ))}

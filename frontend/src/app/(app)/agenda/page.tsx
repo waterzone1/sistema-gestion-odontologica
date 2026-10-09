@@ -40,7 +40,7 @@ export default function AgendaPage() {
   const allowed = can(user, 'appointments:read')
   const canManage = can(user, 'appointments:manage')
   const canAttend = can(user, 'appointments:attend')
-  const compact = useMediaQuery('(max-width: 767px)')
+  const compact = useMediaQuery('(max-width: 1023px)')
 
   const branches = useBranches(allowed)
   const professionals = useProfessionals(allowed)
@@ -148,7 +148,7 @@ export default function AgendaPage() {
       )}
       {appointments.isError && <FormError error={appointments.error} className="mb-4" />}
 
-      <div className="rounded-lg border bg-card p-2 shadow-sm sm:p-4">
+      <div className="overflow-x-auto rounded-lg border bg-card p-2 shadow-sm sm:p-4">
         <FullCalendar
           key={compact ? 'lista' : 'grilla'}
           plugins={[timeGridPlugin, listPlugin, interactionPlugin]}

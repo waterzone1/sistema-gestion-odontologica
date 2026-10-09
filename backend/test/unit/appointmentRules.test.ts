@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   canTransition,
   isEditable,
-  requiresStarted,
   type AppointmentStatus,
 } from '../../src/modules/appointments/domain/status.js'
 import { rangeProblem } from '../../src/modules/appointments/domain/timeRange.js'
@@ -35,12 +34,6 @@ describe('canTransition', () => {
 describe('isEditable', () => {
   it('solo los turnos pendientes o confirmados se pueden modificar', () => {
     expect(ESTADOS.filter(isEditable)).toEqual(['SCHEDULED', 'CONFIRMED'])
-  })
-})
-
-describe('requiresStarted', () => {
-  it('atendido y ausente exigen que haya llegado la hora', () => {
-    expect(ESTADOS.filter(requiresStarted)).toEqual(['ATTENDED', 'NO_SHOW'])
   })
 })
 

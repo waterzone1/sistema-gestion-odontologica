@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocatePayment, balanceCents, fromCents, toCents } from '../../src/modules/billing/domain/balance.js'
+import { allocatePayment, balanceCents, fromCents, localDay, toCents } from '../../src/modules/billing/domain/balance.js'
 
 describe('importes en centavos', () => {
   it('convierte sin errores de punto flotante', () => {
@@ -37,14 +37,14 @@ describe('allocatePayment', () => {
   ]
 
   it('un pago parcial cubre la prestacion mas antigua primero', () => {
-    expect(allocatePayment(4000, servicios)).toEqual({
+    expect(allocatePayment(4000, servicios)).toMatchObject({
       allocations: [{ serviceId: 'a', cents: 4000 }],
       unallocatedCents: 0,
     })
   })
 
   it('un pago que excede una prestacion sigue con la siguiente', () => {
-    expect(allocatePayment(12000, servicios)).toEqual({
+    expect(allocatePayment(12000, servicios)).toMatchObject({
       allocations: [
         { serviceId: 'a', cents: 10000 },
         { serviceId: 'b', cents: 2000 },
@@ -54,7 +54,7 @@ describe('allocatePayment', () => {
   })
 
   it('lo que sobra queda como saldo a favor', () => {
-    expect(allocatePayment(30000, servicios)).toEqual({
+    expect(allocatePayment(30000, servicios)).toMatchObject({
       allocations: [
         { serviceId: 'a', cents: 10000 },
         { serviceId: 'b', cents: 5000 },
@@ -65,7 +65,7 @@ describe('allocatePayment', () => {
   })
 
   it('sin prestaciones pendientes todo queda a favor', () => {
-    expect(allocatePayment(1500, [])).toEqual({ allocations: [], unallocatedCents: 1500 })
+    expect(allocatePayment(1500, [])).toEqual({ allocations: [], unallocatedCents: 1500, remaining: [] })
   })
 
   it('ignora prestaciones sin pendiente', () => {
@@ -80,6 +80,34 @@ describe('allocatePayment', () => {
       const asignado = allocations.reduce((total, a) => total + a.cents, 0)
       expect(asignado + unallocatedCents).toBe(pago)
     }
+  })
+})
+
+describe('allocatePayment encadenado', () => {
+  it('devuelve lo que queda pendiente para aplicar el medio de pago siguiente', () => {
+    const servicios = [
+      { id: 'a', pendingCents: 10000 },
+      { id: 'b', pendingCents: 5000 },
+    ]
+    const credito = allocatePayment(3000, servicios)
+    expect(credito.remaining).toEqual([
+      { id: 'a', pendingCents: 7000 },
+      { id: 'b', pendingCents: 5000 },
+    ])
+    const efectivo = allocatePayment(8000, credito.remaining)
+    expect(efectivo.allocations).toEqual([
+      { serviceId: 'a', cents: 7000 },
+      { serviceId: 'b', cents: 1000 },
+    ])
+    expect(efectivo.remaining).toEqual([{ id: 'b', pendingCents: 4000 }])
+  })
+})
+
+describe('localDay', () => {
+  it('usa el dia de la zona horaria del consultorio', () => {
+    const casiMedianoche = new Date('2026-10-09T02:30:00Z')
+    expect(localDay(casiMedianoche, 'America/Argentina/Buenos_Aires')).toBe('2026-10-08')
+    expect(localDay(casiMedianoche, 'UTC')).toBe('2026-10-09')
   })
 })
 

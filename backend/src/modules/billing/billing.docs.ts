@@ -12,8 +12,10 @@ import {
 } from '../../openapi/common.js'
 import {
   accountSchema,
+  adjustPriceSchema,
   billingPatientParamsSchema,
-  createPaymentSchema,
+  chargeResultSchema,
+  createChargeSchema,
   createServiceSchema,
   debtorSchema,
   paymentParamsSchema,
@@ -45,7 +47,7 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
     tags,
     summary: 'Registra una prestación realizada',
     description:
-      'Solo la registra un odontólogo, a su nombre. El precio se toma del catálogo en ese momento y queda fijo en la prestación.',
+      'La registra un odontólogo (siempre a su nombre), recepción o administración (eligiendo el profesional). El precio es el del catálogo salvo que recepción o administración indiquen otro; el odontólogo no ve importes.',
     security: writeSecurity,
     request: { ...patientParams, ...bodyOf(createServiceSchema) },
     responses: {
@@ -59,10 +61,28 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
 
   registry.registerPath({
     method: 'post',
+    path: '/api/patients/{patientId}/services/{serviceId}/price',
+    tags,
+    summary: 'Ajusta el precio de una prestación',
+    description: 'Recepción y administración. No puede quedar por debajo de lo ya pagado. Queda auditado con el precio anterior.',
+    security: writeSecurity,
+    request: { params: serviceParamsSchema, ...bodyOf(adjustPriceSchema) },
+    responses: {
+      200: json(serviceSchema, 'Prestación actualizada'),
+      400: invalidInput,
+      404: notFound,
+      409: errorResponse('La prestación está anulada'),
+      422: errorResponse('El precio es menor a lo ya pagado'),
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
     path: '/api/patients/{patientId}/services/{serviceId}/void',
     tags,
     summary: 'Anula una prestación',
-    description: 'Solo administración. La prestación se conserva marcada como anulada, con el motivo.',
+    description: 'Recepción solo lo cargado en el día; administración siempre. La prestación se conserva marcada como anulada, con el motivo.',
     security: writeSecurity,
     request: { params: serviceParamsSchema, ...bodyOf(voidSchema) },
     responses: {
@@ -90,16 +110,16 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
     method: 'post',
     path: '/api/patients/{patientId}/payments',
     tags,
-    summary: 'Registra un pago',
+    summary: 'Registra un cobro',
     description:
-      'Se aplica a las prestaciones indicadas, o a las pendientes más antiguas primero si no se indican. Admite pagos parciales; lo que excede lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago con referencia opcional.',
+      'Un cobro puede combinar varios medios de pago y usar saldo a favor. Primero se aplica el saldo a favor y después cada medio, a las prestaciones indicadas o a las pendientes más antiguas. Admite pagos parciales; lo que excede lo pendiente queda como saldo a favor. Mercado Pago es un medio de pago con referencia opcional.',
     security: writeSecurity,
-    request: { ...patientParams, ...bodyOf(createPaymentSchema) },
+    request: { ...patientParams, ...bodyOf(createChargeSchema) },
     responses: {
-      201: json(paymentSchema, 'Pago registrado'),
+      201: json(chargeResultSchema, 'Cobro registrado'),
       400: invalidInput,
       404: notFound,
-      422: errorResponse('Fecha futura o prestaciones elegidas inválidas'),
+      422: errorResponse('Fecha futura, prestaciones elegidas inválidas o saldo a favor insuficiente'),
       ...common,
     },
   })
@@ -109,7 +129,7 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
     path: '/api/patients/{patientId}/payments/{paymentId}/void',
     tags,
     summary: 'Anula un pago',
-    description: 'Solo administración. El pago se conserva marcado como anulado, con el motivo, y deja de contar en el saldo.',
+    description: 'Recepción solo lo cargado en el día; administración siempre. El pago se conserva marcado como anulado, con el motivo, y deja de contar en el saldo.',
     security: writeSecurity,
     request: { params: paymentParamsSchema, ...bodyOf(voidSchema) },
     responses: {
