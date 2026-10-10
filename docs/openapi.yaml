@@ -1404,6 +1404,108 @@ components:
         - PHOTO
         - CONSENT
         - OTHER
+    Odontogram:
+      type: object
+      properties:
+        current:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothFinding"
+          description: Condición actual de cada pieza y superficie (lo último registrado)
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothFinding"
+          description: Todos los registros, del más reciente al más antiguo
+      required:
+        - current
+        - history
+    ToothFinding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tooth:
+          type: integer
+        surface:
+          $ref: "#/components/schemas/ToothSurface"
+        condition:
+          $ref: "#/components/schemas/ToothCondition"
+        note:
+          type:
+            - string
+            - "null"
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tooth
+        - surface
+        - condition
+        - note
+        - professional
+        - createdAt
+    ToothSurface:
+      type:
+        - string
+        - "null"
+      enum:
+        - M
+        - D
+        - V
+        - L
+        - O
+        - null
+      description: M mesial, D distal, V vestibular, L lingual o palatina, O oclusal o
+        incisal
+    ToothCondition:
+      type: string
+      enum:
+        - HEALTHY
+        - CARIES
+        - RESTORATION
+        - TEMP_RESTORATION
+        - CROWN
+        - ROOT_CANAL
+        - IMPLANT
+        - FRACTURE
+        - MISSING
+        - EXTRACTION_INDICATED
+        - SEALANT
+        - PROSTHESIS
+    RecordToothFindingInput:
+      type: object
+      properties:
+        tooth:
+          type: integer
+          description: "Pieza en numeración FDI: 11 a 48 permanentes, 51 a 85 temporales"
+        surfaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothSurface"
+          maxItems: 5
+          default: []
+        condition:
+          $ref: "#/components/schemas/ToothCondition"
+        note:
+          type: string
+          maxLength: 500
+      required:
+        - tooth
+        - condition
     Practice:
       type: object
       properties:
@@ -3992,9 +4094,107 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/practices:
+  /api/patients/{patientId}/odontogram:
     get:
       tags: &a11
+        - Odontograma
+      summary: "Odontograma del paciente: condición actual e historial"
+      description: Solo odontólogos. La condición actual se deriva de los registros;
+        nunca se pisa el historial.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Odontograma
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Odontogram"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/odontogram/findings:
+    post:
+      tags: *a11
+      summary: Registra la condición de una pieza o de sus superficies
+      description: Corona, endodoncia, implante, ausente, extracción indicada y
+        prótesis se registran sobre la pieza completa. Marcar sano limpia la
+        pieza o la superficie. Los registros no se modifican ni se borran.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordToothFindingInput"
+      responses:
+        "201":
+          description: Odontograma actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Odontogram"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Pieza o superficie inválida, paciente archivado o usuario sin
+            perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices:
+    get:
+      tags: &a12
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -4036,7 +4236,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a12
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -4078,7 +4278,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a11
+      tags: *a12
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -4134,7 +4334,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a12
+      tags: &a13
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -4205,7 +4405,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a12
+      tags: *a13
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -4262,7 +4462,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a12
+      tags: *a13
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -4298,7 +4498,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a12
+      tags: *a13
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -4360,7 +4560,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a12
+      tags: *a13
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar

@@ -125,6 +125,8 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'post', path: `/api/patients/${FANTASMA}/files`, body: {}, allowed: SOLO_ODONTOLOGO },
   { method: 'get', path: `/api/patients/${FANTASMA}/files/${FANTASMA}/content`, allowed: SOLO_ODONTOLOGO },
   { method: 'post', path: `/api/patients/${FANTASMA}/files/${FANTASMA}/archive`, allowed: SOLO_ODONTOLOGO },
+  { method: 'get', path: `/api/patients/${FANTASMA}/odontogram`, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/odontogram/findings`, body: {}, allowed: SOLO_ODONTOLOGO },
   { method: 'put', path: '/api/auth/preferences', body: { theme: 'DARK' }, allowed: TODOS },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]

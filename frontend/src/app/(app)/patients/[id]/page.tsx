@@ -10,6 +10,7 @@ import { ServicesTab } from '@/components/billing/services-tab'
 import { ClinicalHistory } from '@/components/clinical/clinical-history'
 import { ClinicalProfileCard } from '@/components/clinical/clinical-profile-card'
 import { FilesTab } from '@/components/clinical/files-tab'
+import { OdontogramTab } from '@/components/clinical/odontogram-tab'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +55,7 @@ export default function PatientPage() {
     { id: 'resumen', label: 'Resumen' },
     ...(can(user, 'appointments:read') ? [{ id: 'turnos', label: 'Turnos' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'historia', label: 'Historia clínica' }] : []),
+    ...(can(user, 'clinical:read') ? [{ id: 'odontograma', label: 'Odontograma' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'archivos', label: 'Archivos' }] : []),
     ...(can(user, 'services:read') ? [{ id: 'prestaciones', label: 'Prestaciones' }] : []),
     ...(can(user, 'account:read') ? [{ id: 'cuenta', label: 'Cuenta' }] : []),
@@ -110,6 +112,9 @@ export default function PatientPage() {
             patient={{ id: data.id, fullName: fullName(data), archived: data.archivedAt !== null }}
             user={user}
           />
+        )}
+        {tab === 'odontograma' && (
+          <OdontogramTab patientId={data.id} canWrite={can(user, 'clinical:write') && data.archivedAt === null} />
         )}
         {tab === 'archivos' && (
           <FilesTab
