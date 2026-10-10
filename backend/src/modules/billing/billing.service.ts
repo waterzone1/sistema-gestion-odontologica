@@ -4,6 +4,8 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { organizationTimeZone } from '../availability/availability.service.js'
+import { findingProblem } from '../odontogram/domain/fdi.js'
+import { syncPlanStatus } from '../treatment/treatment.service.js'
 import { hasPermission } from '../users/domain/permissions.js'
 import { allocatePayment, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
 import type {
@@ -52,6 +54,7 @@ type Tx = Prisma.TransactionClient
 interface Viewer {
   actor: AuthContext
   showAmounts: boolean
+  showClinical: boolean
   today: string
   timeZone: string
 }
@@ -68,6 +71,7 @@ async function viewerOf(db: Pick<Db, 'organization'>, actor: AuthContext): Promi
   return {
     actor,
     showAmounts: hasPermission(actor.permissions, 'account:read'),
+    showClinical: hasPermission(actor.permissions, 'clinical:read'),
     timeZone,
     today: localDay(new Date(), timeZone),
   }
@@ -107,6 +111,9 @@ function toServiceDto(service: ServiceRecord, viewer: Viewer): ServiceDto {
     practice: service.practice,
     professional: { id: service.professional.id, displayName: service.professional.user.displayName },
     appointmentId: service.appointmentId,
+    treatmentItemId: service.treatmentItemId,
+    tooth: viewer.showClinical ? service.tooth : null,
+    surfaces: viewer.showClinical ? service.surfaces : [],
     price: show(price),
     catalogPrice: show(cents(service.catalogPrice)),
     paid: show(paid),
@@ -169,6 +176,29 @@ async function findPatientOrFail(db: Pick<Db, 'patient'>, actor: AuthContext, pa
   const patient = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId } })
   if (!patient) throw new AppError(404, 'NOT_FOUND', 'El paciente no existe')
   return patient
+}
+
+async function openItem(tx: Tx, actor: AuthContext, patientId: string, itemId: string) {
+  const item = await tx.treatmentItem.findFirst({
+    where: { id: itemId, plan: { patientId, organizationId: actor.organizationId } },
+  })
+  if (!item) throw new AppError(422, 'INVALID_TREATMENT_ITEM', 'El ítem no corresponde a un plan de este paciente')
+  if (item.status !== 'PLANNED' && item.status !== 'IN_PROGRESS') {
+    throw new AppError(409, 'ITEM_CLOSED', 'Ese ítem del plan ya está terminado o cancelado')
+  }
+  return item
+}
+
+function serviceLocation(actor: AuthContext, input: CreateServiceInput) {
+  const tooth = input.tooth ?? null
+  if (tooth === null && input.surfaces.length === 0) return { tooth: null, surfaces: [] }
+  if (!hasPermission(actor.permissions, 'clinical:write')) {
+    throw new AppError(403, 'FORBIDDEN', 'Solo el odontólogo registra la pieza tratada')
+  }
+  if (tooth === null) throw new AppError(422, 'INVALID_TOOTH', 'Las superficies necesitan una pieza')
+  const problem = findingProblem(tooth, 'CARIES', input.surfaces)
+  if (problem) throw new AppError(422, 'INVALID_TOOTH', problem)
+  return { tooth, surfaces: input.surfaces }
 }
 
 function assertNotFuture(iso: string | undefined, label: string): Date {
@@ -240,10 +270,15 @@ export async function createService(
       throw new AppError(422, 'PATIENT_ARCHIVED', 'El paciente está archivado: reactivalo para registrar prestaciones')
     }
     const professional = await resolveProfessional(tx, actor, input.professionalId)
+    const item = input.treatmentItemId ? await openItem(tx, actor, patientId, input.treatmentItemId) : null
+    if (item && input.practiceId && input.practiceId !== item.practiceId) {
+      throw new AppError(422, 'INVALID_PRACTICE', 'La práctica no coincide con la del ítem del plan')
+    }
     const practice = await tx.practice.findFirst({
-      where: { id: input.practiceId, organizationId: actor.organizationId, active: true },
+      where: { id: item?.practiceId ?? input.practiceId, organizationId: actor.organizationId, active: true },
     })
     if (!practice) throw new AppError(422, 'INVALID_PRACTICE', 'La práctica no existe o está inactiva')
+    const location = item ? { tooth: item.tooth, surfaces: item.surfaces } : serviceLocation(actor, input)
     if (input.appointmentId) {
       const appointment = await tx.appointment.findFirst({
         where: {
@@ -257,7 +292,7 @@ export async function createService(
         throw new AppError(422, 'INVALID_APPOINTMENT', 'El turno no corresponde a este paciente y profesional')
       }
     }
-    const price = input.price ?? practice.basePrice.toFixed(2)
+    const price = input.price ?? item?.agreedPrice?.toFixed(2) ?? practice.basePrice.toFixed(2)
     const service = await tx.performedService.create({
       data: {
         organizationId: actor.organizationId,
@@ -265,6 +300,8 @@ export async function createService(
         professionalId: professional.id,
         practiceId: practice.id,
         appointmentId: input.appointmentId ?? null,
+        treatmentItemId: item?.id ?? null,
+        ...location,
         price,
         catalogPrice: practice.basePrice,
         performedAt,
@@ -280,6 +317,10 @@ export async function createService(
       actorUserId: actor.userId,
       metadata: { patientId, practice: practice.code, price: fromCents(toCents(price)) },
     })
+    if (item) {
+      await tx.treatmentItem.update({ where: { id: item.id }, data: { status: 'COMPLETED' } })
+      await syncPlanStatus(tx, item.planId)
+    }
     return toServiceDto(service, viewer)
   })
 }
@@ -338,6 +379,10 @@ export async function voidService(
     if (!service) throw new AppError(404, 'NOT_FOUND', 'La prestación no existe')
     if (service.voidedAt) throw new AppError(409, 'ALREADY_VOIDED', 'La prestación ya está anulada')
     assertVoidAllowed(viewer, 'services:void', service.createdAt)
+    if (service.treatmentItemId) {
+      const item = await tx.treatmentItem.update({ where: { id: service.treatmentItemId }, data: { status: 'PLANNED' } })
+      await syncPlanStatus(tx, item.planId)
+    }
     const voided = await tx.performedService.update({
       where: { id: serviceId },
       data: { voidedAt: new Date(), voidReason: reason, voidedById: actor.userId },

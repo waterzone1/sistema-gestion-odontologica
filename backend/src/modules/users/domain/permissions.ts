@@ -25,6 +25,10 @@ export const PERMISSIONS = [
   'billing:void-any-day',
   'availability:manage',
   'appointments:override',
+  'treatment:read',
+  'treatment:write',
+  'treatment:price',
+  'treatment:cancel',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -53,6 +57,9 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'billing:void-any-day',
     'availability:manage',
     'appointments:override',
+    'treatment:read',
+    'treatment:price',
+    'treatment:cancel',
   ],
   DENTIST: [
     'professionals:read',
@@ -64,6 +71,9 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'clinical:write',
     'services:read',
     'services:write',
+    'treatment:read',
+    'treatment:write',
+    'treatment:cancel',
   ],
   RECEPTIONIST: [
     'professionals:read',
@@ -83,6 +93,9 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'payments:create',
     'payments:void',
     'availability:manage',
+    'treatment:read',
+    'treatment:price',
+    'treatment:cancel',
   ],
 }
 

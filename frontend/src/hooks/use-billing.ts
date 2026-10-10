@@ -42,15 +42,25 @@ function useBillingMutation<T, V>(patientId: string, run: (variables: V) => Prom
 }
 
 export interface ServiceInput {
-  practiceId: string
+  practiceId?: string
+  treatmentItemId?: string
   professionalId?: string
+  appointmentId?: string
   price?: string
+  tooth?: number
+  surfaces?: string[]
 }
 
 export function useRecordService(patientId: string) {
-  return useBillingMutation(patientId, (input: ServiceInput) =>
-    api.post<PerformedService>(`/api/patients/${patientId}/services`, input),
-  )
+  const client = useQueryClient()
+  return useBillingMutation(patientId, async (input: ServiceInput) => {
+    const service = await api.post<PerformedService>(`/api/patients/${patientId}/services`, input)
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ['treatment', patientId] }),
+      client.invalidateQueries({ queryKey: ['odontogram', patientId] }),
+    ])
+    return service
+  })
 }
 
 export function useAdjustPrice(patientId: string) {

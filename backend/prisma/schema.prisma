@@ -131,6 +131,7 @@ model ProfessionalProfile {
   clinicalProfiles       ClinicalProfile[]
   clinicalFiles          ClinicalFile[]
   toothFindings          ToothFinding[]
+  treatmentPlans         TreatmentPlan[]
 }
 
 model AuditLog {
@@ -182,6 +183,7 @@ model Patient {
   clinicalProfiles   ClinicalProfile[]
   clinicalFiles      ClinicalFile[]
   toothFindings      ToothFinding[]
+  treatmentPlans     TreatmentPlan[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -199,10 +201,11 @@ model Practice {
   createdAt              DateTime @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime @updatedAt @db.Timestamptz(3)
 
-  organization  Organization           @relation(fields: [organizationId], references: [id])
-  appointments  Appointment[]
-  services      PerformedService[]
-  professionals ProfessionalPractice[]
+  organization   Organization           @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+  services       PerformedService[]
+  professionals  ProfessionalPractice[]
+  treatmentItems TreatmentItem[]
 
   @@unique([organizationId, code])
 }
@@ -283,26 +286,30 @@ enum PaymentMethod {
 }
 
 model PerformedService {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  organizationId String    @db.Uuid
-  patientId      String    @db.Uuid
-  professionalId String    @db.Uuid
-  practiceId     String    @db.Uuid
-  appointmentId  String?   @db.Uuid
-  price          Decimal   @db.Decimal(14, 2)
-  catalogPrice   Decimal   @db.Decimal(14, 2)
-  performedAt    DateTime  @db.Timestamptz(3)
-  createdById    String    @db.Uuid
-  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
-  voidedAt       DateTime? @db.Timestamptz(3)
-  voidReason     String?
-  voidedById     String?   @db.Uuid
+  id              String         @id @default(uuid(7)) @db.Uuid
+  organizationId  String         @db.Uuid
+  patientId       String         @db.Uuid
+  professionalId  String         @db.Uuid
+  practiceId      String         @db.Uuid
+  appointmentId   String?        @db.Uuid
+  treatmentItemId String?        @db.Uuid
+  tooth           Int?
+  surfaces        ToothSurface[]
+  price           Decimal        @db.Decimal(14, 2)
+  catalogPrice    Decimal        @db.Decimal(14, 2)
+  performedAt     DateTime       @db.Timestamptz(3)
+  createdById     String         @db.Uuid
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  voidedAt        DateTime?      @db.Timestamptz(3)
+  voidReason      String?
+  voidedById      String?        @db.Uuid
 
-  patient      Patient             @relation(fields: [patientId], references: [id])
-  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
-  practice     Practice            @relation(fields: [practiceId], references: [id])
-  appointment  Appointment?        @relation(fields: [appointmentId], references: [id])
-  allocations  PaymentAllocation[]
+  patient       Patient             @relation(fields: [patientId], references: [id])
+  professional  ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice      Practice            @relation(fields: [practiceId], references: [id])
+  appointment   Appointment?        @relation(fields: [appointmentId], references: [id])
+  allocations   PaymentAllocation[]
+  treatmentItem TreatmentItem?      @relation(fields: [treatmentItemId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, patientId, performedAt])
 }
@@ -503,4 +510,57 @@ model ToothFinding {
   professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
 
   @@index([patientId, tooth, createdAt])
+}
+
+enum TreatmentPlanStatus {
+  DRAFT
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+enum TreatmentItemStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model TreatmentPlan {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  organizationId String              @db.Uuid
+  patientId      String              @db.Uuid
+  professionalId String              @db.Uuid
+  title          String?
+  status         TreatmentPlanStatus @default(DRAFT)
+  acceptedAt     DateTime?           @db.Timestamptz(3)
+  acceptedById   String?             @db.Uuid
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  items        TreatmentItem[]
+
+  @@index([organizationId, patientId, createdAt])
+}
+
+model TreatmentItem {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  planId       String              @db.Uuid
+  practiceId   String              @db.Uuid
+  tooth        Int?
+  surfaces     ToothSurface[]
+  notes        String?
+  agreedPrice  Decimal?            @db.Decimal(14, 2)
+  status       TreatmentItemStatus @default(PLANNED)
+  cancelReason String?
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime            @updatedAt @db.Timestamptz(3)
+
+  plan     TreatmentPlan      @relation(fields: [planId], references: [id])
+  practice Practice           @relation(fields: [practiceId], references: [id])
+  services PerformedService[]
+
+  @@index([planId])
 }

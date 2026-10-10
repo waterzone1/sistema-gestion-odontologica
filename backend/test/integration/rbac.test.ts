@@ -127,6 +127,23 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'post', path: `/api/patients/${FANTASMA}/files/${FANTASMA}/archive`, allowed: SOLO_ODONTOLOGO },
   { method: 'get', path: `/api/patients/${FANTASMA}/odontogram`, allowed: SOLO_ODONTOLOGO },
   { method: 'post', path: `/api/patients/${FANTASMA}/odontogram/findings`, body: {}, allowed: SOLO_ODONTOLOGO },
+  { method: 'get', path: `/api/patients/${FANTASMA}/treatment-plans`, allowed: TODOS },
+  { method: 'post', path: `/api/patients/${FANTASMA}/treatment-plans`, body: {}, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/treatment-plans/${FANTASMA}/items`, body: {}, allowed: SOLO_ODONTOLOGO },
+  {
+    method: 'put',
+    path: `/api/patients/${FANTASMA}/treatment-plans/${FANTASMA}/items/${FANTASMA}/price`,
+    body: { price: '100' },
+    allowed: ADMIN_Y_RECEPCION,
+  },
+  { method: 'post', path: `/api/patients/${FANTASMA}/treatment-plans/${FANTASMA}/accept`, allowed: ADMIN_Y_RECEPCION },
+  { method: 'post', path: `/api/patients/${FANTASMA}/treatment-plans/${FANTASMA}/items/${FANTASMA}/start`, allowed: SOLO_ODONTOLOGO },
+  {
+    method: 'post',
+    path: `/api/patients/${FANTASMA}/treatment-plans/${FANTASMA}/items/${FANTASMA}/cancel`,
+    body: { reason: 'xxxx' },
+    allowed: TODOS,
+  },
   { method: 'put', path: '/api/auth/preferences', body: { theme: 'DARK' }, allowed: TODOS },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]

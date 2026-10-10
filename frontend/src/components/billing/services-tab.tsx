@@ -17,6 +17,7 @@ import { usePractices, useProfessionals } from '@/hooks/use-catalog'
 import type { PerformedService } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
 import { formatDateTime, formatMoney } from '@/lib/format'
+import { itemLocation } from '@/lib/treatment'
 
 interface Props {
   patientId: string
@@ -60,7 +61,14 @@ export function ServicesTab({ patientId, canRecord, canPrice, archived }: Props)
                     {service.price && ` · ${formatMoney(service.price)}`}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatDateTime(service.performedAt)} · {service.professional.displayName}
+                    {[
+                      formatDateTime(service.performedAt),
+                      service.professional.displayName,
+                      itemLocation(service),
+                      service.treatmentItemId ? 'Del plan de tratamiento' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                   {service.price && service.catalogPrice && service.price !== service.catalogPrice && (
                     <p className="text-xs text-muted-foreground">Precio de catálogo: {formatMoney(service.catalogPrice)}</p>
