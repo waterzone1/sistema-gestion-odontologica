@@ -11,6 +11,8 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string({ error: 'falta DATABASE_URL' })
     .regex(/^postgres(ql)?:\/\//, 'debe empezar con postgresql://'),
+  FILES_DIR: z.string().min(1).default('data/files'),
+  FILE_MAX_MB: z.coerce.number().int().min(1).max(200).default(20),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -1239,6 +1239,86 @@ components:
         - appointmentId
         - professional
         - createdAt
+    ClinicalProfile:
+      type: object
+      properties:
+        current:
+          type:
+            - object
+            - "null"
+          properties:
+            alerts:
+              type:
+                - string
+                - "null"
+            allergies:
+              type:
+                - string
+                - "null"
+            medications:
+              type:
+                - string
+                - "null"
+            background:
+              type:
+                - string
+                - "null"
+            professional:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                displayName:
+                  type: string
+              required:
+                - id
+                - displayName
+            updatedAt:
+              type: string
+              format: date-time
+          required:
+            - alerts
+            - allergies
+            - medications
+            - background
+            - professional
+            - updatedAt
+        versions:
+          type: integer
+          description: Cantidad de versiones guardadas
+      required:
+        - current
+        - versions
+    SaveClinicalProfileInput:
+      type: object
+      properties:
+        alerts:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+          description: Alertas breves que se muestran en la ficha
+        allergies:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+        medications:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+        background:
+          type:
+            - string
+            - "null"
+          maxLength: 4000
+      required:
+        - alerts
+        - allergies
+        - medications
+        - background
     CreateClinicalEntryInput:
       type: object
       properties:
@@ -1262,6 +1342,68 @@ components:
           maxLength: 10000
       required:
         - content
+    ClinicalFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mimeType:
+          type: string
+          enum:
+            - application/pdf
+            - image/jpeg
+            - image/png
+        size:
+          type: integer
+        category:
+          $ref: "#/components/schemas/ClinicalFileCategory"
+        description:
+          type:
+            - string
+            - "null"
+        clinicalEntryId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+        archived:
+          type: boolean
+      required:
+        - id
+        - filename
+        - mimeType
+        - size
+        - category
+        - description
+        - clinicalEntryId
+        - professional
+        - createdAt
+        - archived
+    ClinicalFileCategory:
+      type: string
+      enum:
+        - XRAY
+        - STUDY
+        - PHOTO
+        - CONSENT
+        - OTHER
     Practice:
       type: object
       properties:
@@ -3466,6 +3608,98 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/clinical/profile:
+    get:
+      tags: *a9
+      summary: "Perfil clínico vigente: alertas, alergias, medicación y antecedentes"
+      description: Solo odontólogos. La consulta queda auditada.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Perfil clínico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalProfile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    put:
+      tags: *a9
+      summary: Guarda una nueva versión del perfil clínico
+      description: Cada cambio crea una versión nueva; las anteriores se conservan.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveClinicalProfileInput"
+      responses:
+        "200":
+          description: Perfil clínico actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalProfile"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado o usuario sin perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
       tags: *a9
@@ -3529,9 +3763,238 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/practices:
+  /api/patients/{patientId}/files:
     get:
       tags: &a10
+        - Archivos clínicos
+      summary: Archivos clínicos del paciente
+      description: Solo odontólogos. Por defecto no incluye los archivados.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          required: false
+          name: archived
+          in: query
+      responses:
+        "200":
+          description: Archivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicalFile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a10
+      summary: Sube un archivo clínico (PDF, JPG o PNG)
+      description: El cuerpo es el contenido binario del archivo. El tipo se verifica
+        por su contenido, no por la extensión. El tamaño máximo es configurable
+        (20 MB por defecto). El archivo se guarda fuera de cualquier carpeta
+        pública.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          required: true
+          name: filename
+          in: query
+        - schema:
+            $ref: "#/components/schemas/ClinicalFileCategory"
+          required: true
+          name: category
+          in: query
+        - schema:
+            type: string
+            maxLength: 300
+          required: false
+          name: description
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: clinicalEntryId
+          in: query
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Archivo guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalFile"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "413":
+          description: El archivo supera el tamaño máximo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: Tipo de archivo no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Archivo vacío, paciente archivado, sin perfil profesional o nota
+            que no corresponde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/files/{fileId}/content:
+    get:
+      tags: *a10
+      summary: Descarga o visualiza un archivo clínico
+      description: Solo a través del backend, con sesión y permiso clínico. Cada
+        descarga queda auditada.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: fileId
+          in: path
+      responses:
+        "200":
+          description: Contenido del archivo
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/files/{fileId}/archive:
+    post:
+      tags: *a10
+      summary: Archiva un archivo clínico (no se borra)
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: fileId
+          in: path
+      responses:
+        "200":
+          description: Archivo archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalFile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices:
+    get:
+      tags: &a11
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -3573,7 +4036,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a10
+      tags: *a11
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -3615,7 +4078,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a10
+      tags: *a11
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -3671,7 +4134,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a11
+      tags: &a12
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -3742,7 +4205,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a12
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -3799,7 +4262,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a11
+      tags: *a12
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -3835,7 +4298,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a11
+      tags: *a12
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -3897,7 +4360,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a11
+      tags: *a12
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
