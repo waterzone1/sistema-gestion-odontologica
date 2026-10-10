@@ -20,6 +20,8 @@ export type ProfessionalAvailability = Schemas['ProfessionalAvailability']
 export type AvailabilityException = Schemas['AvailabilityException']
 export type AvailabilityExceptionResult = Schemas['AvailabilityExceptionResult']
 export type AgendaAvailability = Schemas['AgendaAvailability']
+export type ClinicalProfile = Schemas['ClinicalProfile']
+export type ClinicalFile = Schemas['ClinicalFile']
 export type Appointment = Schemas['Appointment']
 export type AppointmentStatus = Schemas['AppointmentStatus']
 export type Role = Schemas['Role']
@@ -49,13 +51,14 @@ type Method = 'GET' | 'POST' | 'PUT' | 'PATCH'
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const binary = body instanceof Blob
+  if (body !== undefined) headers['Content-Type'] = binary ? 'application/octet-stream' : 'application/json'
   if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken
 
   const res = await fetch(path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : binary ? body : JSON.stringify(body),
     cache: 'no-store',
   })
   if (res.status === 204) return undefined as T
@@ -78,6 +81,7 @@ export const api = {
   post: <T = void>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+  upload: <T>(path: string, file: Blob) => request<T>('POST', path, file),
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {

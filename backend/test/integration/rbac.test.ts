@@ -119,6 +119,13 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'post', path: `/api/professionals/${FANTASMA}/exceptions`, body: {}, allowed: ADMIN_Y_RECEPCION },
   { method: 'post', path: `/api/professionals/${FANTASMA}/exceptions/${FANTASMA}/revoke`, allowed: ADMIN_Y_RECEPCION },
   { method: 'get', path: '/api/availability', allowed: TODOS },
+  { method: 'get', path: `/api/patients/${FANTASMA}/clinical/profile`, allowed: SOLO_ODONTOLOGO },
+  { method: 'put', path: `/api/patients/${FANTASMA}/clinical/profile`, body: {}, allowed: SOLO_ODONTOLOGO },
+  { method: 'get', path: `/api/patients/${FANTASMA}/files`, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/files`, body: {}, allowed: SOLO_ODONTOLOGO },
+  { method: 'get', path: `/api/patients/${FANTASMA}/files/${FANTASMA}/content`, allowed: SOLO_ODONTOLOGO },
+  { method: 'post', path: `/api/patients/${FANTASMA}/files/${FANTASMA}/archive`, allowed: SOLO_ODONTOLOGO },
+  { method: 'put', path: '/api/auth/preferences', body: { theme: 'DARK' }, allowed: TODOS },
   { method: 'get', path: '/api/auth/me', allowed: TODOS },
 ]
 
