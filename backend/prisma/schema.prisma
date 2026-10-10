@@ -130,6 +130,7 @@ model ProfessionalProfile {
   practices              ProfessionalPractice[]
   clinicalProfiles       ClinicalProfile[]
   clinicalFiles          ClinicalFile[]
+  toothFindings          ToothFinding[]
 }
 
 model AuditLog {
@@ -180,6 +181,7 @@ model Patient {
   creditApplications CreditApplication[]
   clinicalProfiles   ClinicalProfile[]
   clinicalFiles      ClinicalFile[]
+  toothFindings      ToothFinding[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -462,4 +464,43 @@ model ClinicalFile {
   clinicalEntry ClinicalEntry?      @relation(fields: [clinicalEntryId], references: [id], onDelete: Restrict)
 
   @@index([patientId, createdAt])
+}
+
+enum ToothSurface {
+  M
+  D
+  V
+  L
+  O
+}
+
+enum ToothCondition {
+  HEALTHY
+  CARIES
+  RESTORATION
+  TEMP_RESTORATION
+  CROWN
+  ROOT_CANAL
+  IMPLANT
+  FRACTURE
+  MISSING
+  EXTRACTION_INDICATED
+  SEALANT
+  PROSTHESIS
+}
+
+model ToothFinding {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  patientId      String         @db.Uuid
+  professionalId String         @db.Uuid
+  tooth          Int
+  surface        ToothSurface?
+  condition      ToothCondition
+  note           String?
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+
+  patient      Patient             @relation(fields: [patientId], references: [id])
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+
+  @@index([patientId, tooth, createdAt])
 }

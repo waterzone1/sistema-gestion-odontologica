@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type ClinicalEntry, type ClinicalFile, type ClinicalProfile } from '@/lib/api'
+import { api, type ClinicalEntry, type ClinicalFile, type ClinicalProfile, type Odontogram } from '@/lib/api'
 
 const clinicalKey = (patientId: string) => ['clinical', patientId] as const
 
@@ -84,5 +84,30 @@ export function useArchiveClinicalFile(patientId: string) {
   return useMutation({
     mutationFn: (fileId: string) => api.post<ClinicalFile>(`/api/patients/${patientId}/files/${fileId}/archive`),
     onSuccess: () => client.invalidateQueries({ queryKey: filesKey(patientId) }),
+  })
+}
+
+const odontogramKey = (patientId: string) => ['odontogram', patientId] as const
+
+export function useOdontogram(patientId: string) {
+  return useQuery({
+    queryKey: odontogramKey(patientId),
+    queryFn: () => api.get<Odontogram>(`/api/patients/${patientId}/odontogram`),
+    refetchOnWindowFocus: false,
+  })
+}
+
+export interface FindingInput {
+  tooth: number
+  surfaces: string[]
+  condition: string
+  note: string
+}
+
+export function useRecordFinding(patientId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: FindingInput) => api.post<Odontogram>(`/api/patients/${patientId}/odontogram/findings`, input),
+    onSuccess: (odontogram) => client.setQueryData(odontogramKey(patientId), odontogram),
   })
 }

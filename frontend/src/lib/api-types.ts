@@ -3264,6 +3264,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/patients/{patientId}/odontogram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    patientId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Odontogram"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/patients/{patientId}/odontogram/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    patientId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordToothFindingInput"];
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Odontogram"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practices": {
         parameters: {
             query?: never;
@@ -4172,6 +4312,30 @@ export interface components {
             archived: boolean;
         };
         ClinicalFileCategory: "XRAY" | "STUDY" | "PHOTO" | "CONSENT" | "OTHER";
+        Odontogram: {
+            current: components["schemas"]["ToothFinding"][];
+            history: components["schemas"]["ToothFinding"][];
+        };
+        ToothFinding: {
+            id: string;
+            tooth: number;
+            surface: components["schemas"]["ToothSurface"];
+            condition: components["schemas"]["ToothCondition"];
+            note: string | null;
+            professional: {
+                id: string;
+                displayName: string;
+            };
+            createdAt: string;
+        };
+        ToothSurface: "M" | "D" | "V" | "L" | "O" | null;
+        ToothCondition: "HEALTHY" | "CARIES" | "RESTORATION" | "TEMP_RESTORATION" | "CROWN" | "ROOT_CANAL" | "IMPLANT" | "FRACTURE" | "MISSING" | "EXTRACTION_INDICATED" | "SEALANT" | "PROSTHESIS";
+        RecordToothFindingInput: {
+            tooth: number;
+            surfaces: components["schemas"]["ToothSurface"][];
+            condition: components["schemas"]["ToothCondition"];
+            note?: string;
+        };
         Practice: {
             id: string;
             code: string;

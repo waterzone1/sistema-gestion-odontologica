@@ -64,6 +64,34 @@ test('el odontólogo sube un estudio en PDF, lo abre y lo archiva', async ({ pag
   await expect(lista.getByText('Archivado')).toBeVisible()
 })
 
+test('el odontólogo registra caries y una corona en el odontograma, con historial', async ({ page }) => {
+  await ingresar(page, ODONTOLOGO)
+  await abrirFichaDeRossi(page)
+  await page.getByRole('tab', { name: 'Odontograma' }).click()
+  await page.getByRole('button', { name: /^Pieza 16$/ }).click()
+  const panel = page.getByRole('complementary', { name: 'Pieza 16' })
+  await expect(panel.getByText('Sin registros: sana')).toBeVisible()
+  await panel.getByLabel('Registrar condición').selectOption({ label: 'Caries' })
+  await panel.getByRole('button', { name: 'O', exact: true }).click()
+  await panel.getByRole('button', { name: 'M', exact: true }).click()
+  await panel.getByLabel('Observación (opcional)').fill('Caries profunda')
+  await panel.getByRole('button', { name: 'Registrar' }).click()
+  await expect(panel.getByText('Oclusal / incisal: Caries')).toBeVisible()
+  await expect(panel.getByText('Mesial: Caries')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Pieza 16, O: Caries|^Pieza 16, M: Caries/ })).toBeVisible()
+
+  await page.getByRole('button', { name: /^Pieza 11$/ }).click()
+  const once = page.getByRole('complementary', { name: 'Pieza 11' })
+  await once.getByLabel('Registrar condición').selectOption({ label: 'Corona' })
+  await expect(once.getByRole('button', { name: 'O', exact: true })).toHaveCount(0)
+  await once.getByRole('button', { name: 'Registrar' }).click()
+  await expect(once.getByText('Corona', { exact: true }).first()).toBeVisible()
+  await page.screenshot({ path: captura('35-odontograma'), fullPage: true })
+
+  await page.getByRole('tab', { name: 'Temporal' }).click()
+  await expect(page.getByRole('button', { name: /^Pieza 55$/ })).toBeVisible()
+})
+
 test('recepción no ve archivos ni perfil clínico, ni por pantalla ni por API', async ({ page }) => {
   await ingresar(page, RECEPCION)
   await abrirFichaDeRossi(page)
