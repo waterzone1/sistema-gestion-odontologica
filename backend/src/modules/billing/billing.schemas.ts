@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SURFACES } from '../odontogram/domain/fdi.js'
 
 const moneySchema = z
   .string()
@@ -16,11 +17,18 @@ export const creditParamsSchema = z.object({ patientId: z.uuid(), creditId: z.uu
 
 export const createServiceSchema = z
   .object({
-    practiceId: z.uuid(),
+    practiceId: z.uuid().optional(),
+    treatmentItemId: z.uuid().optional().meta({ description: 'Ítem del plan de tratamiento que se realizó: toma su práctica, pieza, superficies y precio acordado' }),
     professionalId: z.uuid().optional(),
     appointmentId: z.uuid().nullish(),
     performedAt: z.iso.datetime().optional(),
     price: moneySchema.optional(),
+    tooth: z.number().int().nullish(),
+    surfaces: z.array(z.enum(SURFACES)).max(5).default([]),
+  })
+  .refine((value) => value.practiceId !== undefined || value.treatmentItemId !== undefined, {
+    path: ['practiceId'],
+    message: 'Elegí la práctica o el ítem del plan',
   })
   .meta({ id: 'CreateServiceInput' })
 
@@ -66,6 +74,9 @@ export const serviceSchema = z
     practice: z.object({ id: z.uuid(), code: z.string(), name: z.string() }),
     professional: z.object({ id: z.uuid(), displayName: z.string() }),
     appointmentId: z.uuid().nullable(),
+    treatmentItemId: z.uuid().nullable(),
+    tooth: z.number().int().nullable().meta({ description: 'Nulo para quien no accede a datos clínicos' }),
+    surfaces: z.array(z.enum(SURFACES)),
     price: amount('Precio final. Nulo para quien no puede ver importes'),
     catalogPrice: amount('Precio del catálogo al registrarla'),
     paid: amount('Importe cubierto por pagos vigentes'),

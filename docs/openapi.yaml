@@ -130,6 +130,10 @@ components:
               - billing:void-any-day
               - availability:manage
               - appointments:override
+              - treatment:read
+              - treatment:write
+              - treatment:price
+              - treatment:cancel
         branchIds:
           type: array
           items:
@@ -936,6 +940,26 @@ components:
             - string
             - "null"
           format: uuid
+        treatmentItemId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        tooth:
+          type:
+            - integer
+            - "null"
+          description: Nulo para quien no accede a datos clínicos
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
         price:
           type:
             - string
@@ -983,6 +1007,9 @@ components:
         - practice
         - professional
         - appointmentId
+        - treatmentItemId
+        - tooth
+        - surfaces
         - price
         - catalogPrice
         - paid
@@ -998,6 +1025,11 @@ components:
         practiceId:
           type: string
           format: uuid
+        treatmentItemId:
+          type: string
+          format: uuid
+          description: "Ítem del plan de tratamiento que se realizó: toma su práctica,
+            pieza, superficies y precio acordado"
         professionalId:
           type: string
           format: uuid
@@ -1012,8 +1044,22 @@ components:
         price:
           type: string
           pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
-      required:
-        - practiceId
+        tooth:
+          type:
+            - integer
+            - "null"
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
+          maxItems: 5
+          default: []
     AdjustPriceInput:
       type: object
       properties:
@@ -1417,9 +1463,75 @@ components:
           items:
             $ref: "#/components/schemas/ToothFinding"
           description: Todos los registros, del más reciente al más antiguo
+        planned:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              tooth:
+                type: integer
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ToothSurface"
+              practice:
+                type: string
+              status:
+                type: string
+              date:
+                type: string
+                format: date-time
+              professional:
+                type: string
+            required:
+              - id
+              - tooth
+              - surfaces
+              - practice
+              - status
+              - date
+              - professional
+          description: Ítems pendientes o en curso de planes de tratamiento
+        performed:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              tooth:
+                type: integer
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ToothSurface"
+              practice:
+                type: string
+              status:
+                type: string
+              date:
+                type: string
+                format: date-time
+              professional:
+                type: string
+            required:
+              - id
+              - tooth
+              - surfaces
+              - practice
+              - status
+              - date
+              - professional
+          description: Prestaciones vigentes registradas sobre una pieza
       required:
         - current
         - history
+        - planned
+        - performed
     ToothFinding:
       type: object
       properties:
@@ -1506,6 +1618,184 @@ components:
       required:
         - tooth
         - condition
+    TreatmentPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type:
+            - string
+            - "null"
+        status:
+          $ref: "#/components/schemas/TreatmentPlanStatus"
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        acceptedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        total:
+          type:
+            - string
+            - "null"
+          description: Suma de los ítems vigentes cotizados. Nulo para quien no ve importes
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              practice:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  code:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - code
+                  - name
+              tooth:
+                type:
+                  - integer
+                  - "null"
+                description: Nulo para quien no accede a datos clínicos
+              surfaces:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - M
+                    - D
+                    - V
+                    - L
+                    - O
+              notes:
+                type:
+                  - string
+                  - "null"
+              agreedPrice:
+                type:
+                  - string
+                  - "null"
+                description: Nulo si no está cotizado o para quien no ve importes
+              catalogPrice:
+                type:
+                  - string
+                  - "null"
+              priced:
+                type: boolean
+              status:
+                $ref: "#/components/schemas/TreatmentItemStatus"
+              cancelReason:
+                type:
+                  - string
+                  - "null"
+            required:
+              - id
+              - practice
+              - tooth
+              - surfaces
+              - notes
+              - agreedPrice
+              - catalogPrice
+              - priced
+              - status
+              - cancelReason
+      required:
+        - id
+        - title
+        - status
+        - professional
+        - acceptedAt
+        - total
+        - createdAt
+        - items
+    TreatmentPlanStatus:
+      type: string
+      enum:
+        - DRAFT
+        - ACCEPTED
+        - COMPLETED
+        - CANCELLED
+    TreatmentItemStatus:
+      type: string
+      enum:
+        - PLANNED
+        - IN_PROGRESS
+        - COMPLETED
+        - CANCELLED
+    CreateTreatmentPlanInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 120
+    AddTreatmentItemInput:
+      type: object
+      properties:
+        practiceId:
+          type: string
+          format: uuid
+        tooth:
+          type:
+            - integer
+            - "null"
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
+          maxItems: 5
+          default: []
+        notes:
+          type: string
+          maxLength: 500
+      required:
+        - practiceId
+    PriceTreatmentItemInput:
+      type: object
+      properties:
+        price:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+      required:
+        - price
+    CancelTreatmentItemInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 300
+      required:
+        - reason
     Practice:
       type: object
       properties:
@@ -4192,9 +4482,409 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/practices:
+  /api/patients/{patientId}/treatment-plans:
     get:
       tags: &a12
+        - Plan de tratamiento
+      summary: Planes de tratamiento del paciente
+      description: El odontólogo ve piezas y superficies pero no importes; recepción y
+        administración ven prácticas e importes pero no piezas ni superficies.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Planes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a12
+      summary: Crea un plan de tratamiento
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTreatmentPlanInput"
+      responses:
+        "201":
+          description: Plan creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado o sin perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items:
+    post:
+      tags: *a12
+      summary: Agrega una práctica al plan, con pieza y superficies opcionales
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTreatmentItemInput"
+      responses:
+        "201":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El plan está cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Pieza, superficie o práctica inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/price:
+    put:
+      tags: *a12
+      summary: Fija el precio acordado de un ítem
+      description: Recepción y administración. Al registrar la prestación de ese ítem
+        se cobra este precio.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceTreatmentItemInput"
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ítem o plan cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/accept:
+    post:
+      tags: *a12
+      summary: Registra que el paciente aceptó el presupuesto
+      description: Exige que todos los ítems vigentes estén cotizados.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+      responses:
+        "200":
+          description: Presupuesto aceptado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El presupuesto ya fue aceptado o el plan está cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Plan sin ítems o con ítems sin cotizar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/start:
+    post:
+      tags: *a12
+      summary: Marca un ítem como en curso
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El ítem no está pendiente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/cancel:
+    post:
+      tags: *a12
+      summary: Cancela un ítem con motivo (no se borra)
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelTreatmentItemInput"
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ítem cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/practices:
+    get:
+      tags: &a13
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -4236,7 +4926,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a12
+      tags: *a13
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -4278,7 +4968,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a12
+      tags: *a13
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -4334,7 +5024,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a13
+      tags: &a14
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -4405,7 +5095,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a13
+      tags: *a14
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -4462,7 +5152,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a13
+      tags: *a14
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -4498,7 +5188,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a13
+      tags: *a14
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -4560,7 +5250,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a13
+      tags: *a14
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar

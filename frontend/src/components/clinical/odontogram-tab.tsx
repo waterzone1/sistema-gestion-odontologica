@@ -64,7 +64,13 @@ export function OdontogramTab({ patientId, canWrite }: Props) {
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
           <section aria-label="Odontograma" className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
             <div className="hidden overflow-x-auto sm:block">
-              <Chart rows={rows} views={views} selected={selected} onSelect={setSelected} />
+              <Chart
+                rows={rows}
+                views={views}
+                planned={new Set(odontogram.data.planned.map((p) => p.tooth))}
+                selected={selected}
+                onSelect={setSelected}
+              />
             </div>
             <div className="sm:hidden">
               <Field label="Pieza" htmlFor="tooth-select">
@@ -101,11 +107,13 @@ export function OdontogramTab({ patientId, canWrite }: Props) {
 function Chart({
   rows,
   views,
+  planned,
   selected,
   onSelect,
 }: {
   rows: number[][]
   views: Map<number, ToothView>
+  planned: Set<number>
   selected: number | null
   onSelect: (tooth: number) => void
 }) {
@@ -127,6 +135,7 @@ function Chart({
               y={y}
               labelY={labelY}
               view={views.get(tooth)}
+              planned={planned.has(tooth)}
               selected={selected === tooth}
               onSelect={() => onSelect(tooth)}
             />
@@ -151,6 +160,7 @@ function ToothShape({
   y,
   labelY,
   view,
+  planned,
   selected,
   onSelect,
 }: {
@@ -159,6 +169,7 @@ function ToothShape({
   y: number
   labelY: number
   view: ToothView | undefined
+  planned: boolean
   selected: boolean
   onSelect: () => void
 }) {
@@ -169,6 +180,7 @@ function ToothShape({
     `Pieza ${tooth}`,
     ...whole.map((c) => CONDITION_LABELS[c]),
     ...Object.entries(view?.surfaces ?? {}).map(([s, c]) => `${s}: ${CONDITION_LABELS[c]}`),
+    ...(planned ? ['con tratamiento planificado'] : []),
   ].join(', ')
   return (
     <g
@@ -220,6 +232,7 @@ function ToothShape({
           <line x1={x + TOOTH - 2} y1={y + 2} x2={x + 2} y2={y + TOOTH - 2} />
         </g>
       )}
+      {planned && <circle cx={x + TOOTH - 2} cy={y + 2} r="4" fill="var(--primary)" />}
       <rect
         x={x - 3}
         y={y - 3}
@@ -244,6 +257,7 @@ function Legend() {
     { label: 'Corona: círculo azul', mark: '◯' },
     { label: 'Endodoncia: línea violeta', mark: '│' },
     { label: 'Ausente: cruz gris · Extracción indicada: cruz roja', mark: '✕' },
+    { label: 'Con tratamiento planificado', mark: '●' },
   ]
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Referencias del odontograma">
@@ -287,6 +301,8 @@ function ToothPanel({
 
   const current = odontogram.current.filter((f) => f.tooth === tooth)
   const history = odontogram.history.filter((f) => f.tooth === tooth)
+  const planned = odontogram.planned.filter((w) => w.tooth === tooth)
+  const performed = odontogram.performed.filter((w) => w.tooth === tooth)
   const whole = isWholeTooth(condition)
   const valid = whole || condition === 'HEALTHY' || surfaces.length > 0
 
@@ -310,6 +326,39 @@ function ToothPanel({
           </ul>
         )}
       </div>
+
+      {(planned.length > 0 || performed.length > 0) && (
+        <div className="space-y-2 border-t pt-3 text-sm">
+          {planned.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Planificado</p>
+              <ul className="space-y-0.5">
+                {planned.map((w) => (
+                  <li key={w.id}>
+                    {w.practice}
+                    {w.surfaces.length > 0 && ` (${w.surfaces.join(', ')})`}
+                    <span className="text-xs text-muted-foreground"> · {w.status === 'IN_PROGRESS' ? 'en curso' : 'pendiente'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {performed.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Realizado</p>
+              <ul className="space-y-0.5">
+                {performed.map((w) => (
+                  <li key={w.id}>
+                    {w.practice}
+                    {w.surfaces.length > 0 && ` (${w.surfaces.join(', ')})`}
+                    <span className="text-xs text-muted-foreground"> · {formatDateTime(w.date)} · {w.professional}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {canWrite && (
         <form

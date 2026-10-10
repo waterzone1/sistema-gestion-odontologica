@@ -22,13 +22,46 @@ function toDto(finding: FindingRecord): ToothFindingDto {
   }
 }
 
-async function load(db: Pick<Db, 'toothFinding'>, patientId: string): Promise<OdontogramDto> {
+const professionalName = { select: { user: { select: { displayName: true } } } } as const
+
+async function load(db: Pick<Db, 'toothFinding' | 'treatmentItem' | 'performedService'>, patientId: string): Promise<OdontogramDto> {
   const findings = await db.toothFinding.findMany({
     where: { patientId },
     include,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
-  return { current: currentState(findings).map(toDto), history: findings.map(toDto) }
+  const items = await db.treatmentItem.findMany({
+    where: { tooth: { not: null }, status: { in: ['PLANNED', 'IN_PROGRESS'] }, plan: { patientId } },
+    include: { practice: { select: { name: true } }, plan: { select: { professional: professionalName } } },
+    orderBy: { createdAt: 'asc' },
+  })
+  const services = await db.performedService.findMany({
+    where: { patientId, tooth: { not: null }, voidedAt: null },
+    include: { practice: { select: { name: true } }, professional: professionalName },
+    orderBy: { performedAt: 'desc' },
+  })
+  return {
+    current: currentState(findings).map(toDto),
+    history: findings.map(toDto),
+    planned: items.map((item) => ({
+      id: item.id,
+      tooth: item.tooth as number,
+      surfaces: item.surfaces,
+      practice: item.practice.name,
+      status: item.status,
+      date: item.createdAt.toISOString(),
+      professional: item.plan.professional.user.displayName,
+    })),
+    performed: services.map((service) => ({
+      id: service.id,
+      tooth: service.tooth as number,
+      surfaces: service.surfaces,
+      practice: service.practice.name,
+      status: 'COMPLETED',
+      date: service.performedAt.toISOString(),
+      professional: service.professional.user.displayName,
+    })),
+  }
 }
 
 export async function getOdontogram(db: Db, actor: AuthContext, patientId: string): Promise<OdontogramDto> {

@@ -11,6 +11,7 @@ import { ClinicalHistory } from '@/components/clinical/clinical-history'
 import { ClinicalProfileCard } from '@/components/clinical/clinical-profile-card'
 import { FilesTab } from '@/components/clinical/files-tab'
 import { OdontogramTab } from '@/components/clinical/odontogram-tab'
+import { TreatmentTab } from '@/components/clinical/treatment-tab'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -20,10 +21,11 @@ import { useClinicalProfile } from '@/hooks/use-clinical'
 import { usePatient } from '@/hooks/use-patients'
 import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api'
-import { ageFrom, documentLabel, formatDate, fullName } from '@/lib/format'
+import { ageFrom, documentLabel, fullName } from '@/lib/format'
 import { can } from '@/lib/permissions'
 import { ArchivePatientDialog } from '../archive-patient-dialog'
 import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
+import { PatientSummary } from '@/components/patients/patient-summary'
 
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
@@ -57,6 +59,7 @@ export default function PatientPage() {
     ...(can(user, 'clinical:read') ? [{ id: 'historia', label: 'Historia clínica' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'odontograma', label: 'Odontograma' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'archivos', label: 'Archivos' }] : []),
+    ...(can(user, 'treatment:read') ? [{ id: 'tratamiento', label: 'Tratamiento' }] : []),
     ...(can(user, 'services:read') ? [{ id: 'prestaciones', label: 'Prestaciones' }] : []),
     ...(can(user, 'account:read') ? [{ id: 'cuenta', label: 'Cuenta' }] : []),
   ]
@@ -134,6 +137,16 @@ export default function PatientPage() {
             />
           </div>
         )}
+        {tab === 'tratamiento' && (
+          <TreatmentTab
+            patientId={data.id}
+            canPlan={can(user, 'treatment:write')}
+            canPrice={can(user, 'treatment:price')}
+            canCancel={can(user, 'treatment:cancel')}
+            canPerform={can(user, 'services:write') && can(user, 'treatment:write')}
+            archived={data.archivedAt !== null}
+          />
+        )}
         {tab === 'prestaciones' && (
           <ServicesTab
             patientId={data.id}
@@ -145,19 +158,7 @@ export default function PatientPage() {
         {tab === 'cuenta' && (
           <AccountTab patientId={data.id} canCollect={can(user, 'payments:create')} />
         )}
-        {tab === 'resumen' && (
-        <section aria-label="Datos administrativos" className="rounded-lg border bg-card p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold">Datos administrativos</h2>
-          <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            <Item label="Documento" value={documentLabel(data)} />
-            <Item label="Fecha de nacimiento" value={data.birthDate ? formatDate(data.birthDate) : null} />
-            <Item label="Teléfono" value={data.phone} />
-            <Item label="Email" value={data.email} />
-            <Item label="Dirección" value={data.address} />
-            <Item label="Alta en el sistema" value={formatDate(data.createdAt)} />
-          </dl>
-        </section>
-        )}
+        {tab === 'resumen' && <PatientSummary patient={data} user={user} />}
       </Tabs>
 
       <PatientFormDialog
@@ -168,14 +169,5 @@ export default function PatientPage() {
       />
       <ArchivePatientDialog patient={data} open={archiving} onOpenChange={setArchiving} />
     </>
-  )
-}
-
-function Item({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5">{value || '—'}</dd>
-    </div>
   )
 }

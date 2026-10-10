@@ -35,10 +35,22 @@ const findingSchema = z
   })
   .meta({ id: 'ToothFinding' })
 
+const workSchema = z.object({
+  id: z.uuid(),
+  tooth: z.number().int(),
+  surfaces: z.array(surfaceSchema),
+  practice: z.string(),
+  status: z.string(),
+  date: z.iso.datetime(),
+  professional: z.string(),
+})
+
 export const odontogramSchema = z
   .object({
     current: z.array(findingSchema).meta({ description: 'Condición actual de cada pieza y superficie (lo último registrado)' }),
     history: z.array(findingSchema).meta({ description: 'Todos los registros, del más reciente al más antiguo' }),
+    planned: z.array(workSchema).meta({ description: 'Ítems pendientes o en curso de planes de tratamiento' }),
+    performed: z.array(workSchema).meta({ description: 'Prestaciones vigentes registradas sobre una pieza' }),
   })
   .meta({ id: 'Odontogram' })
 

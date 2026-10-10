@@ -3,16 +3,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useState } from 'react'
+import { RegisterServicePanel } from '@/components/appointments/register-service-panel'
 import { FormError } from '@/components/form-error'
+import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
+import { useSession } from '@/hooks/use-session'
 import { api, type Appointment, type AppointmentStatus } from '@/lib/api'
 import { isEditable, STATUS_LABELS, STATUS_VARIANT } from '@/lib/appointments'
 import { formatDateTime, formatTime } from '@/lib/format'
+import { can } from '@/lib/permissions'
 
 interface Props {
   appointment: Appointment | null
@@ -57,6 +61,10 @@ function Detail({
   const [cancelling, setCancelling] = useState(false)
   const [reason, setReason] = useState('')
   const [early, setEarly] = useState<'ATTENDED' | 'NO_SHOW' | null>(null)
+  const [registering, setRegistering] = useState(false)
+  const [registered, setRegistered] = useState(false)
+  const session = useSession()
+  const canRegister = can(session.data?.user, 'services:write') && appointment.status === 'ATTENDED'
 
   const change = useMutation({
     mutationFn: (body: { status: AppointmentStatus; cancellationReason?: string }) =>
@@ -96,8 +104,24 @@ function Detail({
       </dl>
 
       <FormError error={change.error} />
+      {registered && <Alert variant="info">Prestación registrada.</Alert>}
 
-      {early ? (
+      {registering ? (
+        <RegisterServicePanel
+          appointment={appointment}
+          onDone={() => {
+            setRegistering(false)
+            setRegistered(true)
+          }}
+          onCancel={() => setRegistering(false)}
+        />
+      ) : canRegister ? (
+        <div className="border-t pt-4">
+          <Button className="w-full" onClick={() => setRegistering(true)}>
+            Registrar prestación
+          </Button>
+        </div>
+      ) : early ? (
         <div role="alert" className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
           <p>
             El turno todavía no empezó (es el {formatDateTime(appointment.startsAt)}). ¿Lo marcás igual como{' '}
