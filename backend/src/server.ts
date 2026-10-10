@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { createApp } from './app.js'
 import { loadEnv } from './config/env.js'
 import type { Env } from './config/env.js'
@@ -24,6 +25,7 @@ const app = createApp({
   setupTokens,
   appOrigin: env.APP_ORIGIN,
   cookieSecure: env.NODE_ENV === 'production',
+  files: { dir: path.resolve(env.FILES_DIR), maxBytes: env.FILE_MAX_MB * 1024 * 1024 },
 })
 
 const server = app.listen(env.PORT, () => {

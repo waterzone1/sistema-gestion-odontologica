@@ -6,6 +6,9 @@ import { registerHealthDocs } from '../modules/health/health.docs.js'
 import { registerPatientsDocs } from '../modules/patients/patients.docs.js'
 import { registerAvailabilityDocs } from '../modules/availability/availability.docs.js'
 import { registerBillingDocs } from '../modules/billing/billing.docs.js'
+import { registerFilesDocs } from '../modules/files/files.docs.js'
+import { registerTreatmentDocs } from '../modules/treatment/treatment.docs.js'
+import { registerOdontogramDocs } from '../modules/odontogram/odontogram.docs.js'
 import { registerClinicalDocs } from '../modules/clinical/clinical.docs.js'
 import { registerPracticesDocs } from '../modules/practices/practices.docs.js'
 import { registerProfessionalsDocs } from '../modules/professionals/professionals.docs.js'
@@ -22,6 +25,9 @@ export function buildOpenApiDocument() {
   registerAvailabilityDocs(registry)
   registerBillingDocs(registry)
   registerClinicalDocs(registry)
+  registerFilesDocs(registry)
+  registerOdontogramDocs(registry)
+  registerTreatmentDocs(registry)
   registerPracticesDocs(registry)
   registerAppointmentsDocs(registry)
 

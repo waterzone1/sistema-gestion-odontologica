@@ -3,8 +3,11 @@ import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
+import { findPatientOrFail, writableProfile } from './clinical.access.js'
 import type {
   ClinicalEntryDto,
+  ClinicalProfileDto,
+  SaveClinicalProfileInput,
   CorrectClinicalEntryInput,
   CreateClinicalEntryInput,
 } from './clinical.schemas.js'
@@ -25,26 +28,6 @@ function toDto(entry: EntryRecord): ClinicalEntryDto {
     professional: { id: entry.professional.id, displayName: entry.professional.user.displayName },
     createdAt: entry.createdAt.toISOString(),
   }
-}
-
-async function findPatientOrFail(db: Pick<Db, 'patient'>, actor: AuthContext, patientId: string) {
-  const patient = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId } })
-  if (!patient) throw new AppError(404, 'NOT_FOUND', 'El paciente no existe')
-  return patient
-}
-
-async function writableProfile(db: Pick<Db, 'patient' | 'professionalProfile'>, actor: AuthContext, patientId: string) {
-  const patient = await findPatientOrFail(db, actor, patientId)
-  if (patient.archivedAt) {
-    throw new AppError(422, 'PATIENT_ARCHIVED', 'El paciente está archivado: reactivalo para registrar notas')
-  }
-  const profile = await db.professionalProfile.findFirst({
-    where: { userId: actor.userId, active: true, user: { organizationId: actor.organizationId } },
-  })
-  if (!profile) {
-    throw new AppError(422, 'PROFESSIONAL_PROFILE_REQUIRED', 'Tu usuario no tiene un perfil profesional activo')
-  }
-  return profile
 }
 
 export async function listEntries(db: Db, actor: AuthContext, patientId: string): Promise<ClinicalEntryDto[]> {
@@ -144,4 +127,59 @@ export async function correctEntry(
     })
     return toDto(entry)
   })
+}
+
+export async function getProfile(db: Db, actor: AuthContext, patientId: string): Promise<ClinicalProfileDto> {
+  return db.$transaction(async (tx) => {
+    await findPatientOrFail(tx, actor, patientId)
+    const [latest, versions] = [
+      await tx.clinicalProfile.findFirst({
+        where: { patientId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        include: { professional: { select: { id: true, user: { select: { displayName: true } } } } },
+      }),
+      await tx.clinicalProfile.count({ where: { patientId } }),
+    ]
+    await recordAudit(tx, {
+      action: 'CLINICAL_PROFILE_VIEWED',
+      entityType: 'Patient',
+      entityId: patientId,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+    })
+    return {
+      current: latest
+        ? {
+            alerts: latest.alerts,
+            allergies: latest.allergies,
+            medications: latest.medications,
+            background: latest.background,
+            professional: { id: latest.professional.id, displayName: latest.professional.user.displayName },
+            updatedAt: latest.createdAt.toISOString(),
+          }
+        : null,
+      versions,
+    }
+  })
+}
+
+export async function saveProfile(
+  db: Db,
+  actor: AuthContext,
+  patientId: string,
+  input: SaveClinicalProfileInput,
+): Promise<ClinicalProfileDto> {
+  await db.$transaction(async (tx) => {
+    const professional = await writableProfile(tx, actor, patientId)
+    const version = await tx.clinicalProfile.create({ data: { patientId, professionalId: professional.id, ...input } })
+    await recordAudit(tx, {
+      action: 'CLINICAL_PROFILE_UPDATED',
+      entityType: 'ClinicalProfile',
+      entityId: version.id,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+      metadata: { patientId },
+    })
+  })
+  return getProfile(db, actor, patientId)
 }

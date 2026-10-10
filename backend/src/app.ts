@@ -20,6 +20,10 @@ import type { SetupTokenStore } from './modules/organizations/setupToken.js'
 import { agendaAvailabilityRouter, professionalAvailabilityRouter } from './modules/availability/availability.routes.js'
 import { debtorsRouter, patientBillingRouter } from './modules/billing/billing.routes.js'
 import { clinicalRouter } from './modules/clinical/clinical.routes.js'
+import { clinicalFilesRouter } from './modules/files/files.routes.js'
+import type { FileStorageConfig } from './modules/files/files.storage.js'
+import { odontogramRouter } from './modules/odontogram/odontogram.routes.js'
+import { treatmentRouter } from './modules/treatment/treatment.routes.js'
 import { practicesRouter } from './modules/practices/practices.routes.js'
 import { professionalsRouter } from './modules/professionals/professionals.routes.js'
 import { usersRouter } from './modules/users/users.routes.js'
@@ -34,6 +38,7 @@ export interface AppDeps {
   appOrigin: string
   cookieSecure: boolean
   loginRateLimit?: LoginRateLimit
+  files: FileStorageConfig
 }
 
 export function createApp({
@@ -43,6 +48,7 @@ export function createApp({
   appOrigin,
   cookieSecure,
   loginRateLimit = DEFAULT_LOGIN_RATE_LIMIT,
+  files,
 }: AppDeps): Express {
   const app = express()
   app.disable('x-powered-by')
@@ -76,6 +82,9 @@ export function createApp({
   app.use('/api/professionals', professionalsRouter(db))
   app.use('/api/availability', agendaAvailabilityRouter(db))
   app.use('/api/patients/:patientId/clinical', clinicalRouter(db))
+  app.use('/api/patients/:patientId/files', clinicalFilesRouter(db, files))
+  app.use('/api/patients/:patientId/odontogram', odontogramRouter(db))
+  app.use('/api/patients/:patientId/treatment-plans', treatmentRouter(db))
   app.use('/api/patients/:patientId', patientBillingRouter(db))
   app.use('/api/debtors', debtorsRouter(db))
   app.use('/api/patients', patientsRouter(db))

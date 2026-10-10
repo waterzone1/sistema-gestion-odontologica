@@ -1,6 +1,6 @@
 # Modelo de datos (ERD)
 
-Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException` y `ProfessionalPractice`.
+Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException`, `ProfessionalPractice`, `ClinicalProfile`, `ClinicalFile`, `ToothFinding`, `TreatmentPlan` y `TreatmentItem`.
 
 ```mermaid
 erDiagram

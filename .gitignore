@@ -16,3 +16,4 @@ frontend/playwright-report/
 *.log
 .DS_Store
 Thumbs.db
+backend/data/

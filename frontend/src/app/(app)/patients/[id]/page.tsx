@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Pencil, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -8,18 +8,24 @@ import { PatientAppointments } from '@/components/appointments/patient-appointme
 import { AccountTab } from '@/components/billing/account-tab'
 import { ServicesTab } from '@/components/billing/services-tab'
 import { ClinicalHistory } from '@/components/clinical/clinical-history'
+import { ClinicalProfileCard } from '@/components/clinical/clinical-profile-card'
+import { FilesTab } from '@/components/clinical/files-tab'
+import { OdontogramTab } from '@/components/clinical/odontogram-tab'
+import { TreatmentTab } from '@/components/clinical/treatment-tab'
 import { FormError } from '@/components/form-error'
 import { EmptyState, LoadingBlock } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs } from '@/components/ui/tabs'
+import { useClinicalProfile } from '@/hooks/use-clinical'
 import { usePatient } from '@/hooks/use-patients'
 import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api'
-import { ageFrom, documentLabel, formatDate, fullName } from '@/lib/format'
+import { ageFrom, documentLabel, fullName } from '@/lib/format'
 import { can } from '@/lib/permissions'
 import { ArchivePatientDialog } from '../archive-patient-dialog'
 import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
+import { PatientSummary } from '@/components/patients/patient-summary'
 
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
@@ -29,6 +35,7 @@ export default function PatientPage() {
   const allowed = can(user, 'patients:read')
   const canWrite = can(user, 'patients:write')
   const patient = usePatient(id)
+  const clinicalProfile = useClinicalProfile(id, can(user, 'clinical:read'))
 
   const searchParams = useSearchParams()
   const [tab, setTab] = useState(() => searchParams.get('tab') ?? 'resumen')
@@ -50,6 +57,9 @@ export default function PatientPage() {
     { id: 'resumen', label: 'Resumen' },
     ...(can(user, 'appointments:read') ? [{ id: 'turnos', label: 'Turnos' }] : []),
     ...(can(user, 'clinical:read') ? [{ id: 'historia', label: 'Historia clínica' }] : []),
+    ...(can(user, 'clinical:read') ? [{ id: 'odontograma', label: 'Odontograma' }] : []),
+    ...(can(user, 'clinical:read') ? [{ id: 'archivos', label: 'Archivos' }] : []),
+    ...(can(user, 'treatment:read') ? [{ id: 'tratamiento', label: 'Tratamiento' }] : []),
     ...(can(user, 'services:read') ? [{ id: 'prestaciones', label: 'Prestaciones' }] : []),
     ...(can(user, 'account:read') ? [{ id: 'cuenta', label: 'Cuenta' }] : []),
   ]
@@ -76,6 +86,15 @@ export default function PatientPage() {
               .filter(Boolean)
               .join(' · ')}
           </p>
+          {clinicalProfile.data?.current?.alerts && (
+            <p
+              role="note"
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-sm font-medium text-destructive"
+            >
+              <TriangleAlert className="size-4" aria-hidden />
+              {clinicalProfile.data.current.alerts}
+            </p>
+          )}
         </div>
         {canWrite && (
           <div className="flex gap-2">
@@ -97,11 +116,34 @@ export default function PatientPage() {
             user={user}
           />
         )}
-        {tab === 'historia' && (
-          <ClinicalHistory
+        {tab === 'odontograma' && (
+          <OdontogramTab patientId={data.id} canWrite={can(user, 'clinical:write') && data.archivedAt === null} />
+        )}
+        {tab === 'archivos' && (
+          <FilesTab
             patientId={data.id}
-            userId={user.id}
             canWrite={can(user, 'clinical:write')}
+            archivedPatient={data.archivedAt !== null}
+          />
+        )}
+        {tab === 'historia' && (
+          <div className="space-y-6">
+            <ClinicalProfileCard patientId={data.id} canWrite={can(user, 'clinical:write') && data.archivedAt === null} />
+            <ClinicalHistory
+              patientId={data.id}
+              userId={user.id}
+              canWrite={can(user, 'clinical:write')}
+              archived={data.archivedAt !== null}
+            />
+          </div>
+        )}
+        {tab === 'tratamiento' && (
+          <TreatmentTab
+            patientId={data.id}
+            canPlan={can(user, 'treatment:write')}
+            canPrice={can(user, 'treatment:price')}
+            canCancel={can(user, 'treatment:cancel')}
+            canPerform={can(user, 'services:write') && can(user, 'treatment:write')}
             archived={data.archivedAt !== null}
           />
         )}
@@ -116,19 +158,7 @@ export default function PatientPage() {
         {tab === 'cuenta' && (
           <AccountTab patientId={data.id} canCollect={can(user, 'payments:create')} />
         )}
-        {tab === 'resumen' && (
-        <section aria-label="Datos administrativos" className="rounded-lg border bg-card p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold">Datos administrativos</h2>
-          <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            <Item label="Documento" value={documentLabel(data)} />
-            <Item label="Fecha de nacimiento" value={data.birthDate ? formatDate(data.birthDate) : null} />
-            <Item label="Teléfono" value={data.phone} />
-            <Item label="Email" value={data.email} />
-            <Item label="Dirección" value={data.address} />
-            <Item label="Alta en el sistema" value={formatDate(data.createdAt)} />
-          </dl>
-        </section>
-        )}
+        {tab === 'resumen' && <PatientSummary patient={data} user={user} />}
       </Tabs>
 
       <PatientFormDialog
@@ -139,14 +169,5 @@ export default function PatientPage() {
       />
       <ArchivePatientDialog patient={data} open={archiving} onOpenChange={setArchiving} />
     </>
-  )
-}
-
-function Item({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5">{value || '—'}</dd>
-    </div>
   )
 }

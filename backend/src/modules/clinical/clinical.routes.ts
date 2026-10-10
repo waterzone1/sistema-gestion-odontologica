@@ -6,6 +6,7 @@ import {
   clinicalPatientParamsSchema,
   correctClinicalEntrySchema,
   createClinicalEntrySchema,
+  saveClinicalProfileSchema,
 } from './clinical.schemas.js'
 import * as clinical from './clinical.service.js'
 
@@ -17,6 +18,17 @@ export function clinicalRouter(db: Db): Router {
   router.get('/', read, async (req: Request, res: Response) => {
     const { patientId } = clinicalPatientParamsSchema.parse(req.params)
     res.json(await clinical.listEntries(db, authOf(req), patientId))
+  })
+
+  router.get('/profile', read, async (req: Request, res: Response) => {
+    const { patientId } = clinicalPatientParamsSchema.parse(req.params)
+    res.json(await clinical.getProfile(db, authOf(req), patientId))
+  })
+
+  router.put('/profile', write, async (req: Request, res: Response) => {
+    const { patientId } = clinicalPatientParamsSchema.parse(req.params)
+    const input = saveClinicalProfileSchema.parse(req.body)
+    res.json(await clinical.saveProfile(db, authOf(req), patientId, input))
   })
 
   router.post('/', write, async (req: Request, res: Response) => {

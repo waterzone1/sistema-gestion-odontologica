@@ -16,6 +16,8 @@ import {
   clinicalPatientParamsSchema,
   correctClinicalEntrySchema,
   createClinicalEntrySchema,
+  clinicalProfileSchema,
+  saveClinicalProfileSchema,
 } from './clinical.schemas.js'
 
 export function registerClinicalDocs(registry: OpenAPIRegistry): void {
@@ -35,6 +37,34 @@ export function registerClinicalDocs(registry: OpenAPIRegistry): void {
     responses: {
       200: json(z.array(clinicalEntrySchema), 'Notas, de la más reciente a la más antigua'),
       404: notFound,
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/patients/{patientId}/clinical/profile',
+    tags,
+    summary: 'Perfil clínico vigente: alertas, alergias, medicación y antecedentes',
+    description: 'Solo odontólogos. La consulta queda auditada.',
+    security: readSecurity,
+    request: { params: clinicalPatientParamsSchema },
+    responses: { 200: json(clinicalProfileSchema, 'Perfil clínico'), 404: notFound, ...common },
+  })
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/patients/{patientId}/clinical/profile',
+    tags,
+    summary: 'Guarda una nueva versión del perfil clínico',
+    description: 'Cada cambio crea una versión nueva; las anteriores se conservan.',
+    security: writeSecurity,
+    request: { params: clinicalPatientParamsSchema, ...bodyOf(saveClinicalProfileSchema) },
+    responses: {
+      200: json(clinicalProfileSchema, 'Perfil clínico actualizado'),
+      400: invalidInput,
+      404: notFound,
+      422: errorResponse('Paciente archivado o usuario sin perfil profesional'),
       ...common,
     },
   })

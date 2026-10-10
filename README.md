@@ -50,6 +50,8 @@ cd backend
 npm run demo:seed
 ```
 
+Los archivos clínicos se guardan en `FILES_DIR` (por defecto `backend/data/files` en desarrollo y un volumen de Docker en producción), con un máximo de `FILE_MAX_MB` megas por archivo.
+
 El comando crea tres usuarios de demostración, imprime su clave al terminar y se niega a correr con `NODE_ENV=production`. La imagen de producción no incluye estos datos.
 
 ### Calidad
