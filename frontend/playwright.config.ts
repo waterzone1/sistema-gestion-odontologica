@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const TIME_ZONE = 'America/Argentina/Buenos_Aires'
+process.env['TZ'] = TIME_ZONE
+
 export default defineConfig({
   testDir: './e2e',
   workers: 1,
@@ -14,6 +17,7 @@ export default defineConfig({
     baseURL: 'https://localhost:8443',
     ignoreHTTPSErrors: true,
     locale: 'es-AR',
+    timezoneId: TIME_ZONE,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },

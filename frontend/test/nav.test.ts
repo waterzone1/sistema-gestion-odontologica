@@ -10,21 +10,25 @@ describe('navegacion segun permisos', () => {
   it('el administrador ve pacientes, usuarios y sedes', () => {
     expect(
       enlaces(['users:manage', 'branches:manage', 'professionals:read', 'patients:read']),
-    ).toEqual(['/dashboard', '/patients', '/admin/users', '/admin/branches'])
+    ).toEqual(['/dashboard', '/patients', '/admin/users', '/admin/branches', '/settings'])
   })
 
   it('quien puede leer pacientes ve el listado aunque no administre nada', () => {
-    expect(enlaces(['patients:read'])).toEqual(['/dashboard', '/patients'])
+    expect(enlaces(['patients:read'])).toEqual(['/dashboard', '/patients', '/settings'])
   })
 
-  it('un rol sin permisos de administracion solo ve el inicio y no aparece el grupo vacio', () => {
+  it('un rol sin permisos de administracion no ve el grupo vacio, pero si su configuracion', () => {
     const grupos = visibleNav({ permissions: ['professionals:read'] })
-    expect(grupos).toHaveLength(1)
-    expect(enlaces(['professionals:read'])).toEqual(['/dashboard'])
+    expect(grupos).toHaveLength(2)
+    expect(enlaces(['professionals:read'])).toEqual(['/dashboard', '/settings'])
+  })
+
+  it('quien gestiona la disponibilidad ve profesionales', () => {
+    expect(enlaces(['availability:manage', 'appointments:read'])).toEqual(['/dashboard', '/agenda', '/professionals', '/settings'])
   })
 
   it('no muestra opciones sueltas: cada item exige su propio permiso', () => {
-    expect(enlaces(['users:manage'])).toEqual(['/dashboard', '/admin/users'])
+    expect(enlaces(['users:manage'])).toEqual(['/dashboard', '/admin/users', '/settings'])
   })
 })
 

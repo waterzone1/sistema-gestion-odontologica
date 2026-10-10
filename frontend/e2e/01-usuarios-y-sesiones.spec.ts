@@ -93,7 +93,8 @@ test('recepción debe cambiar la clave temporal y no ve la administración', asy
   await expect(recepcion).toHaveURL(/\/dashboard$/)
   await expect(recepcion.getByRole('heading', { name: 'Hola, Lucía Fernández' })).toBeVisible()
   await expect(recepcion.getByRole('link', { name: 'Usuarios' })).toHaveCount(0)
-  await expect(recepcion.getByText('Administración')).toHaveCount(0)
+  await expect(recepcion.getByRole('link', { name: 'Sedes' })).toHaveCount(0)
+  await expect(recepcion.getByRole('link', { name: 'Prácticas' }).first()).toBeVisible()
   await recepcion.screenshot({ path: captura('06-dashboard-recepcion'), fullPage: true })
 })
 

@@ -53,14 +53,14 @@ describe('catalogo de practicas', () => {
     })
   })
 
-  it('solo el admin puede crear o editar; el resto puede consultar', async () => {
+  it('administracion y recepcion crean o editan; el odontologo solo consulta', async () => {
     const creada = await seedPractice(db, seed)
-    for (const cliente of [recepcion, odontologo]) {
-      expect((await as(app, cliente).post('/api/practices', nuevaPractica())).status).toBe(403)
-      expect((await as(app, cliente).patch(`/api/practices/${creada.id}`, { name: 'Otro' })).status).toBe(403)
-      expect((await as(app, cliente).get('/api/practices')).status).toBe(200)
-    }
-    expect(await db.practice.count()).toBe(1)
+    expect((await as(app, odontologo).post('/api/practices', nuevaPractica())).status).toBe(403)
+    expect((await as(app, odontologo).patch(`/api/practices/${creada.id}`, { name: 'Otro' })).status).toBe(403)
+    expect((await as(app, odontologo).get('/api/practices')).status).toBe(200)
+    expect((await as(app, recepcion).post('/api/practices', nuevaPractica())).status).toBe(201)
+    expect((await as(app, recepcion).patch(`/api/practices/${creada.id}`, { basePrice: '12000' })).status).toBe(200)
+    expect(await db.practice.count()).toBe(2)
   })
 
   it('rechaza codigos repetidos', async () => {

@@ -3,6 +3,7 @@ import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
+import { organizationTimeZone } from '../availability/availability.service.js'
 import { hasPermission } from '../users/domain/permissions.js'
 import { allocatePayment, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
 import type {
@@ -63,15 +64,12 @@ const creditIsActive = (allocation: { creditApplication: { voidedAt: Date | null
   !allocation.creditApplication?.voidedAt
 
 async function viewerOf(db: Pick<Db, 'organization'>, actor: AuthContext): Promise<Viewer> {
-  const organization = await db.organization.findUniqueOrThrow({
-    where: { id: actor.organizationId },
-    select: { timezone: true },
-  })
+  const timeZone = await organizationTimeZone(db, actor.organizationId)
   return {
     actor,
     showAmounts: hasPermission(actor.permissions, 'account:read'),
-    timeZone: organization.timezone,
-    today: localDay(new Date(), organization.timezone),
+    timeZone,
+    today: localDay(new Date(), timeZone),
   }
 }
 

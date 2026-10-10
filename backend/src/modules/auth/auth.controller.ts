@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express'
 import { authOf } from '../../middleware/access.js'
 import type { Db } from '../../shared/db.js'
-import { changePasswordSchema, loginSchema } from './auth.schemas.js'
+import { changePasswordSchema, loginSchema, preferencesSchema } from './auth.schemas.js'
 import * as authService from './auth.service.js'
 import { clearSessionCookie, setSessionCookie } from './cookie.js'
 
@@ -35,6 +35,11 @@ export function authController({ db, cookieSecure }: Deps) {
     changePassword: async (req: Request, res: Response): Promise<void> => {
       const auth = authOf(req)
       await authService.changePassword(db, auth, changePasswordSchema.parse(req.body))
+      res.status(204).end()
+    },
+
+    savePreferences: async (req: Request, res: Response): Promise<void> => {
+      await authService.savePreferences(db, authOf(req), preferencesSchema.parse(req.body))
       res.status(204).end()
     },
 

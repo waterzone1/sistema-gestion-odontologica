@@ -132,7 +132,7 @@ let professionalCounter = 0
 export async function seedProfessional(
   db: Db,
   seed: Seed,
-  data: { username: string; displayName?: string; branchIds?: string[] },
+  data: { username: string; displayName?: string; branchIds?: string[]; fullAvailability?: boolean },
 ) {
   professionalCounter += 1
   const user = await seedUser(db, seed, {
@@ -144,6 +144,19 @@ export async function seedProfessional(
   const profile = await db.professionalProfile.create({
     data: { userId: user.id, licenseNumber: `MP-${professionalCounter}` },
   })
+  if (data.fullAvailability ?? true) {
+    await db.availabilityRule.createMany({
+      data: (data.branchIds ?? [seed.branchId]).flatMap((branchId) =>
+        [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+          professionalId: profile.id,
+          branchId,
+          weekday,
+          startMinute: 0,
+          endMinute: 1440,
+        })),
+      ),
+    })
+  }
   return { user, profile }
 }
 

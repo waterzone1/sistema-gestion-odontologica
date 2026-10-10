@@ -4,6 +4,7 @@ import { registerAuthDocs } from '../modules/auth/auth.docs.js'
 import { registerBranchesDocs } from '../modules/branches/branches.docs.js'
 import { registerHealthDocs } from '../modules/health/health.docs.js'
 import { registerPatientsDocs } from '../modules/patients/patients.docs.js'
+import { registerAvailabilityDocs } from '../modules/availability/availability.docs.js'
 import { registerBillingDocs } from '../modules/billing/billing.docs.js'
 import { registerClinicalDocs } from '../modules/clinical/clinical.docs.js'
 import { registerPracticesDocs } from '../modules/practices/practices.docs.js'
@@ -18,6 +19,7 @@ export function buildOpenApiDocument() {
   registerBranchesDocs(registry)
   registerProfessionalsDocs(registry)
   registerPatientsDocs(registry)
+  registerAvailabilityDocs(registry)
   registerBillingDocs(registry)
   registerClinicalDocs(registry)
   registerPracticesDocs(registry)

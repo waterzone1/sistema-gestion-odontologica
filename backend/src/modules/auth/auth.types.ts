@@ -12,4 +12,5 @@ export interface AuthContext {
   branchIds: string[]
   mustChangePassword: boolean
   onboardingCompleted: boolean
+  theme: 'SYSTEM' | 'LIGHT' | 'DARK'
 }

@@ -6,19 +6,27 @@ import { EmptyState, LoadingBlock } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
-import { Textarea } from '@/components/ui/input'
+import { Select, Textarea } from '@/components/ui/input'
+import { useAppointments } from '@/hooks/use-appointments'
 import { useAddClinicalEntry, useClinicalEntries } from '@/hooks/use-clinical'
-import type { ClinicalEntry } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
+import type { Appointment, ClinicalEntry } from '@/lib/api'
+import { dayRange } from '@/lib/appointments'
+import { formatDateTime, formatTime } from '@/lib/format'
 
 interface Props {
   patientId: string
+  userId: string
   canWrite: boolean
   archived: boolean
 }
 
-export function ClinicalHistory({ patientId, canWrite, archived }: Props) {
+export function ClinicalHistory({ patientId, userId, canWrite, archived }: Props) {
   const entries = useClinicalEntries(patientId)
+  const [today] = useState(() => dayRange(new Date()))
+  const appointments = useAppointments({ ...today, patientId }, canWrite)
+  const ownToday = (appointments.data ?? []).filter(
+    (a) => a.professional.userId === userId && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW',
+  )
   const [correcting, setCorrecting] = useState<string | null>(null)
 
   if (entries.isPending) return <LoadingBlock />
@@ -35,7 +43,15 @@ export function ClinicalHistory({ patientId, canWrite, archived }: Props) {
 
   return (
     <div className="space-y-6">
-      {writable && <EntryForm patientId={patientId} label="Nueva nota de evolución" submitLabel="Guardar nota" />}
+      {writable && (
+        <EntryForm
+          key={ownToday.map((a) => a.id).join()}
+          patientId={patientId}
+          appointments={ownToday}
+          label="Nueva nota de evolución"
+          submitLabel="Guardar nota"
+        />
+      )}
       {canWrite && archived && (
         <p className="text-sm text-muted-foreground">El paciente está archivado: reactivalo para registrar notas.</p>
       )}
@@ -97,6 +113,7 @@ function Entry({ entry }: { entry: ClinicalEntry }) {
 
 function EntryForm({
   patientId,
+  appointments = [],
   correctionOfId,
   label,
   submitLabel,
@@ -104,6 +121,7 @@ function EntryForm({
   onCancel,
 }: {
   patientId: string
+  appointments?: Appointment[]
   correctionOfId?: string
   label: string
   submitLabel: string
@@ -111,12 +129,13 @@ function EntryForm({
   onCancel?: () => void
 }) {
   const [content, setContent] = useState('')
+  const [appointmentId, setAppointmentId] = useState(appointments[0]?.id ?? '')
   const add = useAddClinicalEntry(patientId, correctionOfId)
   const id = `entry-${correctionOfId ?? 'new'}`
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
-    add.mutate(content, {
+    add.mutate({ content, ...(appointmentId ? { appointmentId } : {}) }, {
       onSuccess: () => {
         setContent('')
         onDone?.()
@@ -129,6 +148,19 @@ function EntryForm({
       <Field label={label} htmlFor={id} hint="Una vez guardada, la nota no se puede editar ni borrar.">
         <Textarea id={id} value={content} onChange={(event) => setContent(event.target.value)} maxLength={10000} />
       </Field>
+      {appointments.length > 0 && (
+        <Field label="Turno" htmlFor={`${id}-appointment`}>
+          <Select id={`${id}-appointment`} value={appointmentId} onChange={(event) => setAppointmentId(event.target.value)}>
+            {appointments.map((appointment) => (
+              <option key={appointment.id} value={appointment.id}>
+                Turno de hoy {formatTime(appointment.startsAt)}
+                {appointment.practice ? ` · ${appointment.practice.name}` : ''}
+              </option>
+            ))}
+            <option value="">Sin turno</option>
+          </Select>
+        </Field>
+      )}
       <FormError error={add.error} />
       <div className="flex justify-end gap-2">
         {onCancel && (

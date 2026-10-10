@@ -16,6 +16,10 @@ export const changePasswordSchema = z
   })
   .meta({ id: 'ChangePasswordInput' })
 
+const themeSchema = z.enum(['SYSTEM', 'LIGHT', 'DARK']).meta({ id: 'ThemePreference' })
+
+export const preferencesSchema = z.object({ theme: themeSchema }).meta({ id: 'PreferencesInput' })
+
 const sessionUserSchema = z
   .object({
     id: z.uuid(),
@@ -26,6 +30,7 @@ const sessionUserSchema = z
     branchIds: z.array(z.uuid()),
     mustChangePassword: z.boolean(),
     onboardingCompleted: z.boolean(),
+    theme: themeSchema,
   })
   .meta({ id: 'SessionUser' })
 
@@ -39,3 +44,4 @@ export const sessionResponseSchema = z
 export type SessionResponse = z.infer<typeof sessionResponseSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
+export type PreferencesInput = z.infer<typeof preferencesSchema>

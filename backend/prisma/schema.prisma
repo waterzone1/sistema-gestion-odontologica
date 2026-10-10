@@ -32,9 +32,11 @@ model Branch {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  users        UserBranch[]
-  appointments Appointment[]
+  organization           Organization            @relation(fields: [organizationId], references: [id])
+  users                  UserBranch[]
+  appointments           Appointment[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
 
   @@index([organizationId])
 }
@@ -46,16 +48,17 @@ enum Role {
 }
 
 model User {
-  id                  String   @id @default(uuid(7)) @db.Uuid
-  organizationId      String   @db.Uuid
+  id                  String          @id @default(uuid(7)) @db.Uuid
+  organizationId      String          @db.Uuid
   username            String
   displayName         String
   passwordHash        String
-  active              Boolean  @default(true)
-  mustChangePassword  Boolean  @default(false)
-  onboardingCompleted Boolean  @default(false)
-  createdAt           DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+  active              Boolean         @default(true)
+  mustChangePassword  Boolean         @default(false)
+  onboardingCompleted Boolean         @default(false)
+  theme               ThemePreference @default(SYSTEM)
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime        @updatedAt @db.Timestamptz(3)
 
   organization        Organization         @relation(fields: [organizationId], references: [id])
   roles               UserRole[]
@@ -111,14 +114,20 @@ model ProfessionalProfile {
   id            String   @id @default(uuid(7)) @db.Uuid
   userId        String   @unique @db.Uuid
   licenseNumber String
+  color         String?
+  phone         String?
+  email         String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
-  user            User               @relation(fields: [userId], references: [id])
-  appointments    Appointment[]
-  clinicalEntries ClinicalEntry[]
-  services        PerformedService[]
+  user                   User                    @relation(fields: [userId], references: [id])
+  appointments           Appointment[]
+  clinicalEntries        ClinicalEntry[]
+  services               PerformedService[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  practices              ProfessionalPractice[]
 }
 
 model AuditLog {
@@ -184,9 +193,10 @@ model Practice {
   createdAt              DateTime @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime @updatedAt @db.Timestamptz(3)
 
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  appointments Appointment[]
-  services     PerformedService[]
+  organization  Organization           @relation(fields: [organizationId], references: [id])
+  appointments  Appointment[]
+  services      PerformedService[]
+  professionals ProfessionalPractice[]
 
   @@unique([organizationId, code])
 }
@@ -214,6 +224,9 @@ model Appointment {
   createdById        String            @db.Uuid
   createdAt          DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
+
+  availabilityOverride Boolean @default(false)
+  overrideReason       String?
 
   organization    Organization        @relation(fields: [organizationId], references: [id])
   branch          Branch              @relation(fields: [branchId], references: [id])
@@ -340,4 +353,61 @@ model CreditApplication {
   allocations PaymentAllocation[]
 
   @@index([organizationId, patientId, createdAt])
+}
+
+enum AvailabilityExceptionType {
+  BLOCK
+  VACATION
+  ABSENCE
+  EXTRA
+}
+
+model AvailabilityRule {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  professionalId String   @db.Uuid
+  branchId       String   @db.Uuid
+  weekday        Int
+  startMinute    Int
+  endMinute      Int
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  branch       Branch              @relation(fields: [branchId], references: [id])
+
+  @@index([professionalId, weekday])
+}
+
+model AvailabilityException {
+  id             String                    @id @default(uuid(7)) @db.Uuid
+  professionalId String                    @db.Uuid
+  branchId       String?                   @db.Uuid
+  type           AvailabilityExceptionType
+  startsAt       DateTime                  @db.Timestamptz(3)
+  endsAt         DateTime                  @db.Timestamptz(3)
+  reason         String
+  createdById    String                    @db.Uuid
+  createdAt      DateTime                  @default(now()) @db.Timestamptz(3)
+  revokedAt      DateTime?                 @db.Timestamptz(3)
+  revokedById    String?                   @db.Uuid
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  branch       Branch?             @relation(fields: [branchId], references: [id])
+
+  @@index([professionalId, startsAt])
+}
+
+model ProfessionalPractice {
+  professionalId String @db.Uuid
+  practiceId     String @db.Uuid
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice     Practice            @relation(fields: [practiceId], references: [id])
+
+  @@id([professionalId, practiceId])
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
 }

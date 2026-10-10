@@ -7,13 +7,16 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { FormError } from '@/components/form-error'
 import { PatientPicker, type PickedPatient } from '@/components/patient-picker'
+import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input, MaskedInput, Select } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
-import { api, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
-import { maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
+import { useSession } from '@/hooks/use-session'
+import { api, ApiError, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
+import { fullName, maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
+import { can } from '@/lib/permissions'
 
 const schema = z.object({
   branchId: z.string().min(1, 'Elegí la sede'),
@@ -87,6 +90,13 @@ function AppointmentForm({
     appointment ? { id: appointment.patient.id, fullName: appointment.patient.fullName } : (defaults?.patient ?? null),
   )
   const [patientError, setPatientError] = useState<string | null>(null)
+  const [creatingPatient, setCreatingPatient] = useState(false)
+  const [overrideReason, setOverrideReason] = useState('')
+  const [outsideAvailability, setOutsideAvailability] = useState(false)
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [acknowledged, setAcknowledged] = useState(false)
+  const session = useSession()
+  const canOverride = can(session.data?.user, 'appointments:override')
 
   const startDate = appointment ? new Date(appointment.startsAt) : (defaults?.start ?? new Date())
   const duration = appointment
@@ -111,8 +121,17 @@ function AppointmentForm({
       notes: appointment?.notes ?? '',
     },
   })
+  const resetChecks = () => {
+    setWarnings([])
+    setOutsideAvailability(false)
+  }
+
   const branchId = useWatch({ control, name: 'branchId' })
+  const professionalId = useWatch({ control, name: 'professionalId' })
   const availableProfessionals = professionals.filter((p) => p.active && p.branchIds.includes(branchId))
+  const practiceId = useWatch({ control, name: 'practiceId' })
+  const offered = professionals.find((p) => p.id === professionalId)?.practiceIds ?? []
+  const practiceNotOffered = practiceId !== '' && offered.length > 0 && !offered.includes(practiceId)
 
   const save = useMutation({
     mutationFn: (values: Values) => {
@@ -125,10 +144,19 @@ function AppointmentForm({
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         notes: values.notes || null,
+        ...(outsideAvailability && overrideReason.trim() ? { override: { reason: overrideReason.trim() } } : {}),
+        ...(warnings.length > 0 && acknowledged ? { acknowledgeWarnings: true } : {}),
       }
       return appointment
         ? api.patch<Appointment>(`/api/appointments/${appointment.id}`, body)
         : api.post<Appointment>('/api/appointments', { ...body, patientId: patient?.id })
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === 'OUTSIDE_AVAILABILITY') setOutsideAvailability(true)
+      if (error instanceof ApiError && error.code === 'SCHEDULE_WARNINGS') {
+        setWarnings((error.details as { warnings: string[] }).warnings)
+        setAcknowledged(false)
+      }
     },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: appointmentsKey })
@@ -147,7 +175,7 @@ function AppointmentForm({
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <FormError error={save.error} />
+      {!(save.error instanceof ApiError && save.error.code === 'SCHEDULE_WARNINGS') && <FormError error={save.error} />}
 
       <Field label="Paciente" htmlFor="patient-search" error={patientError ?? undefined}>
         <PatientPicker
@@ -157,12 +185,31 @@ function AppointmentForm({
           disabled={editing || defaults?.lockPatient === true}
         />
       </Field>
+      {!patient && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setCreatingPatient(true)}>
+          Paciente nuevo
+        </Button>
+      )}
+      <PatientFormDialog
+        open={creatingPatient}
+        onOpenChange={setCreatingPatient}
+        patient={null}
+        onSaved={(created) => {
+          setPatient({ id: created.id, fullName: fullName(created) })
+          setCreatingPatient(false)
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Sede" htmlFor="branchId" error={errors.branchId?.message}>
           <Select
             id="branchId"
-            {...register('branchId', { onChange: () => setValue('professionalId', '') })}
+            {...register('branchId', {
+              onChange: () => {
+                setValue('professionalId', '')
+                resetChecks()
+              },
+            })}
           >
             {branches.map((branch) => (
               <option key={branch.id} value={branch.id}>
@@ -172,7 +219,7 @@ function AppointmentForm({
           </Select>
         </Field>
         <Field label="Profesional" htmlFor="professionalId" error={errors.professionalId?.message}>
-          <Select id="professionalId" {...register('professionalId')}>
+          <Select id="professionalId" {...register('professionalId', { onChange: resetChecks })}>
             <option value="">Elegí un profesional</option>
             {availableProfessionals.map((professional) => (
               <option key={professional.id} value={professional.id}>
@@ -183,13 +230,22 @@ function AppointmentForm({
         </Field>
       </div>
 
-      <Field label="Práctica" htmlFor="practiceId" hint="Opcional. Propone la duración habitual.">
+      <Field
+        label="Práctica"
+        htmlFor="practiceId"
+        hint={
+          practiceNotOffered
+            ? 'Atención: el profesional no tiene habilitada esta práctica. Se va a pedir confirmación.'
+            : 'Opcional. Propone la duración habitual.'
+        }
+      >
         <Select
           id="practiceId"
           {...register('practiceId', {
             onChange: (event: { target: { value: string } }) => {
               const practice = practices.find((p) => p.id === event.target.value)
               if (practice) setValue('durationMinutes', practice.defaultDurationMinutes)
+              resetChecks()
             },
           })}
         >
@@ -204,10 +260,10 @@ function AppointmentForm({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Fecha" htmlFor="date" error={errors.date?.message}>
-          <MaskedInput id="date" placeholder="dd/mm/aaaa" mask={maskDate} {...register('date')} aria-invalid={!!errors.date} />
+          <MaskedInput id="date" placeholder="dd/mm/aaaa" mask={maskDate} {...register('date', { onChange: resetChecks })} aria-invalid={!!errors.date} />
         </Field>
         <Field label="Hora" htmlFor="time" error={errors.time?.message}>
-          <MaskedInput id="time" placeholder="hh:mm" mask={maskTime} {...register('time')} aria-invalid={!!errors.time} />
+          <MaskedInput id="time" placeholder="hh:mm" mask={maskTime} {...register('time', { onChange: resetChecks })} aria-invalid={!!errors.time} />
         </Field>
         <Field label="Duración (minutos)" htmlFor="durationMinutes" error={errors.durationMinutes?.message}>
           <Input
@@ -216,7 +272,7 @@ function AppointmentForm({
             min={5}
             max={480}
             step={5}
-            {...register('durationMinutes', { valueAsNumber: true })}
+            {...register('durationMinutes', { valueAsNumber: true, onChange: resetChecks })}
             aria-invalid={!!errors.durationMinutes}
           />
         </Field>
@@ -226,11 +282,42 @@ function AppointmentForm({
         <Input id="notes" {...register('notes')} />
       </Field>
 
+      {warnings.length > 0 && (
+        <div role="alert" className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+          <p className="font-medium">Revisá antes de dar el turno:</p>
+          <ul className="list-disc pl-5">
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+            Dar el turno igual
+          </label>
+        </div>
+      )}
+
+      {outsideAvailability && canOverride && (
+        <Field
+          label="Dar el turno igual aunque el profesional no atienda"
+          htmlFor="override-reason"
+          hint="Solo administración. Explicá el motivo: queda registrado en la auditoría. Nunca permite superponer turnos."
+        >
+          <Input
+            id="override-reason"
+            maxLength={300}
+            placeholder="Por ejemplo, urgencia por dolor agudo"
+            value={overrideReason}
+            onChange={(event) => setOverrideReason(event.target.value)}
+          />
+        </Field>
+      )}
+
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={save.isPending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={save.isPending}>
+        <Button type="submit" disabled={save.isPending || (warnings.length > 0 && !acknowledged)}>
           {save.isPending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear turno'}
         </Button>
       </DialogFooter>

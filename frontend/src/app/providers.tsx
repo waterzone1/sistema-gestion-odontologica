@@ -2,6 +2,7 @@
 
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
+import { ThemeSync } from '@/components/theme-sync'
 import { sessionKey } from '@/hooks/use-session'
 import { ApiError, setCsrfToken } from '@/lib/api'
 
@@ -29,5 +30,10 @@ export function Providers({ children }: { children: ReactNode }) {
     })
     return queryClient
   })
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={client}>
+      <ThemeSync />
+      {children}
+    </QueryClientProvider>
+  )
 }

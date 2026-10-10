@@ -1,30 +1,37 @@
 'use client'
 
-import type { DateSelectArg, DatesSetArg, EventClickArg } from '@fullcalendar/core'
+import type { DateSelectArg, DatesSetArg, EventClickArg, EventDropArg } from '@fullcalendar/core'
+import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import esLocale from '@fullcalendar/core/locales/es'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { Plus } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Ban, Check, Plus, UserX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AppointmentFormDialog,
   type AppointmentDefaults,
 } from '@/components/appointments/appointment-form-dialog'
 import { AppointmentDialog } from '@/components/appointments/appointment-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
 import { LoadingBlock, PageHeader } from '@/components/page-header'
-import { Select } from '@/components/ui/input'
+import { MaskedInput, Select } from '@/components/ui/input'
 import { useBranches } from '@/hooks/use-admin'
-import { useAppointments } from '@/hooks/use-appointments'
+import { appointmentsKey, useAppointments } from '@/hooks/use-appointments'
+import { useAgendaAvailability } from '@/hooks/use-availability'
 import { usePractices, useProfessionals } from '@/hooks/use-catalog'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSession } from '@/hooks/use-session'
-import type { Appointment } from '@/lib/api'
-import { formatTime } from '@/lib/format'
+import { api, ApiError, errorMessage, type Appointment } from '@/lib/api'
+import { appointmentEvents, availabilityEvents, noticeEvents, type StatusFilter } from '@/lib/agenda'
+import { STATUS_LABELS } from '@/lib/appointments'
+import { formatDateTime, formatTime, maskDate, parseDateText } from '@/lib/format'
 import { can, visibleBranches } from '@/lib/permissions'
+import { colorVar } from '@/lib/professional-colors'
 import { Button } from '@/components/ui/button'
 
 function nextSlot(): Date {
@@ -52,6 +59,28 @@ export default function AgendaPage() {
   const [creating, setCreating] = useState<AppointmentDefaults | null>(null)
   const [editing, setEditing] = useState<Appointment | null>(null)
   const [selected, setSelected] = useState<Appointment | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE')
+  const [jumpTo, setJumpTo] = useState('')
+  const calendar = useRef<FullCalendar>(null)
+  const client = useQueryClient()
+  const [moving, setMoving] = useState<{
+    revert: () => void
+    appointment: Appointment
+    start: Date
+    end: Date
+  } | null>(null)
+  const move = useMutation({
+    mutationFn: ({ appointment, start, end, acknowledge }: { appointment: Appointment; start: Date; end: Date; acknowledge: boolean }) =>
+      api.patch<Appointment>(`/api/appointments/${appointment.id}`, {
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        ...(acknowledge ? { acknowledgeWarnings: true } : {}),
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: appointmentsKey })
+      setMoving(null)
+    },
+  })
 
   useEffect(() => {
     if (user && !allowed) router.replace('/dashboard')
@@ -65,19 +94,20 @@ export default function AgendaPage() {
     { from: range?.from ?? '', to: range?.to ?? '', branchId, professionalId },
     allowed && range !== null && branchId !== '',
   )
+  const ownProfile = (professionals.data ?? []).find((p) => p.userId === user?.id)
+  const availabilityFor = professionalId || (canManage ? '' : (ownProfile?.id ?? ''))
+  const availability = useAgendaAvailability(
+    { from: range?.from ?? '', to: range?.to ?? '', branchId, ...(availabilityFor ? { professionalId: availabilityFor } : {}) },
+    allowed && range !== null && branchId !== '',
+  )
 
   if (!user || !allowed || branches.isPending || professionals.isPending) return <LoadingBlock />
 
-  const events = (appointments.data ?? [])
-    .filter((a) => a.status !== 'CANCELLED')
-    .map((a) => ({
-      id: a.id,
-      start: a.startsAt,
-      end: a.endsAt,
-      title: a.patient.fullName,
-      classNames: [`fc-estado-${a.status.toLowerCase()}`],
-      extendedProps: { appointment: a },
-    }))
+  const professionalList = professionals.data ?? []
+  const background = availabilityFor ? availabilityEvents(availability.data ?? []) : []
+  const notices = noticeEvents(availability.data ?? [], professionalList)
+  const events = appointmentEvents(appointments.data ?? [], professionalList, statusFilter, canManage)
+  const legend = professionalId ? [] : professionalOptions
 
   const onDatesSet = (arg: DatesSetArg) => {
     const next = { from: arg.start.toISOString(), to: arg.end.toISOString() }
@@ -89,8 +119,23 @@ export default function AgendaPage() {
     setCreating({ start: arg.start, durationMinutes: minutes, branchId, professionalId })
   }
 
+  const onMove = (arg: EventDropArg | EventResizeDoneArg) => {
+    const appointment = arg.event.extendedProps['appointment'] as Appointment | undefined
+    if (!appointment || !arg.event.start || !arg.event.end) return arg.revert()
+    move.reset()
+    setMoving({ revert: arg.revert, appointment, start: arg.event.start, end: arg.event.end })
+  }
+
+  const moveWarned = move.error instanceof ApiError && move.error.code === 'SCHEDULE_WARNINGS'
+
+  const cancelMove = () => {
+    moving?.revert()
+    setMoving(null)
+  }
+
   const onEventClick = (arg: EventClickArg) => {
-    setSelected(arg.event.extendedProps['appointment'] as Appointment)
+    const appointment = arg.event.extendedProps['appointment'] as Appointment | undefined
+    if (appointment) setSelected(appointment)
   }
 
   return (
@@ -108,7 +153,7 @@ export default function AgendaPage() {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select
           aria-label="Sede"
           className="sm:w-56"
@@ -139,6 +184,40 @@ export default function AgendaPage() {
             ))}
           </Select>
         )}
+        <Select
+          aria-label="Estado"
+          className="sm:w-52"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+        >
+          <option value="ACTIVE">Sin cancelados</option>
+          <option value="">Todos los estados</option>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const day = parseDateText(jumpTo)
+            if (day) calendar.current?.getApi().gotoDate(day)
+          }}
+        >
+          <MaskedInput
+            aria-label="Ir a la fecha"
+            placeholder="dd/mm/aaaa"
+            className="w-32"
+            mask={maskDate}
+            value={jumpTo}
+            onChange={(event) => setJumpTo(event.target.value)}
+          />
+          <Button type="submit" variant="outline" disabled={!parseDateText(jumpTo)}>
+            Ir
+          </Button>
+        </form>
       </div>
 
       {myBranches.length === 0 && (
@@ -150,6 +229,7 @@ export default function AgendaPage() {
 
       <div className="overflow-x-auto rounded-lg border bg-card p-2 shadow-sm sm:p-4">
         <FullCalendar
+          ref={calendar}
           key={compact ? 'lista' : 'grilla'}
           plugins={[timeGridPlugin, listPlugin, interactionPlugin]}
           locale={esLocale}
@@ -161,7 +241,8 @@ export default function AgendaPage() {
           }}
           buttonText={{ today: 'Hoy', week: 'Semana', day: 'Día', list: 'Lista' }}
           firstDay={1}
-          allDaySlot={false}
+          allDaySlot={notices.length > 0}
+          allDayText="Avisos"
           nowIndicator
           slotEventOverlap={false}
           height="auto"
@@ -171,13 +252,25 @@ export default function AgendaPage() {
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
           eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
           selectable={canManage}
+          eventDrop={onMove}
+          eventResize={onMove}
           selectMirror
           select={onSelect}
           eventClick={onEventClick}
           datesSet={onDatesSet}
-          events={events}
+          events={[...background, ...notices, ...events]}
           eventContent={(arg) => {
-            const appointment = arg.event.extendedProps['appointment'] as Appointment
+            const appointment = arg.event.extendedProps['appointment'] as Appointment | undefined
+            if (!appointment) {
+              const notice = arg.event.extendedProps['notice'] as string | undefined
+              return arg.event.title ? (
+                <span className="block truncate px-1 text-xs" title={notice ? `${arg.event.title}: ${notice}` : arg.event.title}>
+                  {arg.event.title}
+                </span>
+              ) : null
+            }
+            const StatusIcon =
+              appointment.status === 'ATTENDED' ? Check : appointment.status === 'NO_SHOW' ? UserX : appointment.status === 'CANCELLED' ? Ban : null
             const detail = [appointment.practice?.name, professionalId ? null : appointment.professional.displayName]
               .filter(Boolean)
               .join(' · ')
@@ -186,8 +279,11 @@ export default function AgendaPage() {
                 className="h-full min-w-0 overflow-hidden px-1 py-0.5 text-xs leading-tight"
                 title={[`${formatTime(appointment.startsAt)} ${appointment.patient.fullName}`, detail].filter(Boolean).join(' · ')}
               >
-                <p className="truncate font-semibold">
-                  {formatTime(appointment.startsAt)} {appointment.patient.fullName}
+                <p className="flex items-center gap-1 truncate font-semibold">
+                  {StatusIcon && <StatusIcon className="size-3 shrink-0" aria-label={STATUS_LABELS[appointment.status]} />}
+                  <span className="truncate">
+                    {formatTime(appointment.startsAt)} {appointment.patient.fullName}
+                  </span>
                 </p>
                 <p className="truncate opacity-90">{detail}</p>
               </div>
@@ -196,6 +292,30 @@ export default function AgendaPage() {
         />
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="Referencias">
+        {legend.map((professional) => (
+          <span key={professional.id} className="flex items-center gap-1.5">
+            <span aria-hidden className="size-2.5 rounded-full" style={{ backgroundColor: colorVar(professional.color) }} />
+            {professional.displayName}
+          </span>
+        ))}
+        <span>Borde: pendiente · Lleno: confirmado · Atenuado con ✓: atendido · Tachado: ausente o cancelado</span>
+      </div>
+
+      <ConfirmDialog
+        open={moving !== null}
+        onOpenChange={(open) => !open && cancelMove()}
+        title="Reprogramar turno"
+        description={
+          moving
+            ? `${moving.appointment.patient.fullName}: pasa al ${formatDateTime(moving.start.toISOString())} hasta las ${formatTime(moving.end.toISOString())}. Si estaba confirmado, vuelve a quedar pendiente.`
+            : ''
+        }
+        confirmLabel={moveWarned ? 'Reprogramar igual' : 'Reprogramar'}
+        pending={move.isPending}
+        error={move.error ? errorMessage(move.error) ?? undefined : undefined}
+        onConfirm={() => moving && move.mutate({ ...moving, acknowledge: moveWarned })}
+      />
       <AppointmentDialog
         appointment={selected}
         onOpenChange={(open) => !open && setSelected(null)}

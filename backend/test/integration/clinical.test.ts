@@ -106,6 +106,10 @@ describe('historia clinica: notas', () => {
     const res = await as(app, odontologo).post(ruta(), { content: 'Atendido', appointmentId: turno.id })
     expect(res.status).toBe(201)
     expect(res.body).toMatchObject({ appointmentId: turno.id })
+    const vistaClinica = await as(app, odontologo).get(`/api/appointments/${turno.id}`)
+    expect(vistaClinica.body).toMatchObject({ hasClinicalNote: true })
+    const vistaRecepcion = await as(app, recepcion).get(`/api/appointments/${turno.id}`)
+    expect(vistaRecepcion.body).toMatchObject({ hasClinicalNote: null })
   })
 
   it('rechaza un turno de otro profesional o de otro paciente', async () => {
