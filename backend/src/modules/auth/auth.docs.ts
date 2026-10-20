@@ -107,10 +107,18 @@ export function registerAuthDocs(registry: OpenAPIRegistry): void {
     method: 'put',
     path: '/api/auth/preferences',
     tags: ['Auth'],
-    summary: 'Guarda las preferencias del usuario (tema claro, oscuro o del sistema)',
+    summary: 'Guarda las preferencias del usuario',
+    description:
+      'Tema, orden del menú, pantalla de inicio y cómo se ve la agenda. Solo se pueden ocultar sábados o domingos si ningún profesional activo atiende ese día.',
     security: writeSecurity,
     request: { body: { content: { 'application/json': { schema: preferencesSchema } } } },
-    responses: { 204: noContent('Guardado'), 400: invalidInput, 401: unauthenticated, 403: forbidden },
+    responses: {
+      204: noContent('Guardado'),
+      400: invalidInput,
+      401: unauthenticated,
+      403: forbidden,
+      422: errorResponse('Horario de agenda inválido o un profesional atiende el día que se quiere ocultar'),
+    },
   })
 
   registry.registerPath({

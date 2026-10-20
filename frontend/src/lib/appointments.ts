@@ -16,6 +16,25 @@ export const STATUS_VARIANT: Record<AppointmentStatus, 'default' | 'success' | '
   CANCELLED: 'muted',
 }
 
+export function canReactivate(appointment: Pick<Appointment, 'status'>): boolean {
+  return appointment.status === 'CANCELLED' || appointment.status === 'NO_SHOW'
+}
+
+export function closureText(appointment: Pick<Appointment, 'billing' | 'closure'>): string | null {
+  switch (appointment.billing) {
+    case 'PENDING':
+      return 'Falta registrar la prestación o cerrar el turno'
+    case 'SERVICE':
+      return 'Prestación registrada'
+    case 'TREATMENT_SESSION':
+      return `Sesión de tratamiento: ${appointment.closure?.treatmentItem?.practice ?? ''}`
+    case 'NO_CHARGE':
+      return `Sin cargo: ${appointment.closure?.reason ?? ''}`
+    default:
+      return null
+  }
+}
+
 export function isEditable(appointment: Pick<Appointment, 'status'>): boolean {
   return appointment.status === 'SCHEDULED' || appointment.status === 'CONFIRMED'
 }

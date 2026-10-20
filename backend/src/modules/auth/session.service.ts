@@ -2,6 +2,7 @@ import type { Db } from '../../shared/db.js'
 import { generateToken, hashToken } from '../../shared/tokens.js'
 import { effectivePermissions } from '../users/domain/permissions.js'
 import type { AuthContext } from './auth.types.js'
+import { readPreferences } from './auth.schemas.js'
 import { absoluteExpiry, sessionState, shouldTouch } from './domain/session.js'
 
 interface NewSessionMeta {
@@ -69,6 +70,7 @@ export async function resolveSession(
     mustChangePassword: session.user.mustChangePassword,
     onboardingCompleted: session.user.onboardingCompleted,
     theme: session.user.theme,
+    preferences: readPreferences(session.user.preferences),
   }
 }
 

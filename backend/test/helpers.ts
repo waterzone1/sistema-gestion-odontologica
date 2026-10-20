@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { Writable } from 'node:stream'
 import request from 'supertest'
 import type { Express } from 'express'
@@ -12,6 +14,7 @@ import { buildSearchText } from '../src/modules/patients/domain/search.js'
 export const ORIGIN = 'https://test.local'
 export const PASSWORD = 'Clave-de-prueba-1'
 export const SETUP_TOKEN = 'token-de-prueba'
+export const TEST_FILES = { dir: path.join(tmpdir(), `sgo-archivos-${process.pid}`), maxBytes: 64 * 1024 }
 
 const silentLogger = createLogger({ level: 'silent' })
 
@@ -37,6 +40,7 @@ export function buildApp(db: Db, overrides: Partial<AppDeps> = {}): Express {
     appOrigin: ORIGIN,
     cookieSecure: false,
     loginRateLimit: { max: 1000, windowMs: 60_000 },
+    files: TEST_FILES,
     ...overrides,
   })
 }

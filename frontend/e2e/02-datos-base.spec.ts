@@ -41,6 +41,7 @@ test('el administrador prepara usuarios, práctica y un paciente para los escena
     firstName: 'Luca',
     lastName: 'Rossi',
     documentNumber: '31222333',
+    birthDate: '1990-05-20',
     phone: '11 6000-1111',
   })
   expect(paciente.status()).toBe(201)
