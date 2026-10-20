@@ -30,6 +30,7 @@ export function toSessionResponse(auth: AuthContext): SessionResponse {
       mustChangePassword: auth.mustChangePassword,
       onboardingCompleted: auth.onboardingCompleted,
       theme: auth.theme,
+      preferences: auth.preferences,
     },
     csrfToken: auth.csrfToken,
   }
@@ -116,8 +117,39 @@ export async function changePassword(
   })
 }
 
+const WEEKEND = [
+  { key: 'showSaturday', weekday: 6, label: 'sábados' },
+  { key: 'showSunday', weekday: 7, label: 'domingos' },
+] as const
+
+async function assertWeekendFree(db: Db, auth: AuthContext, input: PreferencesInput): Promise<void> {
+  const hiding = WEEKEND.filter((day) => input.preferences?.[day.key] === false)
+  if (hiding.length === 0) return
+  const rules = await db.availabilityRule.findMany({
+    where: {
+      weekday: { in: hiding.map((day) => day.weekday) },
+      professional: { active: true, user: { organizationId: auth.organizationId, active: true } },
+    },
+    select: { weekday: true, professional: { select: { user: { select: { displayName: true } } } } },
+  })
+  for (const day of hiding) {
+    const names = [...new Set(rules.filter((r) => r.weekday === day.weekday).map((r) => r.professional.user.displayName))]
+    if (names.length > 0) {
+      throw new AppError(422, 'WEEKEND_IN_USE', `No se pueden ocultar los ${day.label}: atienden ${names.join(', ')}`)
+    }
+  }
+}
+
 export async function savePreferences(db: Db, auth: AuthContext, input: PreferencesInput): Promise<void> {
-  await db.user.update({ where: { id: auth.userId }, data: { theme: input.theme } })
+  const preferences = { ...auth.preferences, ...input.preferences }
+  if (preferences.agendaEndHour <= preferences.agendaStartHour) {
+    throw new AppError(422, 'INVALID_AGENDA_HOURS', 'La hora de fin de la agenda tiene que ser posterior a la de inicio')
+  }
+  await assertWeekendFree(db, auth, input)
+  if (input.theme) await db.user.update({ where: { id: auth.userId }, data: { theme: input.theme } })
+  if (input.preferences) {
+    await db.$executeRaw`UPDATE "User" SET "preferences" = "preferences" || ${JSON.stringify(input.preferences)}::jsonb WHERE "id" = ${auth.userId}::uuid`
+  }
 }
 
 export async function completeOnboarding(db: Db, auth: AuthContext): Promise<void> {

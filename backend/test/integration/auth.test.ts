@@ -1,6 +1,19 @@
 import request from 'supertest'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { as, buildApp, capturingLogger, loginAs, ORIGIN, PASSWORD, resetDb, seedInstall, seedUser, testDb, type Seed } from '../helpers.js'
+import {
+  as,
+  buildApp,
+  capturingLogger,
+  loginAs,
+  ORIGIN,
+  PASSWORD,
+  resetDb,
+  seedInstall,
+  seedProfessional,
+  seedUser,
+  testDb,
+  type Seed,
+} from '../helpers.js'
 
 const db = testDb()
 let seed: Seed
@@ -192,5 +205,57 @@ describe('cambio de contraseña', () => {
     expect((await as(app, client).put('/api/auth/preferences', { theme: 'DARK' })).status).toBe(204)
     expect(await tema()).toBe('DARK')
     expect((await as(app, client).put('/api/auth/preferences', { theme: 'ROSA' })).status).toBe(400)
+  })
+
+  it('guarda las preferencias de cada usuario y completa lo que falta con los valores por defecto', async () => {
+    const app = buildApp(db)
+    const admin = await loginAs(app, 'admin')
+    const recepcion = await loginAs(app, 'recepcion')
+    type Me = { user: { theme: string; preferences: Record<string, unknown> } }
+    const yo = async (cliente = admin) => ((await as(app, cliente).get('/api/auth/me')).body as Me).user
+    expect((await yo()).preferences).toEqual({
+      menuOrder: [],
+      homePage: '/dashboard',
+      agendaView: 'timeGridWeek',
+      agendaStartHour: 7,
+      agendaEndHour: 21,
+      agendaSlotMinutes: 30,
+      showSaturday: true,
+      showSunday: true,
+    })
+    await as(app, admin)
+      .put('/api/auth/preferences', { preferences: { homePage: '/agenda', menuOrder: ['/agenda', '/patients'], agendaSlotMinutes: 15 } })
+      .expect(204)
+    await as(app, admin).put('/api/auth/preferences', { theme: 'DARK', preferences: { agendaStartHour: 8 } }).expect(204)
+    const despues = await yo()
+    expect(despues.theme).toBe('DARK')
+    expect(despues.preferences).toMatchObject({ homePage: '/agenda', menuOrder: ['/agenda', '/patients'], agendaSlotMinutes: 15, agendaStartHour: 8 })
+    expect((await yo(recepcion)).preferences).toMatchObject({ homePage: '/dashboard' })
+
+    expect((await as(app, admin).put('/api/auth/preferences', { preferences: { agendaSlotMinutes: 20 } })).status).toBe(400)
+    expect((await as(app, admin).put('/api/auth/preferences', { preferences: { homePage: 'https://otro.sitio' } })).status).toBe(400)
+    const usuario = await db.user.findFirstOrThrow({ where: { username: 'admin' } })
+    await db.user.update({ where: { id: usuario.id }, data: { preferences: { homePage: '/agenda', agendaView: 'mes' } } })
+    expect((await yo()).preferences).toMatchObject({ homePage: '/agenda', agendaView: 'timeGridWeek' })
+    const horas = await as(app, admin).put('/api/auth/preferences', { preferences: { agendaStartHour: 22, agendaEndHour: 9 } })
+    expect((horas.body as { error: { code: string } }).error.code).toBe('INVALID_AGENDA_HOURS')
+  })
+
+  it('solo oculta sabados o domingos si ningun profesional atiende ese dia', async () => {
+    const app = buildApp(db)
+    const admin = await loginAs(app, 'admin')
+    const { profile } = await seedProfessional(db, seed, { username: 'paz', displayName: 'Dra. Paz', fullAvailability: false })
+    await db.availabilityRule.create({
+      data: { professionalId: profile.id, branchId: seed.branchId, weekday: 6, startMinute: 540, endMinute: 780 },
+    })
+    const sabado = await as(app, admin).put('/api/auth/preferences', { preferences: { showSaturday: false } })
+    expect(sabado.status).toBe(422)
+    expect((sabado.body as { error: { code: string; message: string } }).error).toMatchObject({
+      code: 'WEEKEND_IN_USE',
+      message: 'No se pueden ocultar los sábados: atienden Dra. Paz',
+    })
+    await as(app, admin).put('/api/auth/preferences', { preferences: { showSunday: false } }).expect(204)
+    await db.professionalProfile.update({ where: { id: profile.id }, data: { active: false } })
+    await as(app, admin).put('/api/auth/preferences', { preferences: { showSaturday: false } }).expect(204)
   })
 })

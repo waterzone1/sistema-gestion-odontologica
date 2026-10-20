@@ -1,5 +1,8 @@
 import { z } from 'zod'
+import { appointmentSchema } from '../appointments/appointments.schemas.js'
 import { SURFACES } from '../odontogram/domain/fdi.js'
+
+export const currencySchema = z.enum(['ARS', 'USD']).meta({ id: 'Currency' })
 
 const moneySchema = z
   .string()
@@ -43,7 +46,8 @@ export const createChargeSchema = z
     lines: z
       .array(
         z.object({
-          amount: moneySchema,
+          amount: moneySchema.meta({ description: 'Importe en la moneda del pago' }),
+          currency: currencySchema.default('ARS'),
           method: paymentMethodSchema,
           externalReference: z.string().trim().max(120).nullish(),
         }),
@@ -51,11 +55,19 @@ export const createChargeSchema = z
       .max(10)
       .default([]),
     credit: moneySchema.optional(),
+    exchangeRate: moneySchema.optional().meta({
+      description:
+        'Cotización del dólar que vio quien cobra. Obligatoria si hay pagos en dólares: si no coincide con la vigente, el cobro se rechaza',
+    }),
     receivedAt: z.iso.datetime().optional(),
     serviceIds: z.array(z.uuid()).min(1).max(100).optional(),
   })
   .refine((value) => value.lines.length > 0 || value.credit !== undefined, {
     message: 'Agregá al menos un medio de pago',
+  })
+  .refine((value) => value.exchangeRate !== undefined || value.lines.every((line) => line.currency === 'ARS'), {
+    path: ['exchangeRate'],
+    message: 'Falta la cotización del dólar',
   })
   .meta({ id: 'CreateChargeInput' })
 
@@ -89,7 +101,10 @@ export const serviceSchema = z
 export const paymentSchema = z
   .object({
     id: z.uuid(),
-    amount: z.string().meta({ example: '10000.00' }),
+    amount: z.string().meta({ example: '10000.00', description: 'Equivalente en pesos: es lo que descuenta de la deuda' }),
+    currency: currencySchema,
+    originalAmount: z.string().meta({ description: 'Importe en la moneda en que se pagó' }),
+    exchangeRate: z.string().meta({ description: 'Cotización usada al cobrar. 1 para pesos' }),
     method: z
       .enum([...PAYMENT_METHODS, 'CREDIT'])
       .meta({ id: 'MovementMethod', description: 'CREDIT es un uso de saldo a favor, no un ingreso de dinero' }),
@@ -131,6 +146,24 @@ export const debtorSchema = z
   })
   .meta({ id: 'Debtor' })
 
+const unbilledItemSchema = z
+  .object({
+    id: z.uuid(),
+    planId: z.uuid(),
+    practice: z.string(),
+    patient: z.object({ id: z.uuid(), fullName: z.string() }),
+    professional: z.string(),
+    completedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'UnbilledTreatmentItem' })
+
+export const pendingBillingSchema = z
+  .object({
+    appointments: z.array(appointmentSchema).meta({ description: 'Turnos atendidos de los últimos 90 días sin prestación ni cierre' }),
+    items: z.array(unbilledItemSchema).meta({ description: 'Ítems del plan marcados realizados sin prestación registrada' }),
+  })
+  .meta({ id: 'PendingBilling' })
+
 export type CreateServiceInput = z.infer<typeof createServiceSchema>
 export type CreateChargeInput = z.infer<typeof createChargeSchema>
 export type ServiceDto = z.infer<typeof serviceSchema>
@@ -138,3 +171,5 @@ export type PaymentDto = z.infer<typeof paymentSchema>
 export type ChargeResultDto = z.infer<typeof chargeResultSchema>
 export type AccountDto = z.infer<typeof accountSchema>
 export type DebtorDto = z.infer<typeof debtorSchema>
+export type UnbilledItemDto = z.infer<typeof unbilledItemSchema>
+export type PendingBillingDto = z.infer<typeof pendingBillingSchema>

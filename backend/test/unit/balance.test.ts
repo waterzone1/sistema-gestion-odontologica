@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocatePayment, fromCents, localDay, sum, toCents } from '../../src/modules/billing/domain/balance.js'
+import { allocatePayment, convertCents, fromCents, localDay, sum, toCents } from '../../src/modules/billing/domain/balance.js'
 
 describe('importes en centavos', () => {
   it('convierte sin errores de punto flotante', () => {
@@ -115,5 +115,18 @@ describe('sum', () => {
   it('suma centavos y da cero sin valores', () => {
     expect(sum([10000, 5000, 1])).toBe(15001)
     expect(sum([])).toBe(0)
+  })
+})
+
+describe('conversion de moneda', () => {
+  it('convierte a pesos con la cotizacion y redondea al centavo', () => {
+    expect(convertCents(toCents('100'), toCents('1250.50'))).toBe(toCents('125050.00'))
+    expect(convertCents(toCents('0.01'), toCents('1250.50'))).toBe(toCents('12.51'))
+    expect(convertCents(toCents('0.01'), toCents('0.49'))).toBe(0)
+    expect(convertCents(toCents('0.01'), toCents('0.50'))).toBe(1)
+  })
+
+  it('no pierde precision con importes grandes', () => {
+    expect(fromCents(convertCents(toCents('999999999.99'), toCents('1500.00')))).toBe('1499999999985.00')
   })
 })

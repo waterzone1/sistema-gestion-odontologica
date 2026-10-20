@@ -56,6 +56,8 @@ const itemSchema = z.object({
   priced: z.boolean(),
   status: itemStatusSchema,
   cancelReason: z.string().nullable(),
+  completedAt: z.iso.datetime().nullable().meta({ description: 'Cuándo el odontólogo lo marcó realizado' }),
+  billed: z.boolean().meta({ description: 'Si tiene una prestación vigente registrada' }),
 })
 
 export const treatmentPlanSchema = z

@@ -18,7 +18,7 @@ import type { TreatmentPlan } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
 import { formatDate, formatMoney } from '@/lib/format'
 import { SURFACE_LABELS, type Surface } from '@/lib/odontogram'
-import { isOpenItem, ITEM_STATUS_LABELS, itemLocation, PLAN_STATUS_LABELS, TOOTH_OPTIONS } from '@/lib/treatment'
+import { isBillableItem, isOpenItem, itemLocation, itemStatusText, PLAN_STATUS_LABELS, TOOTH_OPTIONS } from '@/lib/treatment'
 
 type Item = TreatmentPlan['items'][number]
 
@@ -27,11 +27,11 @@ interface Props {
   canPlan: boolean
   canPrice: boolean
   canCancel: boolean
-  canPerform: boolean
+  canBill: boolean
   archived: boolean
 }
 
-export function TreatmentTab({ patientId, canPlan, canPrice, canCancel, canPerform, archived }: Props) {
+export function TreatmentTab({ patientId, canPlan, canPrice, canCancel, canBill, archived }: Props) {
   const plans = useTreatmentPlans(patientId)
   const createPlan = useCreatePlan(patientId)
   const action = useItemAction(patientId)
@@ -97,16 +97,16 @@ export function TreatmentTab({ patientId, canPlan, canPrice, canCancel, canPerfo
                         {itemLocation(item) && <span className="font-normal text-muted-foreground"> · {itemLocation(item)}</span>}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {ITEM_STATUS_LABELS[item.status]}
+                        {itemStatusText(item, canBill)}
                         {canPrice &&
                           (item.agreedPrice ? ` · Acordado ${formatMoney(item.agreedPrice)}` : ' · Sin cotizar')}
                         {item.notes && ` · ${item.notes}`}
                         {item.cancelReason && ` · Motivo: ${item.cancelReason}`}
                       </p>
                     </div>
-                    {isOpenItem(item) && !archived && (
+                    {(isOpenItem(item) || (canBill && isBillableItem(item))) && !archived && (
                       <div className="flex flex-wrap gap-2">
-                        {canPrice && (
+                        {canPrice && isOpenItem(item) && (
                           <Button variant="outline" size="sm" onClick={() => setPricing({ planId: plan.id, item })}>
                             {item.priced ? 'Cambiar precio' : 'Cotizar'}
                           </Button>
@@ -121,16 +121,28 @@ export function TreatmentTab({ patientId, canPlan, canPrice, canCancel, canPerfo
                             Iniciar
                           </Button>
                         )}
-                        {canPerform && (
+                        {canPlan && isOpenItem(item) && (
                           <Button
                             size="sm"
-                            disabled={perform.isPending}
-                            onClick={() => perform.mutate({ treatmentItemId: item.id })}
+                            disabled={action.isPending}
+                            onClick={() => action.mutate({ kind: 'complete', planId: plan.id, itemId: item.id })}
                           >
-                            Registrar realizado
+                            Marcar realizado
                           </Button>
                         )}
-                        {canCancel && (
+                        {canBill && isBillableItem(item) && (
+                          <Button
+                            size="sm"
+                            variant={item.status === 'COMPLETED' ? 'default' : 'outline'}
+                            disabled={perform.isPending}
+                            onClick={() =>
+                              perform.mutate({ treatmentItemId: item.id, professionalId: plan.professional.id })
+                            }
+                          >
+                            Registrar prestación
+                          </Button>
+                        )}
+                        {canCancel && isOpenItem(item) && (
                           <Button variant="outline" size="sm" onClick={() => setCancelling({ planId: plan.id, item })}>
                             Cancelar
                           </Button>

@@ -9,7 +9,7 @@ import { useRecordService } from '@/hooks/use-billing'
 import { usePractices } from '@/hooks/use-catalog'
 import { useTreatmentPlans } from '@/hooks/use-treatment'
 import type { Appointment } from '@/lib/api'
-import { isOpenItem, itemLocation } from '@/lib/treatment'
+import { isBillableItem, itemLocation } from '@/lib/treatment'
 
 interface Props {
   appointment: Appointment
@@ -25,9 +25,9 @@ export function RegisterServicePanel({ appointment, onDone, onCancel }: Props) {
   const [choice, setChoice] = useState(appointment.practice ? `practice:${appointment.practice.id}` : '')
 
   const openItems = (plans.data ?? []).flatMap((plan) =>
-    plan.status === 'CANCELLED' || plan.status === 'COMPLETED'
+    plan.status === 'CANCELLED'
       ? []
-      : plan.items.filter(isOpenItem).map((item) => ({ item, plan })),
+      : plan.items.filter(isBillableItem).map((item) => ({ item, plan })),
   )
 
   const submit = () => {

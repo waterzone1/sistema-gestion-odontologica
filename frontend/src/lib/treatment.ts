@@ -24,6 +24,15 @@ export function isOpenItem(item: Pick<TreatmentPlan['items'][number], 'status'>)
   return item.status === 'PLANNED' || item.status === 'IN_PROGRESS'
 }
 
+export function isBillableItem(item: Pick<TreatmentPlan['items'][number], 'status' | 'billed'>): boolean {
+  return item.status !== 'CANCELLED' && !item.billed
+}
+
+export function itemStatusText(item: Pick<TreatmentPlan['items'][number], 'status' | 'billed'>, showBilling: boolean): string {
+  if (showBilling && item.status === 'COMPLETED' && !item.billed) return 'Realizado · falta registrar la prestación'
+  return ITEM_STATUS_LABELS[item.status]
+}
+
 export function itemLocation(item: Pick<TreatmentPlan['items'][number], 'tooth' | 'surfaces'>): string | null {
   if (item.tooth === null) return null
   return item.surfaces.length > 0 ? `Pieza ${item.tooth} (${item.surfaces.join(', ')})` : `Pieza ${item.tooth}`

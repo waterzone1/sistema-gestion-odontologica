@@ -49,6 +49,7 @@ export function useAddItem(patientId: string) {
 export type ItemAction =
   | { kind: 'price'; planId: string; itemId: string; price: string }
   | { kind: 'start'; planId: string; itemId: string }
+  | { kind: 'complete'; planId: string; itemId: string }
   | { kind: 'cancel'; planId: string; itemId: string; reason: string }
   | { kind: 'accept'; planId: string }
 
@@ -60,6 +61,8 @@ export function useItemAction(patientId: string) {
         return api.put<TreatmentPlan>(`${base}/items/${action.itemId}/price`, { price: action.price })
       case 'start':
         return api.post<TreatmentPlan>(`${base}/items/${action.itemId}/start`)
+      case 'complete':
+        return api.post<TreatmentPlan>(`${base}/items/${action.itemId}/complete`)
       case 'cancel':
         return api.post<TreatmentPlan>(`${base}/items/${action.itemId}/cancel`, { reason: action.reason })
       case 'accept':

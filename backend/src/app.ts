@@ -14,11 +14,13 @@ import { appointmentsRouter } from './modules/appointments/appointments.routes.j
 import { authRouter } from './modules/auth/auth.routes.js'
 import { branchesRouter } from './modules/branches/branches.routes.js'
 import { healthRouter } from './modules/health/health.routes.js'
+import { patientNotesRouter } from './modules/patients/notes.routes.js'
 import { patientsRouter } from './modules/patients/patients.routes.js'
 import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
 import { agendaAvailabilityRouter, professionalAvailabilityRouter } from './modules/availability/availability.routes.js'
-import { debtorsRouter, patientBillingRouter } from './modules/billing/billing.routes.js'
+import { cashRouter, exchangeRatesRouter } from './modules/cash/cash.routes.js'
+import { debtorsRouter, patientBillingRouter, pendingBillingRouter } from './modules/billing/billing.routes.js'
 import { clinicalRouter } from './modules/clinical/clinical.routes.js'
 import { clinicalFilesRouter } from './modules/files/files.routes.js'
 import type { FileStorageConfig } from './modules/files/files.storage.js'
@@ -85,8 +87,12 @@ export function createApp({
   app.use('/api/patients/:patientId/files', clinicalFilesRouter(db, files))
   app.use('/api/patients/:patientId/odontogram', odontogramRouter(db))
   app.use('/api/patients/:patientId/treatment-plans', treatmentRouter(db))
+  app.use('/api/patients/:patientId/notes', patientNotesRouter(db))
   app.use('/api/patients/:patientId', patientBillingRouter(db))
   app.use('/api/debtors', debtorsRouter(db))
+  app.use('/api/billing/pending', pendingBillingRouter(db))
+  app.use('/api/exchange-rates', exchangeRatesRouter(db))
+  app.use('/api/cash', cashRouter(db))
   app.use('/api/patients', patientsRouter(db))
   app.use('/api/practices', practicesRouter(db))
   app.use('/api/appointments', appointmentsRouter(db))

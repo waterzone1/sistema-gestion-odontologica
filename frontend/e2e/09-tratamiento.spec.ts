@@ -54,11 +54,12 @@ test('recepción cotiza con descuento y registra la aceptación, sin ver piezas'
   await page.screenshot({ path: captura('37-plan-recepcion'), fullPage: true })
 })
 
-test('el odontólogo registra el ítem como realizado y se ve en el odontograma', async ({ page }) => {
+test('el odontólogo marca el ítem como realizado y se ve en el odontograma', async ({ page }) => {
   await ingresar(page, ODONTOLOGO)
   await abrirFichaDeRossi(page, 'Tratamiento')
   const plan = page.getByRole('region', { name: 'Rehabilitación' })
-  await plan.getByRole('button', { name: 'Registrar realizado' }).click()
+  await expect(plan.getByRole('button', { name: 'Registrar prestación' })).toHaveCount(0)
+  await plan.getByRole('button', { name: 'Marcar realizado' }).click()
   await expect(plan.getByText('Terminado')).toBeVisible()
   await page.getByRole('tab', { name: 'Odontograma' }).click()
   await page.getByRole('button', { name: /^Pieza 46/ }).click()
@@ -67,9 +68,17 @@ test('el odontólogo registra el ítem como realizado y se ve en el odontograma'
   await expect(panel.getByText('Consulta (O)')).toBeVisible()
 })
 
-test('recepción ve la prestación del plan con el precio acordado', async ({ page }) => {
+test('recepción ve el pendiente y registra la prestación del plan con el precio acordado', async ({ page }) => {
   await ingresar(page, RECEPCION)
-  await abrirFichaDeRossi(page, 'Prestaciones')
+  const pendientes = page.getByRole('region', { name: /Pendientes de facturar/ })
+  await expect(pendientes.getByText(/Consulta realizada el/)).toBeVisible()
+  await page.screenshot({ path: captura('38-pendientes-de-facturar'), fullPage: true })
+  await abrirFichaDeRossi(page, 'Tratamiento')
+  const plan = page.getByRole('region', { name: 'Rehabilitación' })
+  await expect(plan.getByText('Realizado · falta registrar la prestación')).toBeVisible()
+  await plan.getByRole('button', { name: 'Registrar prestación' }).click()
+  await expect(plan.getByRole('button', { name: 'Registrar prestación' })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Prestaciones' }).click()
   const lista = page.getByRole('region', { name: 'Prestaciones realizadas' })
   const delPlan = lista.getByRole('listitem').filter({ hasText: 'Del plan de tratamiento' })
   await expect(delPlan.getByText('Consulta · $ 9.000,00')).toBeVisible()
@@ -83,7 +92,7 @@ test('desde un turno atendido se registra la prestación', async ({ page }) => {
   const dialogo = page.getByRole('dialog')
   await dialogo.getByRole('button', { name: 'Registrar prestación' }).click()
   await expect(dialogo.getByLabel('Qué se realizó')).toHaveValue(/practice:/)
-  await page.screenshot({ path: captura('38-prestacion-desde-turno') })
+  await page.screenshot({ path: captura('39-prestacion-desde-turno') })
   await dialogo.getByRole('button', { name: 'Registrar prestación' }).click()
-  await expect(dialogo.getByText('Prestación registrada.')).toBeVisible()
+  await expect(dialogo.getByText('Turno cerrado.')).toBeVisible()
 })

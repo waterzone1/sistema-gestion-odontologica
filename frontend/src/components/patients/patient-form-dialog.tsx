@@ -26,11 +26,12 @@ const schema = z.object({
   firstName: z.string().trim().min(1, 'Ingresá el nombre'),
   lastName: z.string().trim().min(1, 'Ingresá el apellido'),
   documentType: z.enum(['DNI', 'LE', 'LC', 'PASAPORTE', 'OTRO']),
-  documentNumber: z.string().trim(),
+  documentNumber: z.string().trim().min(1, 'Ingresá el número de documento'),
   birthDate: z
     .string()
     .trim()
-    .refine((value) => value === '' || parseDateText(value) !== null, 'Usá el formato dd/mm/aaaa con una fecha válida'),
+    .min(1, 'Ingresá la fecha de nacimiento')
+    .refine((value) => parseDateText(value) !== null, 'Usá el formato dd/mm/aaaa con una fecha válida'),
   phone: z.string().trim(),
   email: z
     .string()
@@ -97,8 +98,7 @@ function PatientForm({
     mutationFn: (values: Values) => {
       const body = {
         ...values,
-        documentNumber: emptyToNull(values.documentNumber),
-        birthDate: values.birthDate ? parseDateText(values.birthDate) : null,
+        birthDate: parseDateText(values.birthDate),
         phone: emptyToNull(values.phone),
         email: emptyToNull(values.email),
         address: emptyToNull(values.address),
@@ -148,8 +148,13 @@ function PatientForm({
               ))}
             </Select>
           </Field>
-          <Field label="Número de documento" htmlFor="documentNumber">
-            <Input id="documentNumber" inputMode="text" {...register('documentNumber')} />
+          <Field label="Número de documento" htmlFor="documentNumber" error={errors.documentNumber?.message}>
+            <Input
+              id="documentNumber"
+              inputMode="text"
+              {...register('documentNumber')}
+              aria-invalid={!!errors.documentNumber}
+            />
           </Field>
           <Field label="Fecha de nacimiento" htmlFor="birthDate" error={errors.birthDate?.message}>
             <MaskedInput
@@ -166,13 +171,13 @@ function PatientForm({
       <fieldset className="space-y-4">
         <legend className="mb-1 text-sm font-semibold">Contacto</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Teléfono" htmlFor="phone">
+          <Field label="Teléfono (opcional)" htmlFor="phone">
             <Input id="phone" type="tel" {...register('phone')} />
           </Field>
-          <Field label="Email" htmlFor="email" error={errors.email?.message}>
+          <Field label="Email (opcional)" htmlFor="email" error={errors.email?.message}>
             <Input id="email" type="email" {...register('email')} aria-invalid={!!errors.email} />
           </Field>
-          <Field label="Dirección" htmlFor="address">
+          <Field label="Dirección (opcional)" htmlFor="address">
             <Input id="address" {...register('address')} />
           </Field>
         </div>

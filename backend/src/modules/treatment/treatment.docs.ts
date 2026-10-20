@@ -107,6 +107,18 @@ export function registerTreatmentDocs(registry: OpenAPIRegistry): void {
 
   registry.registerPath({
     method: 'post',
+    path: `${base}/{planId}/items/{itemId}/complete`,
+    tags,
+    summary: 'El odontólogo marca un ítem como realizado',
+    description:
+      'Es un hecho clínico: no registra la prestación ni el cobro. El ítem queda para que recepción registre la prestación con el precio acordado.',
+    security: writeSecurity,
+    request: { params: itemParamsSchema },
+    responses: { 200: plan('Plan actualizado'), 404: notFound, 409: errorResponse('El ítem ya está terminado o cancelado'), ...common },
+  })
+
+  registry.registerPath({
+    method: 'post',
     path: `${base}/{planId}/items/{itemId}/cancel`,
     tags,
     summary: 'Cancela un ítem con motivo (no se borra)',

@@ -1,5 +1,6 @@
 'use client'
 
+import { homePath } from '@/lib/nav'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { LoadingBlock } from '@/components/page-header'
@@ -14,7 +15,7 @@ export default function RootPage() {
   const destino = session.data
     ? session.data.user.mustChangePassword
       ? '/cambiar-clave'
-      : '/dashboard'
+      : homePath(session.data.user)
     : setup.data?.needsSetup
       ? '/setup'
       : session.data === null && setup.data

@@ -24,6 +24,22 @@ function toDto(finding: FindingRecord): ToothFindingDto {
 
 const professionalName = { select: { user: { select: { displayName: true } } } } as const
 
+function performedEntry(
+  source: { id: string; tooth: number | null; surfaces: OdontogramDto['performed'][number]['surfaces']; practice: { name: string } },
+  date: Date,
+  professional: { user: { displayName: string } },
+) {
+  return {
+    id: source.id,
+    tooth: source.tooth as number,
+    surfaces: source.surfaces,
+    practice: source.practice.name,
+    status: 'COMPLETED' as const,
+    date: date.toISOString(),
+    professional: professional.user.displayName,
+  }
+}
+
 async function load(db: Pick<Db, 'toothFinding' | 'treatmentItem' | 'performedService'>, patientId: string): Promise<OdontogramDto> {
   const findings = await db.toothFinding.findMany({
     where: { patientId },
@@ -31,19 +47,25 @@ async function load(db: Pick<Db, 'toothFinding' | 'treatmentItem' | 'performedSe
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
   const items = await db.treatmentItem.findMany({
-    where: { tooth: { not: null }, status: { in: ['PLANNED', 'IN_PROGRESS'] }, plan: { patientId } },
-    include: { practice: { select: { name: true } }, plan: { select: { professional: professionalName } } },
+    where: { tooth: { not: null }, status: { in: ['PLANNED', 'IN_PROGRESS', 'COMPLETED'] }, plan: { patientId } },
+    include: {
+      practice: { select: { name: true } },
+      plan: { select: { professional: professionalName } },
+      services: { where: { voidedAt: null }, select: { performedAt: true }, orderBy: { performedAt: 'desc' }, take: 1 },
+    },
     orderBy: { createdAt: 'asc' },
   })
   const services = await db.performedService.findMany({
-    where: { patientId, tooth: { not: null }, voidedAt: null },
+    where: { patientId, tooth: { not: null }, voidedAt: null, treatmentItemId: null },
     include: { practice: { select: { name: true } }, professional: professionalName },
     orderBy: { performedAt: 'desc' },
   })
+  const open = items.filter((item) => item.status !== 'COMPLETED')
+  const done = items.filter((item) => item.status === 'COMPLETED')
   return {
     current: currentState(findings).map(toDto),
     history: findings.map(toDto),
-    planned: items.map((item) => ({
+    planned: open.map((item) => ({
       id: item.id,
       tooth: item.tooth as number,
       surfaces: item.surfaces,
@@ -52,15 +74,12 @@ async function load(db: Pick<Db, 'toothFinding' | 'treatmentItem' | 'performedSe
       date: item.createdAt.toISOString(),
       professional: item.plan.professional.user.displayName,
     })),
-    performed: services.map((service) => ({
-      id: service.id,
-      tooth: service.tooth as number,
-      surfaces: service.surfaces,
-      practice: service.practice.name,
-      status: 'COMPLETED',
-      date: service.performedAt.toISOString(),
-      professional: service.professional.user.displayName,
-    })),
+    performed: [
+      ...done.map((item) =>
+        performedEntry(item, item.completedAt ?? item.services[0]?.performedAt ?? item.updatedAt, item.plan.professional),
+      ),
+      ...services.map((service) => performedEntry(service, service.performedAt, service.professional)),
+    ].sort((a, b) => b.date.localeCompare(a.date)),
   }
 }
 

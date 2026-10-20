@@ -29,7 +29,7 @@ export function fullName(patient: Pick<Patient, 'lastName' | 'firstName'>): stri
   return `${patient.lastName}, ${patient.firstName}`
 }
 
-const pad = (value: number) => String(value).padStart(2, '0')
+export const pad = (value: number) => String(value).padStart(2, '0')
 
 export function formatTime(iso: string): string {
   return toTimeText(new Date(iso))
@@ -42,6 +42,15 @@ export function formatDateTime(iso: string): string {
 
 export function toDateText(date: Date): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`
+}
+
+export function toIsoDay(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+export function shiftIsoDay(isoDay: string, days: number): string {
+  const [year, month, day] = isoDay.split('-').map(Number) as [number, number, number]
+  return toIsoDay(new Date(year, month - 1, day + days))
 }
 
 export function toTimeText(date: Date): string {
@@ -77,6 +86,6 @@ export function parseDateTimeText(dateText: string, timeText: string): Date | nu
   return new Date(year, month - 1, day, Number(time[1]), Number(time[2]))
 }
 
-export function formatMoney(amount: string): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(amount))
+export function formatMoney(amount: string, currency: 'ARS' | 'USD' = 'ARS'): string {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency }).format(Number(amount))
 }
