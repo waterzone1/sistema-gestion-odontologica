@@ -157,7 +157,7 @@ test('archivar un paciente con turnos pendientes pide confirmarlo y los cancela'
   const admin = await apiLogin(ADMIN_USERNAME, ADMIN_PASSWORD)
   const profesionales = (await (await admin.get('/api/professionals')).json()) as { id: string; displayName: string }[]
   const sedes = (await (await admin.get('/api/branches')).json()) as { id: string }[]
-  const paciente = (await (await admin.post('/api/patients', { firstName: 'Lara', lastName: 'Díaz', documentNumber: '35111222' })).json()) as { id: string }
+  const paciente = (await (await admin.post('/api/patients', { firstName: 'Lara', lastName: 'Díaz', documentNumber: '35111222', birthDate: '1988-02-14' })).json()) as { id: string }
   const inicio = manana(15)
   const turno = await admin.post('/api/appointments', {
     patientId: paciente.id,

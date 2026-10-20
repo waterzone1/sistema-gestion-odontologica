@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayRange, isEditable, STATUS_LABELS } from '@/lib/appointments'
+import { canReactivate, closureText, dayRange, isEditable, STATUS_LABELS } from '@/lib/appointments'
 import {
   formatMoney,
   formatTime,
@@ -85,5 +85,27 @@ describe('visibleBranches', () => {
 
   it('el resto solo ve las suyas', () => {
     expect(visibleBranches({ roles: ['RECEPTIONIST'], branchIds: ['b', 'c'] }, sedes).map((s) => s.id)).toEqual(['b'])
+  })
+})
+
+describe('cierre y reactivacion de turnos', () => {
+  it('solo se reactivan cancelados o ausentes', () => {
+    expect(canReactivate({ status: 'CANCELLED' })).toBe(true)
+    expect(canReactivate({ status: 'NO_SHOW' })).toBe(true)
+    expect(canReactivate({ status: 'ATTENDED' })).toBe(false)
+  })
+
+  it('describe como se cerro un turno atendido', () => {
+    expect(closureText({ billing: 'NOT_APPLICABLE', closure: null })).toBeNull()
+    expect(closureText({ billing: 'PENDING', closure: null })).toBe('Falta registrar la prestación o cerrar el turno')
+    expect(
+      closureText({
+        billing: 'TREATMENT_SESSION',
+        closure: { reason: null, treatmentItem: { id: 'i', practice: 'Implante' }, closedAt: '2026-10-20T10:00:00.000Z' },
+      }),
+    ).toBe('Sesión de tratamiento: Implante')
+    expect(
+      closureText({ billing: 'NO_CHARGE', closure: { reason: 'Control', treatmentItem: null, closedAt: '2026-10-20T10:00:00.000Z' } }),
+    ).toBe('Sin cargo: Control')
   })
 })

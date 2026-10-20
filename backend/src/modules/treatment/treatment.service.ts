@@ -12,7 +12,10 @@ import type { AddItemInput, CreatePlanInput, TreatmentPlanDto } from './treatmen
 const include = {
   professional: { select: { id: true, user: { select: { displayName: true } } } },
   items: {
-    include: { practice: { select: { id: true, code: true, name: true, basePrice: true } } },
+    include: {
+      practice: { select: { id: true, code: true, name: true, basePrice: true } },
+      services: { where: { voidedAt: null }, select: { id: true } },
+    },
     orderBy: { createdAt: 'asc' },
   },
 } satisfies Prisma.TreatmentPlanInclude
@@ -46,6 +49,8 @@ function toDto(plan: PlanRecord, actor: AuthContext): TreatmentPlanDto {
       priced: item.agreedPrice !== null,
       status: item.status,
       cancelReason: item.cancelReason,
+      completedAt: item.completedAt?.toISOString() ?? null,
+      billed: item.services.length > 0,
     })),
   }
 }
@@ -181,6 +186,24 @@ export async function startItem(db: Db, actor: AuthContext, patientId: string, p
     const item = findItemOrFail(plan, itemId)
     if (item.status !== 'PLANNED') throw new AppError(409, 'ITEM_NOT_PLANNED', 'Solo se inicia un ítem pendiente')
     await tx.treatmentItem.update({ where: { id: itemId }, data: { status: 'IN_PROGRESS' } })
+    return reload(tx, actor, patientId, planId)
+  })
+}
+
+export async function completeItem(db: Db, actor: AuthContext, patientId: string, planId: string, itemId: string) {
+  return db.$transaction(async (tx) => {
+    await writableProfile(tx, actor, patientId)
+    const plan = await findPlanOrFail(tx, actor, patientId, planId)
+    const item = findItemOrFail(plan, itemId)
+    if (!(ACTIVE_ITEM as readonly string[]).includes(item.status)) {
+      throw new AppError(409, 'ITEM_CLOSED', 'El ítem ya está terminado o cancelado')
+    }
+    await tx.treatmentItem.update({
+      where: { id: itemId },
+      data: { status: 'COMPLETED', completedAt: new Date(), completedById: actor.userId },
+    })
+    await syncPlanStatus(tx, planId)
+    await audit(tx, actor, { action: 'TREATMENT_ITEM_COMPLETED', entityType: 'TreatmentItem', entityId: itemId, metadata: { planId } })
     return reload(tx, actor, patientId, planId)
   })
 }

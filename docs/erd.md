@@ -1,6 +1,6 @@
 # Modelo de datos (ERD)
 
-Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException`, `ProfessionalPractice`, `ClinicalProfile`, `ClinicalFile`, `ToothFinding`, `TreatmentPlan` y `TreatmentItem`.
+Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException`, `ProfessionalPractice`, `ClinicalProfile`, `ClinicalFile`, `ToothFinding`, `TreatmentPlan`, `TreatmentItem`, `PatientNote` y `ExchangeRate`.
 
 ```mermaid
 erDiagram
@@ -59,6 +59,10 @@ erDiagram
   Appointment |o--o{ PerformedService : "durante"
   PatientCoverage |o--o{ PerformedService : "factura a"
 
+  Patient ||--o{ PatientNote : "tiene mensajes"
+  User ||--o{ PatientNote : "escribe"
+  TreatmentItem |o--o{ Appointment : "cierra como sesion"
+  Organization ||--o{ ExchangeRate : "cotiza"
   Patient ||--o{ Payment : "paga"
   User ||--o{ Payment : "recibe"
   Payment ||--o{ PaymentAllocation : "se imputa"
@@ -291,6 +295,9 @@ erDiagram
 - **Historia clínica:** las entradas no se modifican ni se borran. Una corrección es una entrada nueva que referencia a la original (`correctionOfId`).
 - **Odontograma:** `ToothEvent` guarda solo la condición existente de cada pieza, como eventos. El estado actual es el último evento por pieza y superficie. Lo planificado sale de `TreatmentItem` y lo realizado de `PerformedService`.
 - **Prestaciones:** los importes (`totalPrice`, `coverageAmount`, `patientAmount`) se congelan al registrar la prestación. El estado de pago no se guarda: se deriva de las imputaciones. Se anulan con `voidedAt`, nunca se borran.
+- **Moneda:** la deuda se lleva en pesos. Un pago en dólares guarda el monto original, la cotización vigente y el equivalente en pesos, que es lo que se imputa; una constraint verifica que los tres cierren. Las cotizaciones (`ExchangeRate`) son de solo agregado: la vigente es la última.
+- **Cierre de turnos:** un turno atendido queda pendiente hasta tener una prestación vigente o un cierre explícito (sesión de un ítem del plan o sin cargo con motivo). El estado se deriva; el cierre se guarda en el turno.
+- **Mensajes sobre el paciente:** `PatientNote` es de solo agregado salvo el archivado, y no lleva información clínica.
 - **Cobros:** el saldo del paciente es la suma de importes a cargo del paciente menos los pagos activos. Un pago puede quedar parcialmente sin imputar (saldo a favor). Se anula con motivo, no se borra.
 - **Coberturas:** `PatientCoverage` conserva el historial y admite una sola cobertura principal activa. Los convenios de un mismo plan no pueden tener vigencias superpuestas.
 - **Liquidaciones:** los totales reclamado y aprobado se derivan de los ítems. Una prestación pertenece a una sola liquidación activa; un ítem rechazado puede volver a presentarse.

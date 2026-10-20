@@ -22,24 +22,29 @@ async function abrirFichaDeRossi(page: Page) {
   await page.getByRole('link', { name: 'Rossi, Luca' }).click()
 }
 
-test('el odontólogo registra una prestación sin ver importes', async ({ page }) => {
-  await ingresar(page, ODONTOLOGO)
+test('recepción registra la prestación y el odontólogo la ve sin importes', async ({ page }) => {
+  await ingresar(page, RECEPCION)
   await abrirFichaDeRossi(page)
-  await expect(page.getByRole('tab', { name: 'Cuenta' })).toHaveCount(0)
-
   await page.getByRole('tab', { name: 'Prestaciones' }).click()
   await expect(page.getByText('Todavía no tiene prestaciones registradas')).toBeVisible()
   await page.getByRole('button', { name: 'Registrar prestación' }).click()
   const dialogo = page.getByRole('dialog')
   await dialogo.getByLabel('Práctica realizada').selectOption({ label: 'Consulta' })
-  await expect(dialogo.getByLabel('Precio')).toHaveCount(0)
+  await dialogo.getByLabel('Profesional que la realizó').selectOption({ label: ODONTOLOGO.displayName })
   await dialogo.getByRole('button', { name: 'Registrar' }).click()
+  await expect(page.getByRole('region', { name: 'Prestaciones realizadas' }).getByText('Consulta · $ 10.000,00')).toBeVisible()
 
+  await page.getByRole('button', { name: 'Cerrar sesión' }).click()
+  await ingresar(page, ODONTOLOGO)
+  await abrirFichaDeRossi(page)
+  await expect(page.getByRole('tab', { name: 'Cuenta' })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Prestaciones' }).click()
   const lista = page.getByRole('region', { name: 'Prestaciones realizadas' })
   await expect(lista.getByText('Consulta', { exact: true })).toBeVisible()
   await expect(lista.getByText(ODONTOLOGO.displayName, { exact: false })).toBeVisible()
   await expect(lista.getByText('$')).toHaveCount(0)
-  await page.screenshot({ path: captura('20-prestacion-odontologo'), fullPage: true })
+  await expect(page.getByRole('button', { name: 'Registrar prestación' })).toHaveCount(0)
+  await page.screenshot({ path: captura('20-prestaciones-odontologo'), fullPage: true })
 })
 
 test('recepción ajusta el precio y cobra con dos medios de pago', async ({ page }) => {
@@ -72,7 +77,7 @@ test('recepción ajusta el precio y cobra con dos medios de pago', async ({ page
   await cobro.getByLabel('Importe').nth(1).fill('1000,50')
   await cobro.getByLabel('Medio de pago', { exact: true }).nth(1).selectOption({ label: 'Mercado Pago' })
   await cobro.getByLabel('Referencia (opcional)').fill('MP-0001')
-  await expect(cobro.getByText('Total del cobro: $ 4.000,50')).toBeVisible()
+  await expect(cobro.getByText('Total del cobro en pesos: $ 4.000,50')).toBeVisible()
   await page.screenshot({ path: captura('23-registrar-pago') })
   await cobro.getByRole('button', { name: 'Registrar pago' }).click()
 

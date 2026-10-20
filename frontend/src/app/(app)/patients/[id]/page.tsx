@@ -143,7 +143,7 @@ export default function PatientPage() {
             canPlan={can(user, 'treatment:write')}
             canPrice={can(user, 'treatment:price')}
             canCancel={can(user, 'treatment:cancel')}
-            canPerform={can(user, 'services:write') && can(user, 'treatment:write')}
+            canBill={can(user, 'services:write')}
             archived={data.archivedAt !== null}
           />
         )}

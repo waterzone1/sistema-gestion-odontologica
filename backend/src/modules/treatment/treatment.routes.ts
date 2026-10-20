@@ -37,6 +37,11 @@ export function treatmentRouter(db: Db): Router {
     res.json(await treatment.startItem(db, authOf(req), patientId, planId, itemId))
   })
 
+  router.post('/:planId/items/:itemId/complete', write, async (req: Request, res: Response) => {
+    const { patientId, planId, itemId } = itemParamsSchema.parse(req.params)
+    res.json(await treatment.completeItem(db, authOf(req), patientId, planId, itemId))
+  })
+
   router.put('/:planId/items/:itemId/price', price, async (req: Request, res: Response) => {
     const { patientId, planId, itemId } = itemParamsSchema.parse(req.params)
     const input = priceItemSchema.parse(req.body)

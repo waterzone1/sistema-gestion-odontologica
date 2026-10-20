@@ -207,6 +207,7 @@ async function main() {
                 organizationId: organization.id,
                 patientId: patient.id,
                 amount,
+                originalAmount: amount,
                 method: pick(['CASH', 'TRANSFER', 'CARD', 'MERCADOPAGO'] as const, random),
                 receivedAt: endsAt,
                 createdById: admin.id,

@@ -11,6 +11,11 @@ export function fromCents(cents: number): string {
   return `${sign}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`
 }
 
+export function convertCents(originalCents: number, rateCents: number): number {
+  const product = BigInt(originalCents) * BigInt(rateCents)
+  return Number((product + 50n) / 100n)
+}
+
 export interface PendingService {
   id: string
   pendingCents: number

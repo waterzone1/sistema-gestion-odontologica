@@ -132,17 +132,21 @@ describe('plan de tratamiento', () => {
 })
 
 describe('prestacion desde un item del plan', () => {
-  it('toma el precio acordado, la pieza y completa el item y el plan', async () => {
+  const servicios = () => `/api/patients/${pacienteId}/services`
+  const perfil = () => db.professionalProfile.findFirstOrThrow()
+  const pendientes = async () =>
+    ((await as(app, recepcion).get('/api/billing/pending').expect(200)).body as { items: { id: string }[] }).items.map(
+      (i) => i.id,
+    )
+
+  it('el odontologo marca realizado y recepcion registra la prestacion con el precio acordado', async () => {
     const plan = await cotizarYAceptar(await planConItems(), ['90000', '170000'])
     const [primero, segundo] = plan.items
-    const res = await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, { treatmentItemId: primero?.id })
-    expect(res.status).toBe(201)
-    expect(res.body).toMatchObject({ tooth: 46, treatmentItemId: primero?.id, price: null, practice: { code: 'END' } })
-    const servicios = (await as(app, recepcion).get(`/api/patients/${pacienteId}/services`)).body as {
-      price: string
-      tooth: number | null
-    }[]
-    expect(servicios[0]).toMatchObject({ price: '90000.00', tooth: null })
+    const marcado = await as(app, odontologo).post(`${planes()}/${plan.id}/items/${primero?.id}/complete`).expect(200)
+    const item = (marcado.body as Plan).items[0] as Item & { billed: boolean; completedAt: string | null }
+    expect(item).toMatchObject({ status: 'COMPLETED', billed: false })
+    expect(item.completedAt).not.toBeNull()
+    expect(await db.performedService.count()).toBe(0)
 
     const odontograma = (await as(app, odontologo).get(`/api/patients/${pacienteId}/odontogram`)).body as {
       planned: { practice: string }[]
@@ -150,39 +154,63 @@ describe('prestacion desde un item del plan', () => {
     }
     expect(odontograma.planned.map((p) => p.practice)).toEqual(['Corona'])
     expect(odontograma.performed).toMatchObject([{ practice: 'Endodoncia', tooth: 46 }])
+    expect(await pendientes()).toEqual([primero?.id])
 
-    await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, { treatmentItemId: segundo?.id }).expect(201)
+    const sinPermiso = await as(app, odontologo).post(servicios(), { treatmentItemId: primero?.id })
+    expect(sinPermiso.status).toBe(403)
+
+    const { id: perfilId } = await perfil()
+    const res = await as(app, recepcion).post(servicios(), { treatmentItemId: primero?.id, professionalId: perfilId })
+    expect(res.status).toBe(201)
+    expect(res.body).toMatchObject({ treatmentItemId: primero?.id, price: '90000.00', tooth: null, practice: { code: 'END' } })
+    expect(await pendientes()).toEqual([])
+
+    await as(app, recepcion).post(servicios(), { treatmentItemId: segundo?.id, professionalId: perfilId }).expect(201)
     const [completo] = (await as(app, recepcion).get(planes())).body as Plan[]
     expect(completo?.status).toBe('COMPLETED')
-    const repetido = await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, { treatmentItemId: segundo?.id })
+    const repetido = await as(app, recepcion).post(servicios(), { treatmentItemId: segundo?.id, professionalId: perfilId })
     expect(codigo(repetido)).toBe('ITEM_CLOSED')
   })
 
-  it('anular la prestacion devuelve el item a pendiente', async () => {
+  it('anular la prestacion devuelve el item a pendiente, salvo que el odontologo lo haya marcado realizado', async () => {
     const plan = await cotizarYAceptar(await planConItems(), ['90000', '170000'])
-    const servicio = (await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, { treatmentItemId: plan.items[0]?.id }))
-      .body as { id: string }
-    await as(app, recepcion).post(`/api/patients/${pacienteId}/services/${servicio.id}/void`, { reason: 'Error de carga' }).expect(200)
+    const [primero, segundo] = plan.items
+    const { id: perfilId } = await perfil()
+    await as(app, odontologo).post(`${planes()}/${plan.id}/items/${primero?.id}/complete`).expect(200)
+    const anular = async (itemId: string | undefined) => {
+      const servicio = (await as(app, recepcion).post(servicios(), { treatmentItemId: itemId, professionalId: perfilId }))
+        .body as { id: string }
+      await as(app, recepcion).post(`${servicios()}/${servicio.id}/void`, { reason: 'Error de carga' }).expect(200)
+    }
+    await anular(primero?.id)
+    await anular(segundo?.id)
     const [final] = (await as(app, recepcion).get(planes())).body as Plan[]
-    expect(final?.items[0]?.status).toBe('PLANNED')
+    expect(final?.items.map((i) => i.status)).toEqual(['COMPLETED', 'PLANNED'])
     expect(final?.status).toBe('ACCEPTED')
+    expect(await pendientes()).toEqual([primero?.id])
   })
 
-  it('solo el odontologo registra la pieza tratada en una prestacion suelta', async () => {
-    const perfil = await db.professionalProfile.findFirstOrThrow()
-    const deRecepcion = await as(app, recepcion).post(`/api/patients/${pacienteId}/services`, {
-      practiceId: corona.id,
-      professionalId: perfil.id,
-      tooth: 21,
-    })
+  it('el odontologo no marca realizado un item cancelado ni ya realizado', async () => {
+    const plan = await planConItems()
+    const [primero, segundo] = plan.items
+    await as(app, recepcion).post(`${planes()}/${plan.id}/items/${primero?.id}/cancel`, { reason: 'No quiere' }).expect(200)
+    const cancelado = await as(app, odontologo).post(`${planes()}/${plan.id}/items/${primero?.id}/complete`)
+    expect(codigo(cancelado)).toBe('ITEM_CLOSED')
+    await as(app, odontologo).post(`${planes()}/${plan.id}/items/${segundo?.id}/complete`).expect(200)
+    const repetido = await as(app, odontologo).post(`${planes()}/${plan.id}/items/${segundo?.id}/complete`)
+    expect(codigo(repetido)).toBe('ITEM_CLOSED')
+    expect((await as(app, recepcion).post(`${planes()}/${plan.id}/items/${segundo?.id}/complete`)).status).toBe(403)
+  })
+
+  it('solo quien tambien es odontologo registra la pieza tratada en una prestacion suelta', async () => {
+    const { id: perfilId, userId } = await perfil()
+    const deRecepcion = await as(app, recepcion).post(servicios(), { practiceId: corona.id, professionalId: perfilId, tooth: 21 })
     expect(deRecepcion.status).toBe(403)
-    const conPieza = await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, {
-      practiceId: corona.id,
-      tooth: 21,
-      surfaces: [],
-    })
+    await db.userRole.create({ data: { userId, role: 'ADMIN' } })
+    const mixto = await loginAs(app, 'odontologo')
+    const conPieza = await as(app, mixto).post(servicios(), { practiceId: corona.id, tooth: 21, surfaces: [] })
     expect(conPieza.body).toMatchObject({ tooth: 21 })
-    const invalida = await as(app, odontologo).post(`/api/patients/${pacienteId}/services`, { practiceId: corona.id, tooth: 9 })
+    const invalida = await as(app, mixto).post(servicios(), { practiceId: corona.id, tooth: 9 })
     expect(codigo(invalida)).toBe('INVALID_TOOTH')
   })
 })

@@ -74,3 +74,13 @@ export function debtorsRouter(db: Db): Router {
 
   return router
 }
+
+export function pendingBillingRouter(db: Db): Router {
+  const router = Router()
+
+  router.get('/', requirePermission('services:write'), async (req: Request, res: Response) => {
+    res.json(await billing.listPendingBilling(db, authOf(req)))
+  })
+
+  return router
+}

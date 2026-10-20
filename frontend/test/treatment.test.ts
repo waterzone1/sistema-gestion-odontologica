@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isOpenItem, itemLocation, ITEM_STATUS_LABELS, TOOTH_OPTIONS } from '@/lib/treatment'
+import { isBillableItem, isOpenItem, itemLocation, itemStatusText, ITEM_STATUS_LABELS, TOOTH_OPTIONS } from '@/lib/treatment'
 
 describe('plan de tratamiento', () => {
   it('ofrece las 52 piezas FDI ordenadas', () => {
@@ -19,5 +19,14 @@ describe('plan de tratamiento', () => {
     expect(isOpenItem({ status: 'IN_PROGRESS' })).toBe(true)
     expect(isOpenItem({ status: 'COMPLETED' })).toBe(false)
     expect(ITEM_STATUS_LABELS.COMPLETED).toBe('Realizado')
+  })
+
+  it('un realizado sin prestacion queda para registrar, y solo recepcion lo ve asi', () => {
+    expect(isBillableItem({ status: 'COMPLETED', billed: false })).toBe(true)
+    expect(isBillableItem({ status: 'PLANNED', billed: false })).toBe(true)
+    expect(isBillableItem({ status: 'COMPLETED', billed: true })).toBe(false)
+    expect(isBillableItem({ status: 'CANCELLED', billed: false })).toBe(false)
+    expect(itemStatusText({ status: 'COMPLETED', billed: false }, true)).toBe('Realizado · falta registrar la prestación')
+    expect(itemStatusText({ status: 'COMPLETED', billed: false }, false)).toBe('Realizado')
   })
 })

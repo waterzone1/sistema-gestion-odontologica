@@ -5,6 +5,7 @@ import { isUniqueViolation } from '../../shared/prismaErrors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { documentProblem } from './domain/document.js'
+import { patientName } from './domain/name.js'
 import { buildSearchText, escapeLike, searchTokens } from './domain/search.js'
 import type {
   CreatePatientInput,
@@ -46,9 +47,8 @@ function assertDocument(type: PatientRecord['documentType'], number: string | nu
   if (problem) throw new AppError(422, 'INVALID_DOCUMENT', problem)
 }
 
-function toDate(value: string | null | undefined): Date | null | undefined {
-  if (value === undefined) return undefined
-  return value === null ? null : new Date(`${value}T00:00:00.000Z`)
+function toDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`)
 }
 
 async function duplicateError(
@@ -62,7 +62,7 @@ async function duplicateError(
   })
   return new AppError(409, 'DUPLICATE_PATIENT', 'Ya existe un paciente con ese documento', {
     patientId: existing?.id ?? null,
-    fullName: existing ? `${existing.lastName}, ${existing.firstName}` : null,
+    fullName: existing ? patientName(existing) : null,
     archived: existing ? existing.archivedAt !== null : false,
   })
 }
@@ -95,7 +95,7 @@ export async function createPatient(
   actor: AuthContext,
   input: CreatePatientInput,
 ): Promise<PatientDto> {
-  const documentNumber = input.documentNumber ?? null
+  const documentNumber = input.documentNumber
   assertDocument(input.documentType, documentNumber)
   const phone = input.phone ?? null
 
@@ -108,7 +108,7 @@ export async function createPatient(
           lastName: input.lastName,
           documentType: input.documentType,
           documentNumber,
-          birthDate: toDate(input.birthDate) ?? null,
+          birthDate: toDate(input.birthDate),
           phone,
           email: input.email ?? null,
           address: input.address ?? null,

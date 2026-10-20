@@ -3,7 +3,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useState } from 'react'
+import { ClosePanel } from '@/components/appointments/close-panel'
 import { RegisterServicePanel } from '@/components/appointments/register-service-panel'
+import { PatientNotesInline } from '@/components/patients/patient-notes'
 import { FormError } from '@/components/form-error'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -11,10 +13,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { appointmentsKey } from '@/hooks/use-appointments'
+import { appointmentsKey, useReactivateAppointment } from '@/hooks/use-appointments'
 import { useSession } from '@/hooks/use-session'
-import { api, type Appointment, type AppointmentStatus } from '@/lib/api'
-import { isEditable, STATUS_LABELS, STATUS_VARIANT } from '@/lib/appointments'
+import { api, ApiError, type Appointment, type AppointmentStatus } from '@/lib/api'
+import { canReactivate, closureText, isEditable, STATUS_LABELS, STATUS_VARIANT } from '@/lib/appointments'
 import { formatDateTime, formatTime } from '@/lib/format'
 import { can } from '@/lib/permissions'
 
@@ -32,6 +34,7 @@ export function AppointmentDialog({ appointment, onOpenChange, canManage, canAtt
       {appointment && (
         <DialogContent title="Turno" description={formatDateTime(appointment.startsAt)}>
           <Detail
+            key={appointment.id}
             appointment={appointment}
             canManage={canManage}
             canAttend={canAttend}
@@ -45,7 +48,7 @@ export function AppointmentDialog({ appointment, onOpenChange, canManage, canAtt
 }
 
 function Detail({
-  appointment,
+  appointment: initial,
   canManage,
   canAttend,
   onEdit,
@@ -58,13 +61,18 @@ function Detail({
   onClose: () => void
 }) {
   const client = useQueryClient()
+  const [appointment, setAppointment] = useState(initial)
   const [cancelling, setCancelling] = useState(false)
   const [reason, setReason] = useState('')
   const [early, setEarly] = useState<'ATTENDED' | 'NO_SHOW' | null>(null)
-  const [registering, setRegistering] = useState(false)
+  const [closing, setClosing] = useState<'service' | 'session' | 'free' | null>(null)
   const [registered, setRegistered] = useState(false)
   const session = useSession()
-  const canRegister = can(session.data?.user, 'services:write') && appointment.status === 'ATTENDED'
+  const canRegister = can(session.data?.user, 'services:write') && appointment.billing === 'PENDING'
+  const reactivate = useReactivateAppointment(appointment.id)
+  const reactivateWarnings =
+    reactivate.error instanceof ApiError && reactivate.error.code === 'SCHEDULE_WARNINGS' ? reactivate.error.message : null
+  const closure = closureText(appointment)
 
   const change = useMutation({
     mutationFn: (body: { status: AppointmentStatus; cancellationReason?: string }) =>
@@ -101,25 +109,75 @@ function Detail({
         <Item label="Práctica">{appointment.practice?.name ?? '—'}</Item>
         <Item label="Notas">{appointment.notes ?? '—'}</Item>
         {appointment.cancellationReason && <Item label="Motivo de cancelación">{appointment.cancellationReason}</Item>}
+        {closure && <Item label="Cierre">{closure}</Item>}
       </dl>
 
-      <FormError error={change.error} />
-      {registered && <Alert variant="info">Prestación registrada.</Alert>}
+      <PatientNotesInline patientId={appointment.patient.id} />
 
-      {registering ? (
+      <FormError error={change.error} />
+      {registered && <Alert variant="info">Turno cerrado.</Alert>}
+
+      {closing === 'service' ? (
         <RegisterServicePanel
           appointment={appointment}
           onDone={() => {
-            setRegistering(false)
+            setClosing(null)
             setRegistered(true)
+            setAppointment((current) => ({ ...current, billing: 'SERVICE' }))
           }}
-          onCancel={() => setRegistering(false)}
+          onCancel={() => setClosing(null)}
         />
-      ) : canRegister ? (
-        <div className="border-t pt-4">
-          <Button className="w-full" onClick={() => setRegistering(true)}>
-            Registrar prestación
-          </Button>
+      ) : closing ? (
+        <ClosePanel
+          appointment={appointment}
+          kind={closing === 'session' ? 'TREATMENT_SESSION' : 'NO_CHARGE'}
+          onDone={(updated) => {
+            setClosing(null)
+            setRegistered(true)
+            setAppointment(updated)
+          }}
+          onCancel={() => setClosing(null)}
+        />
+      ) : canRegister && !registered ? (
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-sm text-muted-foreground">¿Cómo se cierra este turno?</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button className="w-full" onClick={() => setClosing('service')}>
+              Registrar prestación
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setClosing('session')}>
+              Sesión de tratamiento
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setClosing('free')}>
+              Sin cargo
+            </Button>
+          </div>
+        </div>
+      ) : canManage && canReactivate(appointment) ? (
+        <div className="space-y-2 border-t pt-4">
+          <FormError error={reactivateWarnings ? null : reactivate.error} />
+          {reactivateWarnings ? (
+            <div role="alert" className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+              <p>{reactivateWarnings}. ¿Lo reactivás igual?</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => reactivate.reset()} disabled={reactivate.isPending}>
+                  Volver
+                </Button>
+                <Button size="sm" disabled={reactivate.isPending} onClick={() => reactivate.mutate(true, { onSuccess: onClose })}>
+                  Reactivar igual
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={reactivate.isPending}
+              onClick={() => reactivate.mutate(false, { onSuccess: onClose })}
+            >
+              Reactivar turno
+            </Button>
+          )}
         </div>
       ) : early ? (
         <div role="alert" className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">

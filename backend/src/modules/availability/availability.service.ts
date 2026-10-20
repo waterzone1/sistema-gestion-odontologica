@@ -3,6 +3,7 @@ import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
+import { patientName } from '../patients/domain/name.js'
 import { checkAvailability, expandRules, rulesProblem, type AvailabilityResult, type Rule } from './domain/availability.js'
 import type {
   AgendaAvailabilityDto,
@@ -167,7 +168,7 @@ export async function createException(
       conflicts: conflicts.map((a) => ({
         id: a.id,
         startsAt: a.startsAt.toISOString(),
-        patient: `${a.patient.lastName}, ${a.patient.firstName}`,
+        patient: patientName(a.patient),
       })),
     }
   })
