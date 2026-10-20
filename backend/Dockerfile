@@ -31,7 +31,7 @@ COPY --from=build /app/dist ./dist
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 
-RUN mkdir -p /app/data/files && chown -R node:node /app/data
+RUN mkdir -p /app/data/files /app/backups && chown -R node:node /app/data /app/backups
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \

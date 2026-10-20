@@ -7,6 +7,7 @@ import { useClinicalEntries } from '@/hooks/use-clinical'
 import type { Patient, SessionUser } from '@/lib/api'
 import { documentLabel, formatDate, formatDateTime, formatMoney } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { PatientCoverageCard } from './patient-coverage-card'
 import { PatientNotes } from './patient-notes'
 
 const YEAR_MS = 366 * 24 * 60 * 60 * 1000
@@ -20,6 +21,7 @@ export function PatientSummary({ patient, user }: Props) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <PatientNotes patientId={patient.id} canWrite={can(user, 'patient-notes:write') && patient.archivedAt === null} />
+      <PatientCoverageCard patientId={patient.id} canWrite={can(user, 'patients:write') && patient.archivedAt === null} />
       {can(user, 'appointments:read') && <NextAppointment patientId={patient.id} />}
       {can(user, 'account:read') && <Balance patientId={patient.id} />}
       {can(user, 'clinical:read') && <LastEvolution patientId={patient.id} />}

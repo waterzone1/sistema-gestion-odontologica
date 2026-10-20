@@ -4,7 +4,7 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { organizationTimeZone } from '../availability/availability.service.js'
-import { addDays, fromLocal } from '../availability/domain/availability.js'
+import { localDayRange } from '../availability/domain/availability.js'
 import { cents, creditFields, paymentFields } from '../billing/billing.mapping.js'
 import { fromCents, localDay, sum, toCents } from '../billing/domain/balance.js'
 import { patientName } from '../patients/domain/name.js'
@@ -65,7 +65,7 @@ export async function getCashDay(db: Db, actor: AuthContext, date: string | unde
   const timeZone = await organizationTimeZone(db, actor.organizationId)
   const day = date ?? localDay(new Date(), timeZone)
   if (day > localDay(new Date(), timeZone)) throw new AppError(422, 'FUTURE_DATE', 'La fecha no puede ser futura')
-  const range = { gte: fromLocal(day, 0, timeZone), lt: fromLocal(addDays(day, 1), 0, timeZone) }
+  const range = localDayRange(day, day, timeZone)
   const include = {
     patient: { select: { id: true, firstName: true, lastName: true } },
     createdBy: { select: { displayName: true } },
