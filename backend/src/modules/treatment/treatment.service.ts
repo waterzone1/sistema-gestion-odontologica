@@ -1,7 +1,7 @@
 import type { Prisma } from '../../generated/prisma/client.js'
 import type { Db } from '../../shared/db.js'
 import { AppError } from '../../shared/errors.js'
-import { recordAudit, type AuditEntry } from '../audit/audit.service.js'
+import { recordActorAudit as audit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { fromCents, toCents } from '../billing/domain/balance.js'
 import { findPatientOrFail, writableProfile } from '../clinical/clinical.access.js'
@@ -53,10 +53,6 @@ function toDto(plan: PlanRecord, actor: AuthContext): TreatmentPlanDto {
       billed: item.services.length > 0,
     })),
   }
-}
-
-async function audit(tx: Tx, actor: AuthContext, entry: Pick<AuditEntry, 'action' | 'entityType' | 'entityId' | 'metadata'>) {
-  await recordAudit(tx, { ...entry, organizationId: actor.organizationId, actorUserId: actor.userId })
 }
 
 async function findPlanOrFail(tx: Pick<Db, 'patient' | 'treatmentPlan'>, actor: AuthContext, patientId: string, planId: string) {

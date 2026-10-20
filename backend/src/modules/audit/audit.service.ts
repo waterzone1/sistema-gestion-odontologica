@@ -21,6 +21,20 @@ type AuditAction =
   | 'PATIENT_ARCHIVED'
   | 'APPOINTMENT_CLOSED'
   | 'EXCHANGE_RATE_SET'
+  | 'COVERAGE_SAVED'
+  | 'AGREEMENT_SAVED'
+  | 'PATIENT_COVERAGE_SAVED'
+  | 'PATIENT_COVERAGE_ARCHIVED'
+  | 'LIQUIDATION_CREATED'
+  | 'LIQUIDATION_SUBMITTED'
+  | 'LIQUIDATION_ITEM_RESOLVED'
+  | 'LIQUIDATION_PAID'
+  | 'LIQUIDATION_CANCELLED'
+  | 'LIQUIDATION_EXPORTED'
+  | 'BACKUP_STARTED'
+  | 'BACKUP_COMPLETED'
+  | 'BACKUP_FAILED'
+  | 'BACKUP_RESTORED'
   | 'TREATMENT_ITEM_COMPLETED'
   | 'PATIENT_NOTE_CREATED'
   | 'PATIENT_NOTE_ARCHIVED'
@@ -70,6 +84,14 @@ export interface AuditEntry {
 }
 
 type AuditClient = Pick<Db, 'auditLog'>
+
+export function recordActorAudit(
+  client: AuditClient,
+  actor: { organizationId: string; userId: string },
+  entry: Pick<AuditEntry, 'action' | 'entityType' | 'entityId' | 'metadata'>,
+): Promise<void> {
+  return recordAudit(client, { ...entry, organizationId: actor.organizationId, actorUserId: actor.userId })
+}
 
 export async function recordAudit(client: AuditClient, entry: AuditEntry): Promise<void> {
   await client.auditLog.create({

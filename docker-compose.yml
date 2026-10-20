@@ -29,8 +29,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       FILES_DIR: /app/data/files
       FILE_MAX_MB: ${FILE_MAX_MB:-20}
+      BACKUP_DIR: /app/backups
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
     volumes:
       - clinical_files:/app/data/files
+      - backups:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,5 +67,6 @@ services:
 volumes:
   pgdata:
   clinical_files:
+  backups:
   caddy_data:
   caddy_config:

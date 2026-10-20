@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { CoverageNotice, coverageInput, coverageReady, type CoverageChoice } from '@/components/billing/coverage-notice'
 import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Select } from '@/components/ui/input'
 import { useRecordService } from '@/hooks/use-billing'
 import { usePractices } from '@/hooks/use-catalog'
+import { useCoverageQuote } from '@/hooks/use-coverages'
 import { useTreatmentPlans } from '@/hooks/use-treatment'
 import type { Appointment } from '@/lib/api'
 import { isBillableItem, itemLocation } from '@/lib/treatment'
@@ -30,11 +32,16 @@ export function RegisterServicePanel({ appointment, onDone, onCancel }: Props) {
       : plan.items.filter(isBillableItem).map((item) => ({ item, plan })),
   )
 
+  const [coverage, setCoverage] = useState<CoverageChoice>({ apply: true, authorizationCode: '' })
+  const [kind, chosenId] = choice.split(':')
+  const practiceId = kind === 'item' ? openItems.find(({ item }) => item.id === chosenId)?.item.practice.id : chosenId
+  const quote = useCoverageQuote(patientId, practiceId ?? null)
+
   const submit = () => {
-    const [kind, id] = choice.split(':')
     record.mutate(
       {
-        ...(kind === 'item' ? { treatmentItemId: id } : { practiceId: id }),
+        ...(kind === 'item' ? { treatmentItemId: chosenId } : { practiceId: chosenId }),
+        ...coverageInput(quote.data, coverage),
         professionalId: appointment.professional.id,
         appointmentId: appointment.id,
       },
@@ -67,12 +74,13 @@ export function RegisterServicePanel({ appointment, onDone, onCancel }: Props) {
           </optgroup>
         </Select>
       </Field>
+      <CoverageNotice quote={quote.data} value={coverage} onChange={setCoverage} />
       <FormError error={record.error} />
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={onCancel} disabled={record.isPending}>
           Volver
         </Button>
-        <Button size="sm" disabled={!choice || record.isPending} onClick={submit}>
+        <Button size="sm" disabled={!choice || !coverageReady(quote.data, coverage) || record.isPending} onClick={submit}>
           Registrar prestación
         </Button>
       </div>
