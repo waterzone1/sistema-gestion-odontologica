@@ -15,6 +15,12 @@ export const ORIGIN = 'https://test.local'
 export const PASSWORD = 'Clave-de-prueba-1'
 export const SETUP_TOKEN = 'token-de-prueba'
 export const TEST_FILES = { dir: path.join(tmpdir(), `sgo-archivos-${process.pid}`), maxBytes: 64 * 1024 }
+export const TEST_BACKUPS = {
+  dir: path.join(tmpdir(), `sgo-backups-${process.pid}`),
+  filesDir: TEST_FILES.dir,
+  databaseUrl: process.env['TEST_DATABASE_URL'] ?? '',
+  pgBinDir: process.env['PG_BIN_DIR'],
+}
 
 const silentLogger = createLogger({ level: 'silent' })
 
@@ -41,6 +47,7 @@ export function buildApp(db: Db, overrides: Partial<AppDeps> = {}): Express {
     cookieSecure: false,
     loginRateLimit: { max: 1000, windowMs: 60_000 },
     files: TEST_FILES,
+    backups: TEST_BACKUPS,
     ...overrides,
   })
 }

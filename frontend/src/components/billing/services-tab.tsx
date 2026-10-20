@@ -2,6 +2,7 @@
 
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { CoverageNotice, coverageInput, coverageReady, type CoverageChoice } from '@/components/billing/coverage-notice'
 import { PriceField } from '@/components/billing/price-field'
 import { ReasonDialog } from '@/components/billing/reason-dialog'
 import { FormError } from '@/components/form-error'
@@ -14,6 +15,7 @@ import { Field } from '@/components/ui/field'
 import { Select } from '@/components/ui/input'
 import { useAdjustPrice, useRecordService, useServices, useVoid } from '@/hooks/use-billing'
 import { usePractices, useProfessionals } from '@/hooks/use-catalog'
+import { useCoverageQuote } from '@/hooks/use-coverages'
 import type { PerformedService } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
 import { formatDateTime, formatMoney } from '@/lib/format'
@@ -60,6 +62,13 @@ export function ServicesTab({ patientId, canRecord, canPrice, archived }: Props)
                     {service.practice.name}
                     {service.price && ` · ${formatMoney(service.price)}`}
                   </p>
+                  {service.coverage && (
+                    <p className="text-xs text-muted-foreground">
+                      {service.coverage.provider} {service.coverage.plan} · Afiliado {service.coverage.affiliateNumber}
+                      {service.coverageAmount && Number(service.coverageAmount) > 0 && ` · A cargo de la cobertura ${formatMoney(service.coverageAmount)}`}
+                      {service.authorizationCode && ` · Autorización ${service.authorizationCode}`}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {[
                       formatDateTime(service.performedAt),
@@ -170,10 +179,19 @@ function RecordServiceForm({ patientId, canPrice, onClose }: { patientId: string
   const record = useRecordService(patientId)
   const [practiceId, setPracticeId] = useState('')
   const [professionalId, setProfessionalId] = useState('')
-  const [price, setPrice] = useState('')
+  const [typedPrice, setTypedPrice] = useState<string | null>(null)
+  const [coverage, setCoverage] = useState<CoverageChoice>({ apply: true, authorizationCode: '' })
+  const quote = useCoverageQuote(patientId, practiceId || null)
 
   const practice = practices.data?.find((p) => p.id === practiceId)
-  const valid = practiceId !== '' && (!canPrice || (professionalId !== '' && isValidAmount(price)))
+  const covered = coverage.apply && quote.data?.patientCopay != null
+  const suggested = covered ? (quote.data?.patientCopay ?? '') : (practice?.basePrice ?? '')
+  const price = typedPrice ?? suggested
+  const sendPrice = isValidAmount(price) && !(covered && price === suggested)
+  const valid =
+    practiceId !== '' &&
+    coverageReady(quote.data, coverage) &&
+    (!canPrice || (professionalId !== '' && (isValidAmount(price) || (covered && price === suggested))))
 
   return (
     <div className="space-y-4">
@@ -183,8 +201,7 @@ function RecordServiceForm({ patientId, canPrice, onClose }: { patientId: string
           value={practiceId}
           onChange={(event) => {
             setPracticeId(event.target.value)
-            const selected = practices.data?.find((p) => p.id === event.target.value)
-            setPrice(selected ? selected.basePrice : '')
+            setTypedPrice(null)
           }}
         >
           <option value="">Elegí una práctica</option>
@@ -209,8 +226,19 @@ function RecordServiceForm({ patientId, canPrice, onClose }: { patientId: string
           </Select>
         </Field>
       )}
+      <CoverageNotice quote={quote.data} value={coverage} onChange={(value) => {
+        setCoverage(value)
+        setTypedPrice(null)
+      }} />
       {canPrice && practice && (
-        <PriceField id="service-price" value={price} onChange={setPrice} catalogPrice={practice.basePrice} />
+        <PriceField
+          id="service-price"
+          label={covered ? 'A cargo del paciente' : undefined}
+          reference={covered ? 'Coseguro del convenio' : undefined}
+          value={price}
+          onChange={setTypedPrice}
+          catalogPrice={suggested || practice.basePrice}
+        />
       )}
       <FormError error={record.error} />
       <DialogFooter>
@@ -221,7 +249,11 @@ function RecordServiceForm({ patientId, canPrice, onClose }: { patientId: string
           disabled={!valid || record.isPending}
           onClick={() =>
             record.mutate(
-              canPrice ? { practiceId, professionalId, price: normalizeAmount(price) } : { practiceId },
+              {
+                practiceId,
+                ...coverageInput(quote.data, coverage),
+                ...(canPrice ? { professionalId, ...(sendPrice ? { price: normalizeAmount(price) } : {}) } : {}),
+              },
               { onSuccess: onClose },
             )
           }

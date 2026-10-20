@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { createApp } from './app.js'
+import { startBackupScheduler } from './modules/backups/backups.scheduler.js'
 import { loadEnv } from './config/env.js'
 import type { Env } from './config/env.js'
 import { needsSetup } from './modules/organizations/setup.service.js'
@@ -18,6 +19,12 @@ try {
 const logger = createLogger({ level: env.LOG_LEVEL, pretty: env.NODE_ENV === 'development' })
 const db = createDb(env.DATABASE_URL)
 const setupTokens = createSetupTokenStore()
+const backups = {
+  dir: path.resolve(env.BACKUP_DIR),
+  filesDir: path.resolve(env.FILES_DIR),
+  databaseUrl: env.DATABASE_URL,
+  pgBinDir: env.PG_BIN_DIR,
+}
 
 const app = createApp({
   db,
@@ -26,7 +33,9 @@ const app = createApp({
   appOrigin: env.APP_ORIGIN,
   cookieSecure: env.NODE_ENV === 'production',
   files: { dir: path.resolve(env.FILES_DIR), maxBytes: env.FILE_MAX_MB * 1024 * 1024 },
+  backups,
 })
+const stopBackups = env.BACKUP_SCHEDULE === 'on' ? startBackupScheduler(db, backups, logger, env.BACKUP_HOUR) : () => undefined
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'servidor escuchando')
@@ -47,6 +56,7 @@ needsSetup(db)
 
 function shutdown(signal: string): void {
   logger.info({ signal }, 'cerrando servidor')
+  stopBackups()
   const forzar = setTimeout(() => process.exit(1), 10_000)
   forzar.unref()
   server.close(() => {

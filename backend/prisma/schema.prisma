@@ -15,12 +15,14 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  branches      Branch[]
-  users         User[]
-  patients      Patient[]
-  practices     Practice[]
-  appointments  Appointment[]
-  exchangeRates ExchangeRate[]
+  branches          Branch[]
+  users             User[]
+  patients          Patient[]
+  practices         Practice[]
+  appointments      Appointment[]
+  exchangeRates     ExchangeRate[]
+  coverageProviders CoverageProvider[]
+  liquidations      Liquidation[]
 }
 
 model Branch {
@@ -72,6 +74,7 @@ model User {
   creditApplications  CreditApplication[]  @relation("CreditApplicationCreatedBy")
   patientNotes        PatientNote[]        @relation("PatientNoteAuthor")
   exchangeRates       ExchangeRate[]
+  liquidations        Liquidation[]
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -150,6 +153,7 @@ model AuditLog {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([createdAt])
+  @@index([organizationId, createdAt])
   @@index([actorUserId])
   @@index([entityType, entityId])
 }
@@ -189,6 +193,7 @@ model Patient {
   toothFindings      ToothFinding[]
   treatmentPlans     TreatmentPlan[]
   notes              PatientNote[]
+  coverages          PatientCoverage[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -211,6 +216,7 @@ model Practice {
   services       PerformedService[]
   professionals  ProfessionalPractice[]
   treatmentItems TreatmentItem[]
+  agreementItems AgreementItem[]
 
   @@unique([organizationId, code])
 }
@@ -298,32 +304,38 @@ enum PaymentMethod {
 }
 
 model PerformedService {
-  id              String         @id @default(uuid(7)) @db.Uuid
-  organizationId  String         @db.Uuid
-  patientId       String         @db.Uuid
-  professionalId  String         @db.Uuid
-  practiceId      String         @db.Uuid
-  appointmentId   String?        @db.Uuid
-  treatmentItemId String?        @db.Uuid
-  tooth           Int?
-  surfaces        ToothSurface[]
-  price           Decimal        @db.Decimal(14, 2)
-  catalogPrice    Decimal        @db.Decimal(14, 2)
-  performedAt     DateTime       @db.Timestamptz(3)
-  createdById     String         @db.Uuid
-  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
-  voidedAt        DateTime?      @db.Timestamptz(3)
-  voidReason      String?
-  voidedById      String?        @db.Uuid
+  id                String         @id @default(uuid(7)) @db.Uuid
+  organizationId    String         @db.Uuid
+  patientId         String         @db.Uuid
+  professionalId    String         @db.Uuid
+  practiceId        String         @db.Uuid
+  appointmentId     String?        @db.Uuid
+  treatmentItemId   String?        @db.Uuid
+  tooth             Int?
+  surfaces          ToothSurface[]
+  price             Decimal        @db.Decimal(14, 2)
+  catalogPrice      Decimal        @db.Decimal(14, 2)
+  coverageAmount    Decimal        @default(0) @db.Decimal(14, 2)
+  patientCoverageId String?        @db.Uuid
+  authorizationCode String?
+  performedAt       DateTime       @db.Timestamptz(3)
+  createdById       String         @db.Uuid
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+  voidedAt          DateTime?      @db.Timestamptz(3)
+  voidReason        String?
+  voidedById        String?        @db.Uuid
 
-  patient       Patient             @relation(fields: [patientId], references: [id])
-  professional  ProfessionalProfile @relation(fields: [professionalId], references: [id])
-  practice      Practice            @relation(fields: [practiceId], references: [id])
-  appointment   Appointment?        @relation(fields: [appointmentId], references: [id])
-  allocations   PaymentAllocation[]
-  treatmentItem TreatmentItem?      @relation(fields: [treatmentItemId], references: [id], onDelete: Restrict)
+  patient          Patient             @relation(fields: [patientId], references: [id])
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id])
+  practice         Practice            @relation(fields: [practiceId], references: [id])
+  appointment      Appointment?        @relation(fields: [appointmentId], references: [id])
+  allocations      PaymentAllocation[]
+  treatmentItem    TreatmentItem?      @relation(fields: [treatmentItemId], references: [id], onDelete: Restrict)
+  patientCoverage  PatientCoverage?    @relation(fields: [patientCoverageId], references: [id], onDelete: Restrict)
+  liquidationItems LiquidationItem[]
 
   @@index([organizationId, patientId, performedAt])
+  @@index([patientCoverageId, performedAt])
   @@index([appointmentId])
   @@index([treatmentItemId])
 }
@@ -624,4 +636,145 @@ model ExchangeRate {
   setBy        User         @relation(fields: [setById], references: [id])
 
   @@index([organizationId, currency, createdAt])
+}
+
+enum CoverageKind {
+  OBRA_SOCIAL
+  PREPAGA
+  OTHER
+}
+
+model CoverageProvider {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  organizationId String       @db.Uuid
+  name           String
+  kind           CoverageKind
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  plans        CoveragePlan[]
+  liquidations Liquidation[]
+
+  @@unique([organizationId, name])
+}
+
+model CoveragePlan {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  providerId String   @db.Uuid
+  name       String
+  code       String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  provider         CoverageProvider  @relation(fields: [providerId], references: [id])
+  patientCoverages PatientCoverage[]
+  agreements       Agreement[]
+
+  @@unique([providerId, name])
+}
+
+model PatientCoverage {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  patientId       String    @db.Uuid
+  planId          String    @db.Uuid
+  affiliateNumber String
+  validFrom       DateTime  @db.Date
+  validTo         DateTime? @db.Date
+  notes           String?
+  primary         Boolean   @default(true)
+  archivedAt      DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  patient  Patient            @relation(fields: [patientId], references: [id])
+  plan     CoveragePlan       @relation(fields: [planId], references: [id])
+  services PerformedService[]
+
+  @@index([patientId])
+}
+
+model Agreement {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  planId    String    @db.Uuid
+  validFrom DateTime  @db.Date
+  validTo   DateTime? @db.Date
+  notes     String?
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  plan  CoveragePlan    @relation(fields: [planId], references: [id])
+  items AgreementItem[]
+
+  @@index([planId])
+}
+
+model AgreementItem {
+  id                    String  @id @default(uuid(7)) @db.Uuid
+  agreementId           String  @db.Uuid
+  practiceId            String  @db.Uuid
+  insurerAmount         Decimal @db.Decimal(14, 2)
+  patientCopay          Decimal @db.Decimal(14, 2)
+  requiresAuthorization Boolean @default(false)
+
+  agreement Agreement @relation(fields: [agreementId], references: [id])
+  practice  Practice  @relation(fields: [practiceId], references: [id])
+
+  @@unique([agreementId, practiceId])
+}
+
+enum LiquidationStatus {
+  DRAFT
+  SUBMITTED
+  PAID
+  CANCELLED
+}
+
+enum LiquidationItemStatus {
+  PENDING
+  APPROVED
+  DEBITED
+  REJECTED
+}
+
+model Liquidation {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  organizationId   String            @db.Uuid
+  providerId       String            @db.Uuid
+  periodFrom       DateTime          @db.Date
+  periodTo         DateTime          @db.Date
+  status           LiquidationStatus @default(DRAFT)
+  createdById      String            @db.Uuid
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  submittedAt      DateTime?         @db.Timestamptz(3)
+  paidAt           DateTime?         @db.Timestamptz(3)
+  paidAmount       Decimal?          @db.Decimal(14, 2)
+  paymentReference String?
+  cancelledAt      DateTime?         @db.Timestamptz(3)
+  cancelReason     String?
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  provider     CoverageProvider  @relation(fields: [providerId], references: [id])
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  items        LiquidationItem[]
+
+  @@index([organizationId, createdAt])
+}
+
+model LiquidationItem {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  liquidationId  String                @db.Uuid
+  serviceId      String                @db.Uuid
+  claimedAmount  Decimal               @db.Decimal(14, 2)
+  status         LiquidationItemStatus @default(PENDING)
+  approvedAmount Decimal?              @db.Decimal(14, 2)
+  reason         String?
+  active         Boolean               @default(true)
+
+  liquidation Liquidation      @relation(fields: [liquidationId], references: [id])
+  service     PerformedService @relation(fields: [serviceId], references: [id])
+
+  @@index([liquidationId])
+  @@index([serviceId])
 }

@@ -11,9 +11,11 @@ interface Props {
   value: string
   onChange: (value: string) => void
   catalogPrice: string
+  label?: string | undefined
+  reference?: string | undefined
 }
 
-export function PriceField({ id, value, onChange, catalogPrice }: Props) {
+export function PriceField({ id, value, onChange, catalogPrice, label = 'Precio', reference = 'Precio de catálogo' }: Props) {
   const invalid = value !== '' && !isValidAmount(value)
   const current = isValidAmount(value) ? Number(normalizeAmount(value)).toFixed(2) : null
   const preset = (percent: number) => {
@@ -34,9 +36,9 @@ export function PriceField({ id, value, onChange, catalogPrice }: Props) {
   }
   return (
     <Field
-      label="Precio"
+      label={label}
       htmlFor={id}
-      hint={`Precio de catálogo: ${formatMoney(catalogPrice)}. Los porcentajes se aplican sobre ese precio.`}
+      hint={`${reference}: ${formatMoney(catalogPrice)}. Los porcentajes se aplican sobre ese precio.`}
       error={invalid ? 'Ingresá un importe mayor a cero, con hasta 2 decimales' : undefined}
     >
       <Input
