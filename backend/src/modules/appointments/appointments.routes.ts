@@ -4,8 +4,10 @@ import type { Db } from '../../shared/db.js'
 import {
   appointmentIdParamsSchema,
   changeStatusSchema,
+  closeAppointmentSchema,
   createAppointmentSchema,
   listAppointmentsQuerySchema,
+  reactivateSchema,
   updateAppointmentSchema,
 } from './appointments.schemas.js'
 import * as appointments from './appointments.service.js'
@@ -15,6 +17,7 @@ export function appointmentsRouter(db: Db): Router {
   const read = requirePermission('appointments:read')
   const manage = requirePermission('appointments:manage')
   const attend = requirePermission('appointments:attend')
+  const bill = requirePermission('services:write')
 
   router.get('/', read, async (req: Request, res: Response) => {
     const query = listAppointmentsQuerySchema.parse(req.query)
@@ -41,6 +44,18 @@ export function appointmentsRouter(db: Db): Router {
     const { id } = appointmentIdParamsSchema.parse(req.params)
     const input = changeStatusSchema.parse(req.body)
     res.json(await appointments.changeAppointmentStatus(db, authOf(req), id, input))
+  })
+
+  router.post('/:id/reactivate', manage, async (req: Request, res: Response) => {
+    const { id } = appointmentIdParamsSchema.parse(req.params)
+    const input = reactivateSchema.parse(req.body ?? {})
+    res.json(await appointments.reactivateAppointment(db, authOf(req), id, input))
+  })
+
+  router.post('/:id/close', bill, async (req: Request, res: Response) => {
+    const { id } = appointmentIdParamsSchema.parse(req.params)
+    const input = closeAppointmentSchema.parse(req.body)
+    res.json(await appointments.closeAppointment(db, authOf(req), id, input))
   })
 
   return router

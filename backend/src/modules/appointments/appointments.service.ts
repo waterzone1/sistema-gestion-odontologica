@@ -5,18 +5,17 @@ import { isExclusionViolation } from '../../shared/prismaErrors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import { slotAvailability } from '../availability/availability.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
+import { patientName } from '../patients/domain/name.js'
 import { hasPermission } from '../users/domain/permissions.js'
-import {
-  canTransition,
-  isEditable,
-  type AppointmentStatus,
-} from './domain/status.js'
+import { billingState, canReactivate, canTransition, isEditable, type AppointmentStatus } from './domain/status.js'
 import { rangeProblem } from './domain/timeRange.js'
 import type {
   AppointmentDto,
   ChangeStatusInput,
+  CloseAppointmentInput,
   CreateAppointmentInput,
   ListAppointmentsQuery,
+  ReactivateInput,
   UpdateAppointmentInput,
 } from './appointments.schemas.js'
 
@@ -25,7 +24,8 @@ const include = {
   patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
   professional: { select: { id: true, user: { select: { id: true, displayName: true } } } },
   practice: { select: { id: true, code: true, name: true } },
-  _count: { select: { clinicalEntries: true } },
+  closureItem: { select: { id: true, practice: { select: { name: true } } } },
+  _count: { select: { clinicalEntries: true, services: { where: { voidedAt: null } } } },
 } as const
 
 type AppointmentRecord = Prisma.AppointmentGetPayload<{ include: typeof include }>
@@ -41,7 +41,7 @@ function toDto(appointment: AppointmentRecord, actor: AuthContext): AppointmentD
     branch: appointment.branch,
     patient: {
       id: appointment.patient.id,
-      fullName: `${appointment.patient.lastName}, ${appointment.patient.firstName}`,
+      fullName: patientName(appointment.patient),
       phone: appointment.patient.phone,
     },
     professional: {
@@ -53,6 +53,16 @@ function toDto(appointment: AppointmentRecord, actor: AuthContext): AppointmentD
     hasClinicalNote: hasPermission(actor.permissions, 'clinical:read') ? appointment._count.clinicalEntries > 0 : null,
     availabilityOverride: appointment.availabilityOverride,
     overrideReason: appointment.overrideReason,
+    billing: billingState(appointment.status, appointment._count.services, appointment.closureKind),
+    closure: appointment.closedAt
+      ? {
+          reason: appointment.closureReason,
+          treatmentItem: appointment.closureItem
+            ? { id: appointment.closureItem.id, practice: appointment.closureItem.practice.name }
+            : null,
+          closedAt: appointment.closedAt.toISOString(),
+        }
+      : null,
     createdAt: appointment.createdAt.toISOString(),
   }
 }
@@ -443,4 +453,133 @@ export async function changeAppointmentStatus(
     })
     return toDto(updated, actor)
   })
+}
+
+export async function reactivateAppointment(
+  db: Db,
+  actor: AuthContext,
+  id: string,
+  input: ReactivateInput,
+): Promise<AppointmentDto> {
+  let attempt: AppointmentRecord | null = null
+  try {
+    return await db.$transaction(async (tx) => {
+      const current = await findVisibleOrFail(tx, actor, id)
+      attempt = current
+      if (!canReactivate(current.status)) {
+        throw new AppError(409, 'INVALID_TRANSITION', 'Solo se reactivan turnos cancelados o ausentes')
+      }
+      assertBranchAccess(actor, current.branch.id)
+      await assertReferences(
+        tx,
+        actor,
+        {
+          patientId: current.patient.id,
+          branchId: current.branch.id,
+          professionalId: current.professional.id,
+          practiceId: current.practice?.id ?? null,
+        },
+        true,
+      )
+      const availability = await checkAvailability(tx, actor, {
+        professionalId: current.professional.id,
+        branchId: current.branch.id,
+        practiceId: current.practice?.id ?? null,
+        startsAt: current.startsAt,
+        endsAt: current.endsAt,
+        override: input.override,
+        acknowledgeWarnings: input.acknowledgeWarnings,
+      })
+      const updated = await tx.appointment.update({
+        where: { id },
+        data: { status: 'SCHEDULED', cancellationReason: null, ...availability.data },
+        include,
+      })
+      if (input.override) await auditOverride(tx, actor, id, current.branch.id, input.override.reason)
+      else await auditWarnings(tx, actor, id, current.branch.id, availability.warnings)
+      await recordAudit(tx, {
+        action: 'APPOINTMENT_STATUS_CHANGED',
+        entityType: 'Appointment',
+        entityId: id,
+        organizationId: actor.organizationId,
+        actorUserId: actor.userId,
+        branchId: current.branch.id,
+        metadata: { desde: current.status, hacia: 'SCHEDULED', reactivado: true },
+      })
+      return toDto(updated, actor)
+    })
+  } catch (err) {
+    const tried = attempt as AppointmentRecord | null
+    if (isExclusionViolation(err) && tried) {
+      throw await conflictError(db, tried.professional.id, tried.startsAt, tried.endsAt, id)
+    }
+    throw err
+  }
+}
+
+export async function closeAppointment(
+  db: Db,
+  actor: AuthContext,
+  id: string,
+  input: CloseAppointmentInput,
+): Promise<AppointmentDto> {
+  return db.$transaction(async (tx) => {
+    const current = await findVisibleOrFail(tx, actor, id)
+    const state = billingState(current.status, current._count.services, current.closureKind)
+    if (state !== 'PENDING') {
+      throw new AppError(409, 'NOT_PENDING', 'Solo se cierran turnos atendidos que todavía no tienen prestación ni cierre')
+    }
+    if (input.kind === 'TREATMENT_SESSION') {
+      const item = await tx.treatmentItem.findFirst({
+        where: {
+          id: input.treatmentItemId,
+          status: { not: 'CANCELLED' },
+          plan: { patientId: current.patient.id, organizationId: actor.organizationId },
+        },
+      })
+      if (!item) {
+        throw new AppError(422, 'INVALID_TREATMENT_ITEM', 'El ítem no corresponde a un plan vigente de este paciente')
+      }
+    }
+    const updated = await tx.appointment.update({
+      where: { id },
+      data: {
+        closureKind: input.kind,
+        closureReason: input.kind === 'NO_CHARGE' ? input.reason : null,
+        closureTreatmentItemId: input.kind === 'TREATMENT_SESSION' ? input.treatmentItemId : null,
+        closedAt: new Date(),
+        closedById: actor.userId,
+      },
+      include,
+    })
+    await recordAudit(tx, {
+      action: 'APPOINTMENT_CLOSED',
+      entityType: 'Appointment',
+      entityId: id,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+      branchId: current.branch.id,
+      metadata: { tipo: input.kind, ...(input.kind === 'NO_CHARGE' ? { motivo: input.reason } : {}) },
+    })
+    return toDto(updated, actor)
+  })
+}
+
+const UNCLOSED_WINDOW_DAYS = 90
+
+export async function listUnclosedAppointments(db: Db, actor: AuthContext): Promise<AppointmentDto[]> {
+  const since = new Date(Date.now() - UNCLOSED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const appointments = await db.appointment.findMany({
+    where: {
+      ...visibleWhere(actor),
+      status: 'ATTENDED',
+      closedAt: null,
+      startsAt: { gte: since },
+      services: { none: { voidedAt: null } },
+    },
+    include,
+    orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+    take: 200,
+  })
+  return appointments.map((appointment) => toDto(appointment, actor))
 }

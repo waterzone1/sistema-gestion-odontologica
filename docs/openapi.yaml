@@ -130,6 +130,12 @@ components:
               - billing:void-any-day
               - availability:manage
               - appointments:override
+              - treatment:read
+              - treatment:write
+              - treatment:price
+              - treatment:cancel
+              - patient-notes:write
+              - exchange-rate:manage
         branchIds:
           type: array
           items:
@@ -141,6 +147,8 @@ components:
           type: boolean
         theme:
           $ref: "#/components/schemas/ThemePreference"
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
       required:
         - id
         - username
@@ -151,6 +159,7 @@ components:
         - mustChangePassword
         - onboardingCompleted
         - theme
+        - preferences
     Role:
       type: string
       enum:
@@ -163,6 +172,55 @@ components:
         - SYSTEM
         - LIGHT
         - DARK
+    UserPreferences:
+      type: object
+      properties:
+        menuOrder:
+          type: array
+          items:
+            type: string
+            pattern: ^\/[a-z/-]{0,60}$
+          maxItems: 20
+          description: Orden del menú, por ruta. Lo que no figura va al final
+        homePage:
+          type: string
+          pattern: ^\/[a-z/-]{0,60}$
+          description: Pantalla que se abre al entrar
+        agendaView:
+          type: string
+          enum:
+            - timeGridWeek
+            - timeGridDay
+            - listWeek
+        agendaStartHour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        agendaEndHour:
+          type: integer
+          minimum: 1
+          maximum: 24
+        agendaSlotMinutes:
+          anyOf:
+            - type: number
+              enum:
+                - 15
+            - type: number
+              enum:
+                - 30
+        showSaturday:
+          type: boolean
+        showSunday:
+          type: boolean
+      required:
+        - menuOrder
+        - homePage
+        - agendaView
+        - agendaStartHour
+        - agendaEndHour
+        - agendaSlotMinutes
+        - showSaturday
+        - showSunday
     SetupInput:
       type: object
       properties:
@@ -257,8 +315,46 @@ components:
       properties:
         theme:
           $ref: "#/components/schemas/ThemePreference"
-      required:
-        - theme
+        preferences:
+          type: object
+          properties:
+            menuOrder:
+              type: array
+              items:
+                type: string
+                pattern: ^\/[a-z/-]{0,60}$
+              maxItems: 20
+              description: Orden del menú, por ruta. Lo que no figura va al final
+            homePage:
+              type: string
+              pattern: ^\/[a-z/-]{0,60}$
+              description: Pantalla que se abre al entrar
+            agendaView:
+              type: string
+              enum:
+                - timeGridWeek
+                - timeGridDay
+                - listWeek
+            agendaStartHour:
+              type: integer
+              minimum: 0
+              maximum: 23
+            agendaEndHour:
+              type: integer
+              minimum: 1
+              maximum: 24
+            agendaSlotMinutes:
+              anyOf:
+                - type: number
+                  enum:
+                    - 15
+                - type: number
+                  enum:
+                    - 30
+            showSaturday:
+              type: boolean
+            showSunday:
+              type: boolean
     User:
       type: object
       properties:
@@ -618,14 +714,11 @@ components:
         documentType:
           $ref: "#/components/schemas/DocumentType"
         documentNumber:
-          type:
-            - string
-            - "null"
+          type: string
+          minLength: 1
           maxLength: 24
         birthDate:
-          type:
-            - string
-            - "null"
+          type: string
           format: date
         phone:
           type:
@@ -645,6 +738,8 @@ components:
       required:
         - firstName
         - lastName
+        - documentNumber
+        - birthDate
     UpdatePatientInput:
       type: object
       properties:
@@ -659,14 +754,11 @@ components:
         documentType:
           $ref: "#/components/schemas/DocumentType"
         documentNumber:
-          type:
-            - string
-            - "null"
+          type: string
+          minLength: 1
           maxLength: 24
         birthDate:
-          type:
-            - string
-            - "null"
+          type: string
           format: date
         phone:
           type:
@@ -689,6 +781,48 @@ components:
         cancelActiveAppointments:
           type: boolean
           default: false
+    PatientNote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        author:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+        archivedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+      required:
+        - id
+        - content
+        - author
+        - createdAt
+        - archivedAt
+    CreatePatientNoteInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+        - content
     ProfessionalAvailability:
       type: object
       properties:
@@ -936,6 +1070,26 @@ components:
             - string
             - "null"
           format: uuid
+        treatmentItemId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        tooth:
+          type:
+            - integer
+            - "null"
+          description: Nulo para quien no accede a datos clínicos
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
         price:
           type:
             - string
@@ -983,6 +1137,9 @@ components:
         - practice
         - professional
         - appointmentId
+        - treatmentItemId
+        - tooth
+        - surfaces
         - price
         - catalogPrice
         - paid
@@ -998,6 +1155,11 @@ components:
         practiceId:
           type: string
           format: uuid
+        treatmentItemId:
+          type: string
+          format: uuid
+          description: "Ítem del plan de tratamiento que se realizó: toma su práctica,
+            pieza, superficies y precio acordado"
         professionalId:
           type: string
           format: uuid
@@ -1012,8 +1174,22 @@ components:
         price:
           type: string
           pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
-      required:
-        - practiceId
+        tooth:
+          type:
+            - integer
+            - "null"
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
+          maxItems: 5
+          default: []
     AdjustPriceInput:
       type: object
       properties:
@@ -1070,6 +1246,15 @@ components:
         amount:
           type: string
           example: "10000.00"
+          description: "Equivalente en pesos: es lo que descuenta de la deuda"
+        currency:
+          $ref: "#/components/schemas/Currency"
+        originalAmount:
+          type: string
+          description: Importe en la moneda en que se pagó
+        exchangeRate:
+          type: string
+          description: Cotización usada al cobrar. 1 para pesos
         method:
           $ref: "#/components/schemas/MovementMethod"
         externalReference:
@@ -1104,6 +1289,9 @@ components:
       required:
         - id
         - amount
+        - currency
+        - originalAmount
+        - exchangeRate
         - method
         - externalReference
         - receivedAt
@@ -1114,6 +1302,11 @@ components:
         - voidReason
         - voidable
         - createdAt
+    Currency:
+      type: string
+      enum:
+        - ARS
+        - USD
     MovementMethod:
       type: string
       enum:
@@ -1147,6 +1340,9 @@ components:
               amount:
                 type: string
                 pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+                description: Importe en la moneda del pago
+              currency:
+                $ref: "#/components/schemas/Currency"
               method:
                 $ref: "#/components/schemas/PaymentMethod"
               externalReference:
@@ -1162,6 +1358,11 @@ components:
         credit:
           type: string
           pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+        exchangeRate:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+          description: "Cotización del dólar que vio quien cobra. Obligatoria si hay pagos
+            en dólares: si no coincide con la vigente, el cobro se rechaza"
         receivedAt:
           type: string
           format: date-time
@@ -1194,140 +1395,22 @@ components:
         - patientId
         - fullName
         - balance
-    ClinicalEntry:
+    PendingBilling:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        entryType:
-          type: string
-          enum:
-            - EVOLUTION
-            - CORRECTION
-        content:
-          type: string
-        correctionOfId:
-          type:
-            - string
-            - "null"
-          format: uuid
-        appointmentId:
-          type:
-            - string
-            - "null"
-          format: uuid
-        professional:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-            displayName:
-              type: string
-          required:
-            - id
-            - displayName
-        createdAt:
-          type: string
-          format: date-time
+        appointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Appointment"
+          description: Turnos atendidos de los últimos 90 días sin prestación ni cierre
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnbilledTreatmentItem"
+          description: Ítems del plan marcados realizados sin prestación registrada
       required:
-        - id
-        - entryType
-        - content
-        - correctionOfId
-        - appointmentId
-        - professional
-        - createdAt
-    CreateClinicalEntryInput:
-      type: object
-      properties:
-        content:
-          type: string
-          minLength: 3
-          maxLength: 10000
-        appointmentId:
-          type:
-            - string
-            - "null"
-          format: uuid
-      required:
-        - content
-    CorrectClinicalEntryInput:
-      type: object
-      properties:
-        content:
-          type: string
-          minLength: 3
-          maxLength: 10000
-      required:
-        - content
-    Practice:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        code:
-          type: string
-        name:
-          type: string
-        defaultDurationMinutes:
-          type: integer
-        basePrice:
-          type: string
-          example: "25000.00"
-          description: Importe en pesos con dos decimales
-        active:
-          type: boolean
-      required:
-        - id
-        - code
-        - name
-        - defaultDurationMinutes
-        - basePrice
-        - active
-    CreatePracticeInput:
-      type: object
-      properties:
-        code:
-          type: string
-          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
-        name:
-          type: string
-          minLength: 2
-          maxLength: 120
-        defaultDurationMinutes:
-          type: integer
-          minimum: 5
-          maximum: 480
-          default: 30
-        basePrice:
-          type: string
-          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
-      required:
-        - code
-        - name
-        - basePrice
-    UpdatePracticeInput:
-      type: object
-      properties:
-        code:
-          type: string
-          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
-        name:
-          type: string
-          minLength: 2
-          maxLength: 120
-        defaultDurationMinutes:
-          type: integer
-          minimum: 5
-          maximum: 480
-        basePrice:
-          type: string
-          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
-        active:
-          type: boolean
+        - appointments
+        - items
     Appointment:
       type: object
       properties:
@@ -1420,6 +1503,37 @@ components:
           type:
             - string
             - "null"
+        billing:
+          $ref: "#/components/schemas/AppointmentBillingState"
+        closure:
+          type:
+            - object
+            - "null"
+          properties:
+            reason:
+              type:
+                - string
+                - "null"
+            treatmentItem:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                practice:
+                  type: string
+              required:
+                - id
+                - practice
+            closedAt:
+              type: string
+              format: date-time
+          required:
+            - reason
+            - treatmentItem
+            - closedAt
         createdAt:
           type: string
           format: date-time
@@ -1437,6 +1551,8 @@ components:
         - hasClinicalNote
         - availabilityOverride
         - overrideReason
+        - billing
+        - closure
         - createdAt
     AppointmentStatus:
       type: string
@@ -1446,6 +1562,887 @@ components:
         - ATTENDED
         - NO_SHOW
         - CANCELLED
+    AppointmentBillingState:
+      type: string
+      enum:
+        - NOT_APPLICABLE
+        - PENDING
+        - SERVICE
+        - TREATMENT_SESSION
+        - NO_CHARGE
+      description: "Solo para turnos atendidos: PENDING si todavía no tiene prestación
+        ni cierre; SERVICE si tiene una prestación registrada; TREATMENT_SESSION
+        si es una sesión de un ítem del plan; NO_CHARGE si se cerró sin cargo"
+    UnbilledTreatmentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        practice:
+          type: string
+        patient:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            fullName:
+              type: string
+          required:
+            - id
+            - fullName
+        professional:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - planId
+        - practice
+        - patient
+        - professional
+        - completedAt
+    ExchangeRates:
+      type: object
+      properties:
+        current:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            currency:
+              $ref: "#/components/schemas/Currency"
+            rate:
+              type: string
+            setBy:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+          required:
+            - id
+            - currency
+            - rate
+            - setBy
+            - createdAt
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              currency:
+                $ref: "#/components/schemas/Currency"
+              rate:
+                type: string
+              setBy:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+            required:
+              - id
+              - currency
+              - rate
+              - setBy
+              - createdAt
+          description: Últimos 20 cambios, del más reciente al más antiguo
+      required:
+        - current
+        - history
+    SetExchangeRateInput:
+      type: object
+      properties:
+        rate:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,8}(\.\d{1,2})?$
+          description: Pesos por dólar
+          example: "1250.50"
+      required:
+        - rate
+    CashDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        movements:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              kind:
+                type: string
+                enum:
+                  - PAYMENT
+                  - CREDIT
+                description: "CREDIT es un uso de saldo a favor: no entra plata"
+              receivedAt:
+                type: string
+                format: date-time
+              patient:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  fullName:
+                    type: string
+                required:
+                  - id
+                  - fullName
+              method:
+                type: string
+                enum:
+                  - CASH
+                  - TRANSFER
+                  - CARD
+                  - MERCADOPAGO
+                  - OTHER
+                  - CREDIT
+              currency:
+                $ref: "#/components/schemas/Currency"
+              originalAmount:
+                type: string
+              exchangeRate:
+                type: string
+              amount:
+                type: string
+                description: Equivalente en pesos
+              externalReference:
+                type:
+                  - string
+                  - "null"
+              createdBy:
+                type: string
+              status:
+                type: string
+                enum:
+                  - ACTIVE
+                  - VOIDED
+              voidReason:
+                type:
+                  - string
+                  - "null"
+            required:
+              - id
+              - kind
+              - receivedAt
+              - patient
+              - method
+              - currency
+              - originalAmount
+              - exchangeRate
+              - amount
+              - externalReference
+              - createdBy
+              - status
+              - voidReason
+        totals:
+          type: array
+          items:
+            type: object
+            properties:
+              method:
+                type: string
+                enum:
+                  - CASH
+                  - TRANSFER
+                  - CARD
+                  - MERCADOPAGO
+                  - OTHER
+              currency:
+                $ref: "#/components/schemas/Currency"
+              count:
+                type: integer
+              originalTotal:
+                type: string
+              amountTotal:
+                type: string
+            required:
+              - method
+              - currency
+              - count
+              - originalTotal
+              - amountTotal
+          description: Cobros vigentes por medio y moneda
+        byCurrency:
+          type: array
+          items:
+            type: object
+            properties:
+              currency:
+                $ref: "#/components/schemas/Currency"
+              originalTotal:
+                type: string
+              amountTotal:
+                type: string
+            required:
+              - currency
+              - originalTotal
+              - amountTotal
+        totalArs:
+          type: string
+          description: Total cobrado en el día, en pesos
+        creditTotal:
+          type: string
+          description: Saldo a favor aplicado en el día. No suma a la caja
+        voidedCount:
+          type: integer
+      required:
+        - date
+        - movements
+        - totals
+        - byCurrency
+        - totalArs
+        - creditTotal
+        - voidedCount
+    ClinicalEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entryType:
+          type: string
+          enum:
+            - EVOLUTION
+            - CORRECTION
+        content:
+          type: string
+        correctionOfId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - entryType
+        - content
+        - correctionOfId
+        - appointmentId
+        - professional
+        - createdAt
+    ClinicalProfile:
+      type: object
+      properties:
+        current:
+          type:
+            - object
+            - "null"
+          properties:
+            alerts:
+              type:
+                - string
+                - "null"
+            allergies:
+              type:
+                - string
+                - "null"
+            medications:
+              type:
+                - string
+                - "null"
+            background:
+              type:
+                - string
+                - "null"
+            professional:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                displayName:
+                  type: string
+              required:
+                - id
+                - displayName
+            updatedAt:
+              type: string
+              format: date-time
+          required:
+            - alerts
+            - allergies
+            - medications
+            - background
+            - professional
+            - updatedAt
+        versions:
+          type: integer
+          description: Cantidad de versiones guardadas
+      required:
+        - current
+        - versions
+    SaveClinicalProfileInput:
+      type: object
+      properties:
+        alerts:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+          description: Alertas breves que se muestran en la ficha
+        allergies:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+        medications:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+        background:
+          type:
+            - string
+            - "null"
+          maxLength: 4000
+      required:
+        - alerts
+        - allergies
+        - medications
+        - background
+    CreateClinicalEntryInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 3
+          maxLength: 10000
+        appointmentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+      required:
+        - content
+    CorrectClinicalEntryInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 3
+          maxLength: 10000
+      required:
+        - content
+    ClinicalFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mimeType:
+          type: string
+          enum:
+            - application/pdf
+            - image/jpeg
+            - image/png
+        size:
+          type: integer
+        category:
+          $ref: "#/components/schemas/ClinicalFileCategory"
+        description:
+          type:
+            - string
+            - "null"
+        clinicalEntryId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+        archived:
+          type: boolean
+      required:
+        - id
+        - filename
+        - mimeType
+        - size
+        - category
+        - description
+        - clinicalEntryId
+        - professional
+        - createdAt
+        - archived
+    ClinicalFileCategory:
+      type: string
+      enum:
+        - XRAY
+        - STUDY
+        - PHOTO
+        - CONSENT
+        - OTHER
+    Odontogram:
+      type: object
+      properties:
+        current:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothFinding"
+          description: Condición actual de cada pieza y superficie (lo último registrado)
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothFinding"
+          description: Todos los registros, del más reciente al más antiguo
+        planned:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              tooth:
+                type: integer
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ToothSurface"
+              practice:
+                type: string
+              status:
+                type: string
+              date:
+                type: string
+                format: date-time
+              professional:
+                type: string
+            required:
+              - id
+              - tooth
+              - surfaces
+              - practice
+              - status
+              - date
+              - professional
+          description: Ítems pendientes o en curso de planes de tratamiento
+        performed:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              tooth:
+                type: integer
+              surfaces:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ToothSurface"
+              practice:
+                type: string
+              status:
+                type: string
+              date:
+                type: string
+                format: date-time
+              professional:
+                type: string
+            required:
+              - id
+              - tooth
+              - surfaces
+              - practice
+              - status
+              - date
+              - professional
+          description: Prestaciones vigentes registradas sobre una pieza
+      required:
+        - current
+        - history
+        - planned
+        - performed
+    ToothFinding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tooth:
+          type: integer
+        surface:
+          $ref: "#/components/schemas/ToothSurface"
+        condition:
+          $ref: "#/components/schemas/ToothCondition"
+        note:
+          type:
+            - string
+            - "null"
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tooth
+        - surface
+        - condition
+        - note
+        - professional
+        - createdAt
+    ToothSurface:
+      type:
+        - string
+        - "null"
+      enum:
+        - M
+        - D
+        - V
+        - L
+        - O
+        - null
+      description: M mesial, D distal, V vestibular, L lingual o palatina, O oclusal o
+        incisal
+    ToothCondition:
+      type: string
+      enum:
+        - HEALTHY
+        - CARIES
+        - RESTORATION
+        - TEMP_RESTORATION
+        - CROWN
+        - ROOT_CANAL
+        - IMPLANT
+        - FRACTURE
+        - MISSING
+        - EXTRACTION_INDICATED
+        - SEALANT
+        - PROSTHESIS
+    RecordToothFindingInput:
+      type: object
+      properties:
+        tooth:
+          type: integer
+          description: "Pieza en numeración FDI: 11 a 48 permanentes, 51 a 85 temporales"
+        surfaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToothSurface"
+          maxItems: 5
+          default: []
+        condition:
+          $ref: "#/components/schemas/ToothCondition"
+        note:
+          type: string
+          maxLength: 500
+      required:
+        - tooth
+        - condition
+    TreatmentPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type:
+            - string
+            - "null"
+        status:
+          $ref: "#/components/schemas/TreatmentPlanStatus"
+        professional:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+        acceptedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        total:
+          type:
+            - string
+            - "null"
+          description: Suma de los ítems vigentes cotizados. Nulo para quien no ve importes
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              practice:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  code:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - code
+                  - name
+              tooth:
+                type:
+                  - integer
+                  - "null"
+                description: Nulo para quien no accede a datos clínicos
+              surfaces:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - M
+                    - D
+                    - V
+                    - L
+                    - O
+              notes:
+                type:
+                  - string
+                  - "null"
+              agreedPrice:
+                type:
+                  - string
+                  - "null"
+                description: Nulo si no está cotizado o para quien no ve importes
+              catalogPrice:
+                type:
+                  - string
+                  - "null"
+              priced:
+                type: boolean
+              status:
+                $ref: "#/components/schemas/TreatmentItemStatus"
+              cancelReason:
+                type:
+                  - string
+                  - "null"
+              completedAt:
+                type:
+                  - string
+                  - "null"
+                format: date-time
+                description: Cuándo el odontólogo lo marcó realizado
+              billed:
+                type: boolean
+                description: Si tiene una prestación vigente registrada
+            required:
+              - id
+              - practice
+              - tooth
+              - surfaces
+              - notes
+              - agreedPrice
+              - catalogPrice
+              - priced
+              - status
+              - cancelReason
+              - completedAt
+              - billed
+      required:
+        - id
+        - title
+        - status
+        - professional
+        - acceptedAt
+        - total
+        - createdAt
+        - items
+    TreatmentPlanStatus:
+      type: string
+      enum:
+        - DRAFT
+        - ACCEPTED
+        - COMPLETED
+        - CANCELLED
+    TreatmentItemStatus:
+      type: string
+      enum:
+        - PLANNED
+        - IN_PROGRESS
+        - COMPLETED
+        - CANCELLED
+    CreateTreatmentPlanInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 120
+    AddTreatmentItemInput:
+      type: object
+      properties:
+        practiceId:
+          type: string
+          format: uuid
+        tooth:
+          type:
+            - integer
+            - "null"
+        surfaces:
+          type: array
+          items:
+            type: string
+            enum:
+              - M
+              - D
+              - V
+              - L
+              - O
+          maxItems: 5
+          default: []
+        notes:
+          type: string
+          maxLength: 500
+      required:
+        - practiceId
+    PriceTreatmentItemInput:
+      type: object
+      properties:
+        price:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+      required:
+        - price
+    CancelTreatmentItemInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 300
+      required:
+        - reason
+    Practice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        defaultDurationMinutes:
+          type: integer
+        basePrice:
+          type: string
+          example: "25000.00"
+          description: Importe en pesos con dos decimales
+        active:
+          type: boolean
+      required:
+        - id
+        - code
+        - name
+        - defaultDurationMinutes
+        - basePrice
+        - active
+    CreatePracticeInput:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        defaultDurationMinutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+          default: 30
+        basePrice:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+      required:
+        - code
+        - name
+        - basePrice
+    UpdatePracticeInput:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9._-]{1,19}$
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        defaultDurationMinutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+        basePrice:
+          type: string
+          pattern: ^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$
+        active:
+          type: boolean
     CreateAppointmentInput:
       type: object
       properties:
@@ -1553,6 +2550,52 @@ components:
           maxLength: 200
       required:
         - status
+    ReactivateAppointmentInput:
+      type: object
+      properties:
+        acknowledgeWarnings:
+          type: boolean
+          description: Confirma que se da el turno aunque esté fuera del horario del
+            profesional o con una práctica que no tiene habilitada
+        override:
+          type: object
+          properties:
+            reason:
+              type: string
+              minLength: 5
+              maxLength: 300
+          required:
+            - reason
+          description: "Solo administración: permite dar el turno aunque el profesional
+            esté de vacaciones, ausente o bloqueado. Nunca permite superponer
+            turnos"
+    CloseAppointmentInput:
+      oneOf:
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - TREATMENT_SESSION
+            treatmentItemId:
+              type: string
+              format: uuid
+          required:
+            - kind
+            - treatmentItemId
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - NO_CHARGE
+            reason:
+              type: string
+              minLength: 3
+              maxLength: 200
+          required:
+            - kind
+            - reason
   parameters: {}
 paths:
   /api/health:
@@ -1763,7 +2806,10 @@ paths:
     put:
       tags:
         - Auth
-      summary: Guarda las preferencias del usuario (tema claro, oscuro o del sistema)
+      summary: Guarda las preferencias del usuario
+      description: Tema, orden del menú, pantalla de inicio y cómo se ve la agenda.
+        Solo se pueden ocultar sábados o domingos si ningún profesional activo
+        atiende ese día.
       security: *a1
       requestBody:
         content:
@@ -1787,6 +2833,13 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "403":
           description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Horario de agenda inválido o un profesional atiende el día que se
+            quiere ocultar
           content:
             application/json:
               schema:
@@ -2642,9 +3695,157 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/professionals/{professionalId}/availability:
+  /api/patients/{patientId}/notes:
     get:
       tags: &a7
+        - Mensajes sobre el paciente
+      summary: Mensajes internos sobre el paciente
+      description: Mensajes administrativos entre recepción y odontólogos. No son
+        información clínica.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          required: false
+          name: archived
+          in: query
+      responses:
+        "200":
+          description: Del más reciente al más antiguo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatientNote"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a7
+      summary: Dejar un mensaje sobre el paciente
+      description: "No se edita ni se borra: solo se archiva."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientNoteInput"
+      responses:
+        "201":
+          description: Mensaje creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientNote"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El paciente está archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/notes/{noteId}/archive:
+    post:
+      tags: *a7
+      summary: Archivar un mensaje que ya no aplica
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: noteId
+          in: path
+      responses:
+        "200":
+          description: Mensaje archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientNote"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{professionalId}/availability:
+    get:
+      tags: &a8
         - Disponibilidad
       summary: Horario semanal y excepciones vigentes de un profesional
       security: *a2
@@ -2682,7 +3883,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/availability/rules:
     put:
-      tags: *a7
+      tags: *a8
       summary: Reemplaza el horario semanal
       description: Solo administración. Las franjas son por sede y en la hora del
         consultorio; no pueden superponerse el mismo día aunque sean de sedes
@@ -2739,7 +3940,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/exceptions:
     post:
-      tags: *a7
+      tags: *a8
       summary: Registra un bloqueo, vacaciones, ausencia u horario extraordinario
       description: Administración y recepción. Devuelve los turnos activos que quedan
         dentro del período para reprogramarlos; no los cancela.
@@ -2795,7 +3996,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/exceptions/{exceptionId}/revoke:
     post:
-      tags: *a7
+      tags: *a8
       summary: Deja sin efecto una excepción
       description: "La excepción no se borra: queda registrada como revocada."
       security: *a1
@@ -2835,7 +4036,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/availability:
     get:
-      tags: *a7
+      tags: *a8
       summary: Franjas disponibles y bloqueadas de una sede para mostrar en la agenda
       security: *a2
       parameters:
@@ -2890,7 +4091,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services:
     get:
-      tags: &a8
+      tags: &a9
         - Prestaciones y cobros
       summary: Prestaciones realizadas al paciente
       security: *a2
@@ -2929,7 +4130,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a8
+      tags: *a9
       summary: Registra una prestación realizada
       description: La registra un odontólogo (siempre a su nombre), recepción o
         administración (eligiendo el profesional). El precio es el del catálogo
@@ -2988,7 +4189,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/price:
     post:
-      tags: *a8
+      tags: *a9
       summary: Ajusta el precio de una prestación
       description: Recepción y administración. No puede quedar por debajo de lo ya
         pagado. Queda auditado con el precio anterior.
@@ -3056,7 +4257,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/void:
     post:
-      tags: *a8
+      tags: *a9
       summary: Anula una prestación
       description: Recepción solo lo cargado en el día; administración siempre. La
         prestación se conserva marcada como anulada, con el motivo.
@@ -3118,7 +4319,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/account:
     get:
-      tags: *a8
+      tags: *a9
       summary: Cuenta corriente del paciente
       description: El saldo se calcula siempre como prestaciones vigentes menos pagos
         vigentes; no se guarda. Un saldo negativo es saldo a favor.
@@ -3157,7 +4358,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments:
     post:
-      tags: *a8
+      tags: *a9
       summary: Registra un cobro
       description: Un cobro puede combinar varios medios de pago y usar saldo a favor
         si quien cobra lo elige; ese uso queda registrado como un movimiento
@@ -3218,7 +4419,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments/{paymentId}/void:
     post:
-      tags: *a8
+      tags: *a9
       summary: Anula un pago
       description: Recepción solo lo cargado en el día; administración siempre. El
         pago se conserva marcado como anulado, con el motivo, y deja de contar
@@ -3281,7 +4482,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/credits/{creditId}/void:
     post:
-      tags: *a8
+      tags: *a9
       summary: Anula un uso de saldo a favor
       description: Recepción solo lo cargado en el día; administración siempre. El
         saldo a favor vuelve a quedar disponible.
@@ -3343,7 +4544,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/debtors:
     get:
-      tags: *a8
+      tags: *a9
       summary: Pacientes con saldo pendiente
       description: Los 20 mayores saldos a cobrar.
       security: *a2
@@ -3368,9 +4569,145 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/billing/pending:
+    get:
+      tags: *a9
+      summary: Pendientes de facturar
+      description: Turnos atendidos sin prestación ni cierre, e ítems del plan que el
+        odontólogo marcó realizados y todavía no tienen la prestación
+        registrada. Solo para quien registra prestaciones.
+      security: *a2
+      responses:
+        "200":
+          description: Pendientes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingBilling"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/exchange-rates:
+    get:
+      tags: &a10
+        - Caja y cotización
+      summary: Cotización del dólar vigente e historial
+      security: *a2
+      responses:
+        "200":
+          description: Cotización vigente y últimos cambios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRates"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a10
+      summary: Carga una nueva cotización del dólar
+      description: "Queda como vigente para los cobros en dólares. Los cambios no se
+        editan ni se borran: se agrega uno nuevo y queda auditado."
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetExchangeRateInput"
+      responses:
+        "201":
+          description: Cotización actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRates"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/cash:
+    get:
+      tags: *a10
+      summary: Caja del día
+      description: Cobros del día con su moneda, cotización y equivalente en pesos;
+        las anulaciones se listan pero no suman. El uso de saldo a favor se
+        informa aparte.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+            description: Día en la zona horaria del consultorio. Por defecto, hoy
+          required: false
+          description: Día en la zona horaria del consultorio. Por defecto, hoy
+          name: date
+          in: query
+      responses:
+        "200":
+          description: Movimientos y totales del día
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashDay"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: La fecha es futura
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical:
     get:
-      tags: &a9
+      tags: &a11
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -3411,7 +4748,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a9
+      tags: *a11
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige agregando una corrección."
@@ -3466,9 +4803,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/clinical/profile:
+    get:
+      tags: *a11
+      summary: "Perfil clínico vigente: alertas, alergias, medicación y antecedentes"
+      description: Solo odontólogos. La consulta queda auditada.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Perfil clínico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalProfile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    put:
+      tags: *a11
+      summary: Guarda una nueva versión del perfil clínico
+      description: Cada cambio crea una versión nueva; las anteriores se conservan.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveClinicalProfileInput"
+      responses:
+        "200":
+          description: Perfil clínico actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalProfile"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado o usuario sin perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a9
+      tags: *a11
       summary: Agrega una corrección a una nota
       description: La nota original se conserva intacta; la corrección queda vinculada
         a ella.
@@ -3529,9 +4958,794 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/files:
+    get:
+      tags: &a12
+        - Archivos clínicos
+      summary: Archivos clínicos del paciente
+      description: Solo odontólogos. Por defecto no incluye los archivados.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          required: false
+          name: archived
+          in: query
+      responses:
+        "200":
+          description: Archivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicalFile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a12
+      summary: Sube un archivo clínico (PDF, JPG o PNG)
+      description: El cuerpo es el contenido binario del archivo. El tipo se verifica
+        por su contenido, no por la extensión. El tamaño máximo es configurable
+        (20 MB por defecto). El archivo se guarda fuera de cualquier carpeta
+        pública.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          required: true
+          name: filename
+          in: query
+        - schema:
+            $ref: "#/components/schemas/ClinicalFileCategory"
+          required: true
+          name: category
+          in: query
+        - schema:
+            type: string
+            maxLength: 300
+          required: false
+          name: description
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: clinicalEntryId
+          in: query
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Archivo guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalFile"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "413":
+          description: El archivo supera el tamaño máximo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "415":
+          description: Tipo de archivo no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Archivo vacío, paciente archivado, sin perfil profesional o nota
+            que no corresponde
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/files/{fileId}/content:
+    get:
+      tags: *a12
+      summary: Descarga o visualiza un archivo clínico
+      description: Solo a través del backend, con sesión y permiso clínico. Cada
+        descarga queda auditada.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: fileId
+          in: path
+      responses:
+        "200":
+          description: Contenido del archivo
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/files/{fileId}/archive:
+    post:
+      tags: *a12
+      summary: Archiva un archivo clínico (no se borra)
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: fileId
+          in: path
+      responses:
+        "200":
+          description: Archivo archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalFile"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/odontogram:
+    get:
+      tags: &a13
+        - Odontograma
+      summary: "Odontograma del paciente: condición actual e historial"
+      description: Solo odontólogos. La condición actual se deriva de los registros;
+        nunca se pisa el historial.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Odontograma
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Odontogram"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/odontogram/findings:
+    post:
+      tags: *a13
+      summary: Registra la condición de una pieza o de sus superficies
+      description: Corona, endodoncia, implante, ausente, extracción indicada y
+        prótesis se registran sobre la pieza completa. Marcar sano limpia la
+        pieza o la superficie. Los registros no se modifican ni se borran.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordToothFindingInput"
+      responses:
+        "201":
+          description: Odontograma actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Odontogram"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Pieza o superficie inválida, paciente archivado o usuario sin
+            perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans:
+    get:
+      tags: &a14
+        - Plan de tratamiento
+      summary: Planes de tratamiento del paciente
+      description: El odontólogo ve piezas y superficies pero no importes; recepción y
+        administración ven prácticas e importes pero no piezas ni superficies.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Planes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a14
+      summary: Crea un plan de tratamiento
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTreatmentPlanInput"
+      responses:
+        "201":
+          description: Plan creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Paciente archivado o sin perfil profesional
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items:
+    post:
+      tags: *a14
+      summary: Agrega una práctica al plan, con pieza y superficies opcionales
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTreatmentItemInput"
+      responses:
+        "201":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El plan está cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Pieza, superficie o práctica inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/price:
+    put:
+      tags: *a14
+      summary: Fija el precio acordado de un ítem
+      description: Recepción y administración. Al registrar la prestación de ese ítem
+        se cobra este precio.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceTreatmentItemInput"
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ítem o plan cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/accept:
+    post:
+      tags: *a14
+      summary: Registra que el paciente aceptó el presupuesto
+      description: Exige que todos los ítems vigentes estén cotizados.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+      responses:
+        "200":
+          description: Presupuesto aceptado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El presupuesto ya fue aceptado o el plan está cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Plan sin ítems o con ítems sin cotizar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/start:
+    post:
+      tags: *a14
+      summary: Marca un ítem como en curso
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El ítem no está pendiente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/complete:
+    post:
+      tags: *a14
+      summary: El odontólogo marca un ítem como realizado
+      description: "Es un hecho clínico: no registra la prestación ni el cobro. El
+        ítem queda para que recepción registre la prestación con el precio
+        acordado."
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El ítem ya está terminado o cancelado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/cancel:
+    post:
+      tags: *a14
+      summary: Cancela un ítem con motivo (no se borra)
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: planId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelTreatmentItemInput"
+      responses:
+        "200":
+          description: Plan actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentPlan"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ítem cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a10
+      tags: &a15
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -3573,7 +5787,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a10
+      tags: *a15
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -3615,7 +5829,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a10
+      tags: *a15
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -3671,7 +5885,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a11
+      tags: &a16
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -3742,7 +5956,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a16
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -3799,7 +6013,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a11
+      tags: *a16
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -3835,7 +6049,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a11
+      tags: *a16
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -3897,7 +6111,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a11
+      tags: *a16
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
@@ -3948,6 +6162,126 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "409":
           description: Transición no permitida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/appointments/{id}/reactivate:
+    post:
+      tags: *a16
+      summary: Reactiva un turno cancelado o ausente
+      description: Vuelve a Pendiente si el horario sigue libre. Aplica las mismas
+        reglas de disponibilidad que al dar un turno nuevo.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactivateAppointmentInput"
+      responses:
+        "200":
+          description: Turno reactivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El turno no está cancelado ni ausente, o el horario ya está ocupado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Fuera de la disponibilidad del profesional o con advertencias sin
+            confirmar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/appointments/{id}/close:
+    post:
+      tags: *a16
+      summary: Cierra un turno atendido sin prestación propia
+      description: Lo marca como sesión de un ítem del plan de tratamiento (ya cobrado
+        o en curso) o sin cargo con motivo. Registrar una prestación desde el
+        turno también lo cierra.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseAppointmentInput"
+      responses:
+        "200":
+          description: Turno cerrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: El turno no está pendiente de cierre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El ítem no corresponde a un plan vigente del paciente
           content:
             application/json:
               schema:

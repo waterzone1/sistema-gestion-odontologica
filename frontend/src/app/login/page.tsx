@@ -1,5 +1,6 @@
 'use client'
 
+import { homePath } from '@/lib/nav'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
@@ -33,7 +34,7 @@ export default function LoginPage() {
   const user = session.data?.user
   const needsSetup = setup.data?.needsSetup
   useEffect(() => {
-    if (user) router.replace(user.mustChangePassword ? '/cambiar-clave' : '/dashboard')
+    if (user) router.replace(user.mustChangePassword ? '/cambiar-clave' : homePath(user))
     else if (needsSetup) router.replace('/setup')
   }, [user, needsSetup, router])
 

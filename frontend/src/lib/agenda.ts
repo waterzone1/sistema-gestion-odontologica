@@ -1,25 +1,20 @@
 import type { AgendaAvailability, Appointment, AppointmentStatus, Professional } from './api'
 import { isEditable } from './appointments'
 import { EXCEPTION_LABELS } from './availability'
+import { toIsoDay } from './format'
 
 export type StatusFilter = AppointmentStatus | 'ACTIVE' | ''
-
-const pad = (value: number) => String(value).padStart(2, '0')
-
-function localIsoDay(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
 
 export function allDaySpan(startIso: string, endIso: string): { start: string; end: string } {
   const last = new Date(new Date(endIso).getTime() - 1)
   const after = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1)
-  return { start: localIsoDay(new Date(startIso)), end: localIsoDay(after) }
+  return { start: toIsoDay(new Date(startIso)), end: toIsoDay(after) }
 }
 
 const colorClass = (professional: Professional | undefined) => `fc-pro-${professional?.color ?? 'none'}`
 
 export function matchesStatus(appointment: Pick<Appointment, 'status'>, filter: StatusFilter): boolean {
-  if (filter === 'ACTIVE') return appointment.status !== 'CANCELLED'
+  if (filter === 'ACTIVE') return appointment.status !== 'CANCELLED' && appointment.status !== 'NO_SHOW'
   return filter === '' || appointment.status === filter
 }
 
@@ -73,4 +68,16 @@ export function noticeEvents(availability: AgendaAvailability, professionals: Pr
       extendedProps: { notice: interval.reason },
     }))
   })
+}
+
+export function availableIntervals(availability: AgendaAvailability | undefined): Pick<Appointment, 'startsAt'>[] {
+  return (availability ?? []).flatMap((professional) => professional.available.map((interval) => ({ startsAt: interval.start })))
+}
+
+export function hiddenDays(
+  preferences: { showSaturday: boolean; showSunday: boolean },
+  appointments: readonly Pick<Appointment, 'startsAt'>[] = [],
+): number[] {
+  const busy = new Set(appointments.map((a) => new Date(a.startsAt).getDay()))
+  return [...(preferences.showSunday ? [] : [0]), ...(preferences.showSaturday ? [] : [6])].filter((day) => !busy.has(day))
 }

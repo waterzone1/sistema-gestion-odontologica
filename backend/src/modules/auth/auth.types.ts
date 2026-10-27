@@ -1,4 +1,5 @@
 import type { Permission, Role } from '../users/domain/permissions.js'
+import type { UserPreferences } from './auth.schemas.js'
 
 export interface AuthContext {
   userId: string
@@ -13,4 +14,5 @@ export interface AuthContext {
   mustChangePassword: boolean
   onboardingCompleted: boolean
   theme: 'SYSTEM' | 'LIGHT' | 'DARK'
+  preferences: UserPreferences
 }

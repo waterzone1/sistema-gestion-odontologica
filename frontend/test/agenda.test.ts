@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allDaySpan, appointmentEvents, matchesStatus, noticeEvents } from '@/lib/agenda'
+import { allDaySpan, appointmentEvents, hiddenDays, matchesStatus, noticeEvents } from '@/lib/agenda'
 import type { AgendaAvailability, Appointment, Professional } from '@/lib/api'
 import { resolveDark } from '@/lib/theme'
 
@@ -31,12 +31,15 @@ const turno = (status: Appointment['status']): Appointment => ({
   hasClinicalNote: null,
   availabilityOverride: false,
   overrideReason: null,
+  billing: status === 'ATTENDED' ? 'PENDING' : 'NOT_APPLICABLE',
+  closure: null,
   createdAt: new Date(2026, 9, 1).toISOString(),
 })
 
 describe('filtro de estado de la agenda', () => {
-  it('por defecto oculta solo los cancelados', () => {
+  it('por defecto oculta los cancelados y los ausentes', () => {
     expect(matchesStatus({ status: 'CANCELLED' }, 'ACTIVE')).toBe(false)
+    expect(matchesStatus({ status: 'NO_SHOW' }, 'ACTIVE')).toBe(false)
     expect(matchesStatus({ status: 'ATTENDED' }, 'ACTIVE')).toBe(true)
     expect(matchesStatus({ status: 'CANCELLED' }, '')).toBe(true)
     expect(matchesStatus({ status: 'NO_SHOW' }, 'CONFIRMED')).toBe(false)
@@ -100,5 +103,18 @@ describe('tema', () => {
     expect(resolveDark('LIGHT', true)).toBe(false)
     expect(resolveDark('SYSTEM', true)).toBe(true)
     expect(resolveDark('SYSTEM', false)).toBe(false)
+  })
+})
+
+describe('preferencias de la agenda', () => {
+  it('oculta sabados y domingos solo si se pidio', () => {
+    expect(hiddenDays({ showSaturday: true, showSunday: true })).toEqual([])
+    expect(hiddenDays({ showSaturday: false, showSunday: false })).toEqual([0, 6])
+    expect(hiddenDays({ showSaturday: true, showSunday: false })).toEqual([0])
+  })
+
+  it('nunca oculta un dia que tiene turnos', () => {
+    const sabado = { startsAt: new Date(2026, 9, 17, 10).toISOString() }
+    expect(hiddenDays({ showSaturday: false, showSunday: false }, [sabado])).toEqual([0])
   })
 })

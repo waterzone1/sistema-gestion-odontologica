@@ -4,20 +4,29 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { organizationTimeZone } from '../availability/availability.service.js'
+import { findingProblem } from '../odontogram/domain/fdi.js'
+import { syncPlanStatus } from '../treatment/treatment.service.js'
 import { hasPermission } from '../users/domain/permissions.js'
-import { allocatePayment, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
+import { currentRate } from '../cash/cash.service.js'
+import { listUnclosedAppointments } from '../appointments/appointments.service.js'
+import { patientName } from '../patients/domain/name.js'
+import { cents, creditFields, paymentFields } from './billing.mapping.js'
+import { allocatePayment, convertCents, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
 import type {
   AccountDto,
   ChargeResultDto,
   CreateChargeInput,
   CreateServiceInput,
   DebtorDto,
+  PendingBillingDto,
+  UnbilledItemDto,
   PaymentDto,
   ServiceDto,
 } from './billing.schemas.js'
 
 const CLOCK_TOLERANCE_MS = 5 * 60_000
 const DEBTORS_LIMIT = 20
+const MAX_AMOUNT_CENTS = 99_999_999_999_999
 
 const serviceInclude = {
   practice: { select: { id: true, code: true, name: true } },
@@ -52,13 +61,12 @@ type Tx = Prisma.TransactionClient
 interface Viewer {
   actor: AuthContext
   showAmounts: boolean
+  showClinical: boolean
   today: string
   timeZone: string
 }
 
 type VoidPermission = 'services:void' | 'payments:void'
-
-const cents = (value: Prisma.Decimal) => toCents(value.toFixed(2))
 
 const creditIsActive = (allocation: { creditApplication: { voidedAt: Date | null } | null }) =>
   !allocation.creditApplication?.voidedAt
@@ -68,6 +76,7 @@ async function viewerOf(db: Pick<Db, 'organization'>, actor: AuthContext): Promi
   return {
     actor,
     showAmounts: hasPermission(actor.permissions, 'account:read'),
+    showClinical: hasPermission(actor.permissions, 'clinical:read'),
     timeZone,
     today: localDay(new Date(), timeZone),
   }
@@ -107,6 +116,9 @@ function toServiceDto(service: ServiceRecord, viewer: Viewer): ServiceDto {
     practice: service.practice,
     professional: { id: service.professional.id, displayName: service.professional.user.displayName },
     appointmentId: service.appointmentId,
+    treatmentItemId: service.treatmentItemId,
+    tooth: viewer.showClinical ? service.tooth : null,
+    surfaces: viewer.showClinical ? service.surfaces : [],
     price: show(price),
     catalogPrice: show(cents(service.catalogPrice)),
     paid: show(paid),
@@ -120,36 +132,23 @@ function toServiceDto(service: ServiceRecord, viewer: Viewer): ServiceDto {
 }
 
 function toPaymentDto(payment: PaymentRecord, viewer: Viewer): PaymentDto {
-  const { amount, allocated, unallocated } = paymentCents(payment)
+  const { allocated, unallocated } = paymentCents(payment)
   return {
-    id: payment.id,
-    amount: fromCents(amount),
-    method: payment.method,
-    externalReference: payment.externalReference,
-    receivedAt: payment.receivedAt.toISOString(),
+    ...paymentFields(payment),
     allocated: fromCents(allocated),
     unallocated: fromCents(unallocated),
     createdBy: payment.createdBy.displayName,
-    status: payment.voidedAt ? 'VOIDED' : 'ACTIVE',
-    voidReason: payment.voidReason,
     voidable: !payment.voidedAt && canVoid(viewer, 'payments:void', payment.createdAt),
     createdAt: payment.createdAt.toISOString(),
   }
 }
 
 function toCreditDto(credit: CreditRecord, viewer: Viewer): PaymentDto {
-  const amount = credit.voidedAt ? 0 : cents(credit.amount)
   return {
-    id: credit.id,
-    amount: credit.amount.toFixed(2),
-    method: 'CREDIT',
-    externalReference: null,
-    receivedAt: credit.createdAt.toISOString(),
-    allocated: fromCents(amount),
+    ...creditFields(credit),
+    allocated: fromCents(credit.voidedAt ? 0 : cents(credit.amount)),
     unallocated: '0.00',
     createdBy: credit.createdBy.displayName,
-    status: credit.voidedAt ? 'VOIDED' : 'ACTIVE',
-    voidReason: credit.voidReason,
     voidable: !credit.voidedAt && canVoid(viewer, 'payments:void', credit.createdAt),
     createdAt: credit.createdAt.toISOString(),
   }
@@ -169,6 +168,30 @@ async function findPatientOrFail(db: Pick<Db, 'patient'>, actor: AuthContext, pa
   const patient = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId } })
   if (!patient) throw new AppError(404, 'NOT_FOUND', 'El paciente no existe')
   return patient
+}
+
+async function billableItem(tx: Tx, actor: AuthContext, patientId: string, itemId: string) {
+  const item = await tx.treatmentItem.findFirst({
+    where: { id: itemId, plan: { patientId, organizationId: actor.organizationId } },
+    include: { services: { where: { voidedAt: null }, select: { id: true } } },
+  })
+  if (!item) throw new AppError(422, 'INVALID_TREATMENT_ITEM', 'El ítem no corresponde a un plan de este paciente')
+  if (item.status === 'CANCELLED' || item.services.length > 0) {
+    throw new AppError(409, 'ITEM_CLOSED', 'Ese ítem del plan ya tiene la prestación registrada o está cancelado')
+  }
+  return item
+}
+
+function serviceLocation(actor: AuthContext, input: CreateServiceInput) {
+  const tooth = input.tooth ?? null
+  if (tooth === null && input.surfaces.length === 0) return { tooth: null, surfaces: [] }
+  if (!hasPermission(actor.permissions, 'clinical:write')) {
+    throw new AppError(403, 'FORBIDDEN', 'Solo el odontólogo registra la pieza tratada')
+  }
+  if (tooth === null) throw new AppError(422, 'INVALID_TOOTH', 'Las superficies necesitan una pieza')
+  const problem = findingProblem(tooth, 'CARIES', input.surfaces)
+  if (problem) throw new AppError(422, 'INVALID_TOOTH', problem)
+  return { tooth, surfaces: input.surfaces }
 }
 
 function assertNotFuture(iso: string | undefined, label: string): Date {
@@ -240,10 +263,15 @@ export async function createService(
       throw new AppError(422, 'PATIENT_ARCHIVED', 'El paciente está archivado: reactivalo para registrar prestaciones')
     }
     const professional = await resolveProfessional(tx, actor, input.professionalId)
+    const item = input.treatmentItemId ? await billableItem(tx, actor, patientId, input.treatmentItemId) : null
+    if (item && input.practiceId && input.practiceId !== item.practiceId) {
+      throw new AppError(422, 'INVALID_PRACTICE', 'La práctica no coincide con la del ítem del plan')
+    }
     const practice = await tx.practice.findFirst({
-      where: { id: input.practiceId, organizationId: actor.organizationId, active: true },
+      where: { id: item?.practiceId ?? input.practiceId, organizationId: actor.organizationId, active: true },
     })
     if (!practice) throw new AppError(422, 'INVALID_PRACTICE', 'La práctica no existe o está inactiva')
+    const location = item ? { tooth: item.tooth, surfaces: item.surfaces } : serviceLocation(actor, input)
     if (input.appointmentId) {
       const appointment = await tx.appointment.findFirst({
         where: {
@@ -257,7 +285,7 @@ export async function createService(
         throw new AppError(422, 'INVALID_APPOINTMENT', 'El turno no corresponde a este paciente y profesional')
       }
     }
-    const price = input.price ?? practice.basePrice.toFixed(2)
+    const price = input.price ?? item?.agreedPrice?.toFixed(2) ?? practice.basePrice.toFixed(2)
     const service = await tx.performedService.create({
       data: {
         organizationId: actor.organizationId,
@@ -265,6 +293,8 @@ export async function createService(
         professionalId: professional.id,
         practiceId: practice.id,
         appointmentId: input.appointmentId ?? null,
+        treatmentItemId: item?.id ?? null,
+        ...location,
         price,
         catalogPrice: practice.basePrice,
         performedAt,
@@ -280,6 +310,10 @@ export async function createService(
       actorUserId: actor.userId,
       metadata: { patientId, practice: practice.code, price: fromCents(toCents(price)) },
     })
+    if (item && item.status !== 'COMPLETED') {
+      await tx.treatmentItem.update({ where: { id: item.id }, data: { status: 'COMPLETED' } })
+      await syncPlanStatus(tx, item.planId)
+    }
     return toServiceDto(service, viewer)
   })
 }
@@ -338,6 +372,13 @@ export async function voidService(
     if (!service) throw new AppError(404, 'NOT_FOUND', 'La prestación no existe')
     if (service.voidedAt) throw new AppError(409, 'ALREADY_VOIDED', 'La prestación ya está anulada')
     assertVoidAllowed(viewer, 'services:void', service.createdAt)
+    if (service.treatmentItemId) {
+      const item = await tx.treatmentItem.findUniqueOrThrow({ where: { id: service.treatmentItemId } })
+      if (item.completedAt === null) {
+        await tx.treatmentItem.update({ where: { id: item.id }, data: { status: 'PLANNED' } })
+        await syncPlanStatus(tx, item.planId)
+      }
+    }
     const voided = await tx.performedService.update({
       where: { id: serviceId },
       data: { voidedAt: new Date(), voidReason: reason, voidedById: actor.userId },
@@ -398,6 +439,20 @@ export async function getAccount(db: Db, actor: AuthContext, patientId: string):
     services: services.map((service) => toServiceDto(service, viewer)),
     payments: movements,
   }
+}
+
+async function agreedRate(tx: Tx, actor: AuthContext, seen: string | undefined): Promise<number> {
+  const current = await currentRate(tx, actor.organizationId)
+  if (!current) {
+    throw new AppError(422, 'NO_EXCHANGE_RATE', 'Todavía no se cargó la cotización del dólar en Configuración')
+  }
+  const rate = cents(current.rate)
+  if (seen === undefined || toCents(seen) !== rate) {
+    throw new AppError(409, 'EXCHANGE_RATE_CHANGED', `La cotización cambió: ahora es ${fromCents(rate)}. Revisá el cobro`, {
+      rate: fromCents(rate),
+    })
+  }
+  return rate
 }
 
 export async function createCharge(
@@ -477,15 +532,26 @@ export async function createCharge(
       })
     }
 
+    const rateCents = input.lines.some((line) => line.currency !== 'ARS')
+      ? await agreedRate(tx, actor, input.exchangeRate)
+      : null
     const payments: PaymentDto[] = []
     for (const line of input.lines) {
-      const result = allocatePayment(toCents(line.amount), targets)
+      const originalCents = toCents(line.amount)
+      const rate = line.currency === 'ARS' || rateCents === null ? 100 : rateCents
+      const amountCents = convertCents(originalCents, rate)
+      if (amountCents === 0) throw new AppError(422, 'AMOUNT_TOO_SMALL', 'El importe convertido a pesos es cero')
+      if (amountCents > MAX_AMOUNT_CENTS) throw new AppError(422, 'AMOUNT_TOO_LARGE', 'El importe convertido a pesos es demasiado grande')
+      const result = allocatePayment(amountCents, targets)
       targets = result.remaining
       const payment = await tx.payment.create({
         data: {
           organizationId: actor.organizationId,
           patientId,
-          amount: line.amount,
+          amount: fromCents(amountCents),
+          currency: line.currency,
+          originalAmount: fromCents(originalCents),
+          exchangeRate: fromCents(rate),
           method: line.method,
           externalReference: line.externalReference || null,
           receivedAt,
@@ -502,7 +568,12 @@ export async function createCharge(
         entityId: payment.id,
         organizationId: actor.organizationId,
         actorUserId: actor.userId,
-        metadata: { patientId, amount: payment.amount.toFixed(2), method: line.method },
+        metadata: {
+          patientId,
+          amount: payment.amount.toFixed(2),
+          method: line.method,
+          ...(line.currency !== 'ARS' ? { currency: line.currency, originalAmount: fromCents(originalCents), rate: fromCents(rate) } : {}),
+        },
       })
       payments.push(toPaymentDto(payment, viewer))
     }
@@ -596,7 +667,42 @@ export async function listDebtors(db: Db, actor: AuthContext): Promise<DebtorDto
     LIMIT ${DEBTORS_LIMIT}`
   return rows.map((row) => ({
     patientId: row.patientId,
-    fullName: `${row.lastName}, ${row.firstName}`,
+    fullName: patientName(row),
     balance: fromCents(cents(row.pending)),
+  }))
+}
+
+export async function listPendingBilling(db: Db, actor: AuthContext): Promise<PendingBillingDto> {
+  const [appointments, items] = await Promise.all([listUnclosedAppointments(db, actor), listUnbilledItems(db, actor)])
+  return { appointments, items }
+}
+
+async function listUnbilledItems(db: Db, actor: AuthContext): Promise<UnbilledItemDto[]> {
+  const items = await db.treatmentItem.findMany({
+    where: {
+      status: 'COMPLETED',
+      services: { none: { voidedAt: null } },
+      plan: { organizationId: actor.organizationId, patient: { archivedAt: null } },
+    },
+    include: {
+      practice: { select: { name: true } },
+      plan: {
+        select: {
+          id: true,
+          patient: { select: { id: true, firstName: true, lastName: true } },
+          professional: { select: { user: { select: { displayName: true } } } },
+        },
+      },
+    },
+    orderBy: [{ completedAt: 'asc' }, { id: 'asc' }],
+    take: 200,
+  })
+  return items.map((item) => ({
+    id: item.id,
+    planId: item.plan.id,
+    practice: item.practice.name,
+    patient: { id: item.plan.patient.id, fullName: patientName(item.plan.patient) },
+    professional: item.plan.professional.user.displayName,
+    completedAt: (item.completedAt ?? item.updatedAt).toISOString(),
   }))
 }

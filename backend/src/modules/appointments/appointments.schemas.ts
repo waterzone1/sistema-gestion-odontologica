@@ -66,6 +66,25 @@ export const changeStatusSchema = z
   })
   .meta({ id: 'ChangeAppointmentStatusInput' })
 
+export const reactivateSchema = z
+  .object({ acknowledgeWarnings: acknowledgeSchema, override: overrideSchema })
+  .meta({ id: 'ReactivateAppointmentInput' })
+
+export const closeAppointmentSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('TREATMENT_SESSION'), treatmentItemId: z.uuid() }),
+    z.object({ kind: z.literal('NO_CHARGE'), reason: z.string().trim().min(3, 'Indicá el motivo').max(200) }),
+  ])
+  .meta({ id: 'CloseAppointmentInput' })
+
+const billingStateSchema = z
+  .enum(['NOT_APPLICABLE', 'PENDING', 'SERVICE', 'TREATMENT_SESSION', 'NO_CHARGE'])
+  .meta({
+    id: 'AppointmentBillingState',
+    description:
+      'Solo para turnos atendidos: PENDING si todavía no tiene prestación ni cierre; SERVICE si tiene una prestación registrada; TREATMENT_SESSION si es una sesión de un ítem del plan; NO_CHARGE si se cerró sin cargo',
+  })
+
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_RANGE_DAYS = 62
 const MAX_PATIENT_RANGE_DAYS = 366
@@ -109,6 +128,14 @@ export const appointmentSchema = z
       .meta({ description: 'Si el turno tiene una nota clínica. Nulo para quien no accede a datos clínicos' }),
     availabilityOverride: z.boolean(),
     overrideReason: z.string().nullable(),
+    billing: billingStateSchema,
+    closure: z
+      .object({
+        reason: z.string().nullable(),
+        treatmentItem: z.object({ id: z.uuid(), practice: z.string() }).nullable(),
+        closedAt: z.iso.datetime(),
+      })
+      .nullable(),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'Appointment' })
@@ -117,4 +144,6 @@ export type AppointmentDto = z.infer<typeof appointmentSchema>
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>
 export type ChangeStatusInput = z.infer<typeof changeStatusSchema>
+export type ReactivateInput = z.infer<typeof reactivateSchema>
+export type CloseAppointmentInput = z.infer<typeof closeAppointmentSchema>
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>

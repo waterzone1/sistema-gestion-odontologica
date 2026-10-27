@@ -7,20 +7,17 @@ const documentTypeSchema = z.enum(['DNI', 'LE', 'LC', 'PASAPORTE', 'OTRO']).meta
 const nameSchema = (label: string) => z.string().trim().min(1, `Ingresá ${label}`).max(80)
 
 const documentNumberSchema = z
-  .string()
+  .string('Ingresá el número de documento')
   .trim()
+  .min(1, 'Ingresá el número de documento')
   .max(24)
-  .transform((value) => (value === '' ? null : normalizeDocumentNumber(value)))
-  .nullable()
-  .optional()
+  .transform(normalizeDocumentNumber)
 
 const birthDateSchema = z.iso
-  .date('Fecha de nacimiento inválida')
+  .date('Ingresá una fecha de nacimiento válida')
   .refine((value) => value >= '1900-01-01' && value <= new Date().toISOString().slice(0, 10), {
     message: 'La fecha de nacimiento no es válida',
   })
-  .nullable()
-  .optional()
 
 const patientFields = {
   firstName: nameSchema('el nombre'),

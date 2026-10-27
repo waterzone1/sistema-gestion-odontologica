@@ -67,7 +67,7 @@ async function leerCuenta(cliente: Client = recepcion, id = pacienteId): Promise
 }
 
 async function registrar(practica: { id: string }, extra: Record<string, unknown> = {}): Promise<string> {
-  const res = await as(app, odontologo).post(servicios(), { practiceId: practica.id, ...extra })
+  const res = await as(app, recepcion).post(servicios(), { practiceId: practica.id, professionalId: perfilId, ...extra })
   expect(res.status).toBe(201)
   return (res.body as { id: string }).id
 }
@@ -101,10 +101,10 @@ beforeEach(async () => {
 })
 
 describe('registro de prestaciones', () => {
-  it('el odontologo registra a su nombre y no ve ningun importe', async () => {
-    const res = await as(app, odontologo).post(servicios(), { practiceId: limpieza.id })
-    expect(res.status).toBe(201)
-    expect(res.body).toMatchObject({
+  it('el odontologo ve el historial sin importes pero no registra prestaciones', async () => {
+    await registrar(limpieza)
+    const lista = (await as(app, odontologo).get(servicios())).body as Servicio[]
+    expect(lista[0]).toMatchObject({
       practice: { code: 'LIM' },
       professional: { id: perfilId, displayName: 'Dra. Paz' },
       price: null,
@@ -113,18 +113,12 @@ describe('registro de prestaciones', () => {
       pending: null,
       status: 'ACTIVE',
     })
-    const lista = (await as(app, odontologo).get(servicios())).body as Servicio[]
-    expect(lista.every((s) => s.price === null && s.pending === null)).toBe(true)
     const desdeRecepcion = (await as(app, recepcion).get(servicios())).body as Servicio[]
     expect(desdeRecepcion[0]).toMatchObject({ price: '25000.50', catalogPrice: '25000.50', pending: '25000.50' })
-  })
 
-  it('el odontologo no registra a nombre de otro ni define precios', async () => {
-    const ajeno = await as(app, odontologo).post(servicios(), { practiceId: consulta.id, professionalId: otroPerfilId })
-    expect(ajeno.status).toBe(403)
-    const conPrecio = await as(app, odontologo).post(servicios(), { practiceId: consulta.id, price: '5000' })
-    expect(conPrecio.status).toBe(403)
-    expect(await db.performedService.count()).toBe(0)
+    const propia = await as(app, odontologo).post(servicios(), { practiceId: consulta.id })
+    expect(propia.status).toBe(403)
+    expect(await db.performedService.count()).toBe(1)
   })
 
   it('recepcion y administracion registran eligiendo el profesional y pueden fijar otro precio', async () => {
@@ -154,13 +148,13 @@ describe('registro de prestaciones', () => {
 
   it('rechaza practicas inactivas, fechas futuras y pacientes archivados', async () => {
     const inactiva = await seedPractice(db, seed, { active: false })
-    const a = await as(app, odontologo).post(servicios(), { practiceId: inactiva.id })
+    const a = await as(app, recepcion).post(servicios(), { practiceId: inactiva.id, professionalId: perfilId })
     expect([a.status, codigo(a)]).toEqual([422, 'INVALID_PRACTICE'])
     const futura = new Date(Date.now() + DIA).toISOString()
-    const b = await as(app, odontologo).post(servicios(), { practiceId: consulta.id, performedAt: futura })
+    const b = await as(app, recepcion).post(servicios(), { practiceId: consulta.id, professionalId: perfilId, performedAt: futura })
     expect([b.status, codigo(b)]).toEqual([422, 'FUTURE_DATE'])
     await db.patient.update({ where: { id: pacienteId }, data: { archivedAt: new Date() } })
-    const c = await as(app, odontologo).post(servicios(), { practiceId: consulta.id })
+    const c = await as(app, recepcion).post(servicios(), { practiceId: consulta.id, professionalId: perfilId })
     expect([c.status, codigo(c)]).toEqual([422, 'PATIENT_ARCHIVED'])
   })
 })
@@ -239,6 +233,7 @@ describe('anulaciones', () => {
         organizationId: seed.organizationId,
         patientId: pacienteId,
         amount: '500.00',
+        originalAmount: '500.00',
         method: 'CASH',
         receivedAt: new Date(Date.now() - 3 * DIA),
         createdById: recepcion.userId,
@@ -495,7 +490,7 @@ describe('saldos pendientes', () => {
     const alDia = await seedPatient(db, seed, { firstName: 'Beto', lastName: 'Alvarez' })
     await registrar(consulta)
     const registrarA = (id: string, practica: { id: string }) =>
-      as(app, odontologo).post(servicios(id), { practiceId: practica.id }).expect(201)
+      as(app, recepcion).post(servicios(id), { practiceId: practica.id, professionalId: perfilId }).expect(201)
     await registrarA(otro.id, limpieza)
     await registrarA(alDia.id, consulta)
     await cobrar([{ amount: '10000' }], {}, recepcion, alDia.id).expect(201)

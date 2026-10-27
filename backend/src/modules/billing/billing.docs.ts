@@ -19,6 +19,7 @@ import {
   creditParamsSchema,
   createServiceSchema,
   debtorSchema,
+  pendingBillingSchema,
   paymentParamsSchema,
   paymentSchema,
   serviceParamsSchema,
@@ -167,5 +168,16 @@ export function registerBillingDocs(registry: OpenAPIRegistry): void {
     description: 'Los 20 mayores saldos a cobrar.',
     security: readSecurity,
     responses: { 200: json(z.array(debtorSchema), 'Pacientes con saldo a cobrar'), ...common },
+  })
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/billing/pending',
+    tags,
+    summary: 'Pendientes de facturar',
+    description:
+      'Turnos atendidos sin prestación ni cierre, e ítems del plan que el odontólogo marcó realizados y todavía no tienen la prestación registrada. Solo para quien registra prestaciones.',
+    security: readSecurity,
+    responses: { 200: json(pendingBillingSchema, 'Pendientes'), ...common },
   })
 }

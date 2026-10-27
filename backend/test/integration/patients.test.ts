@@ -72,11 +72,24 @@ describe('alta de pacientes', () => {
     expect(await db.patient.count()).toBe(0)
   })
 
-  it('el documento es opcional y varios pacientes pueden no tenerlo', async () => {
-    await as(app, recepcion).post('/api/patients', nuevoPaciente({ documentNumber: null })).expect(201)
-    await as(app, recepcion)
-      .post('/api/patients', nuevoPaciente({ firstName: 'Beto', documentNumber: '' }))
-      .expect(201)
+  it.each([
+    { firstName: '' },
+    { lastName: '  ' },
+    { documentNumber: null },
+    { documentNumber: '' },
+    { birthDate: null },
+    { birthDate: undefined },
+  ])('exige nombre, apellido, documento y fecha de nacimiento (%o)', async (falta) => {
+    const res = await as(app, recepcion).post('/api/patients', nuevoPaciente(falta))
+    expect(res.status).toBe(400)
+    expect(await db.patient.count()).toBe(0)
+  })
+
+  it('no deja borrar el documento ni la fecha de nacimiento al editar', async () => {
+    const id = ((await as(app, recepcion).post('/api/patients', nuevoPaciente()).expect(201)).body as { id: string }).id
+    await as(app, recepcion).patch(`/api/patients/${id}`, { documentNumber: '' }).expect(400)
+    await as(app, recepcion).patch(`/api/patients/${id}`, { birthDate: null }).expect(400)
+    await as(app, recepcion).patch(`/api/patients/${id}`, { phone: '' }).expect(200)
   })
 
   it('rechaza un documento duplicado e indica de quien es', async () => {

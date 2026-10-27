@@ -27,9 +27,9 @@ import { usePractices, useProfessionals } from '@/hooks/use-catalog'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSession } from '@/hooks/use-session'
 import { api, ApiError, errorMessage, type Appointment } from '@/lib/api'
-import { appointmentEvents, availabilityEvents, noticeEvents, type StatusFilter } from '@/lib/agenda'
+import { appointmentEvents, availabilityEvents, availableIntervals, hiddenDays, noticeEvents, type StatusFilter } from '@/lib/agenda'
 import { STATUS_LABELS } from '@/lib/appointments'
-import { formatDateTime, formatTime, maskDate, parseDateText } from '@/lib/format'
+import { formatDateTime, formatTime, maskDate, pad, parseDateText } from '@/lib/format'
 import { can, visibleBranches } from '@/lib/permissions'
 import { colorVar } from '@/lib/professional-colors'
 import { Button } from '@/components/ui/button'
@@ -103,6 +103,7 @@ export default function AgendaPage() {
 
   if (!user || !allowed || branches.isPending || professionals.isPending) return <LoadingBlock />
 
+  const preferences = user.preferences
   const professionalList = professionals.data ?? []
   const background = availabilityFor ? availabilityEvents(availability.data ?? []) : []
   const notices = noticeEvents(availability.data ?? [], professionalList)
@@ -190,7 +191,7 @@ export default function AgendaPage() {
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
         >
-          <option value="ACTIVE">Sin cancelados</option>
+          <option value="ACTIVE">Sin cancelados ni ausentes</option>
           <option value="">Todos los estados</option>
           {Object.entries(STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -233,7 +234,7 @@ export default function AgendaPage() {
           key={compact ? 'lista' : 'grilla'}
           plugins={[timeGridPlugin, listPlugin, interactionPlugin]}
           locale={esLocale}
-          initialView={compact ? 'listWeek' : 'timeGridWeek'}
+          initialView={compact ? 'listWeek' : preferences.agendaView}
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',
@@ -246,8 +247,10 @@ export default function AgendaPage() {
           nowIndicator
           slotEventOverlap={false}
           height="auto"
-          slotMinTime="07:00:00"
-          slotMaxTime="21:00:00"
+          slotMinTime={`${pad(preferences.agendaStartHour)}:00:00`}
+          slotMaxTime={`${pad(preferences.agendaEndHour)}:00:00`}
+          slotDuration={`00:${preferences.agendaSlotMinutes}:00`}
+          hiddenDays={hiddenDays(preferences, [...(appointments.data ?? []), ...availableIntervals(availability.data)])}
           snapDuration="00:15:00"
           slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
           eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}

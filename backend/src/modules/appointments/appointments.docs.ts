@@ -14,8 +14,10 @@ import {
   appointmentIdParamsSchema,
   appointmentSchema,
   changeStatusSchema,
+  closeAppointmentSchema,
   createAppointmentSchema,
   listAppointmentsQuerySchema,
+  reactivateSchema,
   updateAppointmentSchema,
 } from './appointments.schemas.js'
 
@@ -99,6 +101,43 @@ export function registerAppointmentsDocs(registry: OpenAPIRegistry): void {
       400: invalidInput,
       404: notFound,
       409: errorResponse('Transición no permitida'),
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/appointments/{id}/reactivate',
+    tags,
+    summary: 'Reactiva un turno cancelado o ausente',
+    description:
+      'Vuelve a Pendiente si el horario sigue libre. Aplica las mismas reglas de disponibilidad que al dar un turno nuevo.',
+    security: writeSecurity,
+    request: { ...params, ...bodyOf(reactivateSchema) },
+    responses: {
+      200: json(appointmentSchema, 'Turno reactivado'),
+      404: notFound,
+      409: errorResponse('El turno no está cancelado ni ausente, o el horario ya está ocupado'),
+      422: errorResponse('Fuera de la disponibilidad del profesional o con advertencias sin confirmar'),
+      ...common,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/appointments/{id}/close',
+    tags,
+    summary: 'Cierra un turno atendido sin prestación propia',
+    description:
+      'Lo marca como sesión de un ítem del plan de tratamiento (ya cobrado o en curso) o sin cargo con motivo. Registrar una prestación desde el turno también lo cierra.',
+    security: writeSecurity,
+    request: { ...params, ...bodyOf(closeAppointmentSchema) },
+    responses: {
+      200: json(appointmentSchema, 'Turno cerrado'),
+      400: invalidInput,
+      404: notFound,
+      409: errorResponse('El turno no está pendiente de cierre'),
+      422: errorResponse('El ítem no corresponde a un plan vigente del paciente'),
       ...common,
     },
   })
