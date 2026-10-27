@@ -20,6 +20,13 @@ import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
 import { agendaAvailabilityRouter, professionalAvailabilityRouter } from './modules/availability/availability.routes.js'
 import { cashRouter, exchangeRatesRouter } from './modules/cash/cash.routes.js'
+import { coveragesRouter, patientCoveragesRouter } from './modules/coverages/coverages.routes.js'
+import { liquidationsRouter } from './modules/liquidations/liquidations.routes.js'
+import { auditRouter } from './modules/audit/audit.routes.js'
+import type { BackupConfig } from './modules/backups/backups.archive.js'
+import { backupsRouter } from './modules/backups/backups.routes.js'
+import { maintenanceActive } from './modules/backups/backups.service.js'
+import { maintenanceGuard } from './middleware/maintenance.js'
 import { debtorsRouter, patientBillingRouter, pendingBillingRouter } from './modules/billing/billing.routes.js'
 import { clinicalRouter } from './modules/clinical/clinical.routes.js'
 import { clinicalFilesRouter } from './modules/files/files.routes.js'
@@ -41,6 +48,7 @@ export interface AppDeps {
   cookieSecure: boolean
   loginRateLimit?: LoginRateLimit
   files: FileStorageConfig
+  backups: BackupConfig
 }
 
 export function createApp({
@@ -51,6 +59,7 @@ export function createApp({
   cookieSecure,
   loginRateLimit = DEFAULT_LOGIN_RATE_LIMIT,
   files,
+  backups,
 }: AppDeps): Express {
   const app = express()
   app.disable('x-powered-by')
@@ -68,6 +77,7 @@ export function createApp({
 
   app.use(helmet())
   app.use(express.json({ limit: '100kb' }))
+  app.use(maintenanceGuard(maintenanceActive))
   app.use(cookieParser())
   app.use(sessionMiddleware(db))
   app.use(csrfProtection(appOrigin))
@@ -88,11 +98,16 @@ export function createApp({
   app.use('/api/patients/:patientId/odontogram', odontogramRouter(db))
   app.use('/api/patients/:patientId/treatment-plans', treatmentRouter(db))
   app.use('/api/patients/:patientId/notes', patientNotesRouter(db))
+  app.use('/api/patients/:patientId', patientCoveragesRouter(db))
   app.use('/api/patients/:patientId', patientBillingRouter(db))
   app.use('/api/debtors', debtorsRouter(db))
   app.use('/api/billing/pending', pendingBillingRouter(db))
   app.use('/api/exchange-rates', exchangeRatesRouter(db))
   app.use('/api/cash', cashRouter(db))
+  app.use('/api/coverages', coveragesRouter(db))
+  app.use('/api/liquidations', liquidationsRouter(db))
+  app.use('/api/audit', auditRouter(db))
+  app.use('/api/backups', backupsRouter(db, backups, logger))
   app.use('/api/patients', patientsRouter(db))
   app.use('/api/practices', practicesRouter(db))
   app.use('/api/appointments', appointmentsRouter(db))

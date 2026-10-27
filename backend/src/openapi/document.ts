@@ -8,6 +8,10 @@ import { registerPatientsDocs } from '../modules/patients/patients.docs.js'
 import { registerAvailabilityDocs } from '../modules/availability/availability.docs.js'
 import { registerBillingDocs } from '../modules/billing/billing.docs.js'
 import { registerCashDocs } from '../modules/cash/cash.docs.js'
+import { registerCoveragesDocs } from '../modules/coverages/coverages.docs.js'
+import { registerLiquidationsDocs } from '../modules/liquidations/liquidations.docs.js'
+import { registerAuditDocs } from '../modules/audit/audit.docs.js'
+import { registerBackupsDocs } from '../modules/backups/backups.docs.js'
 import { registerFilesDocs } from '../modules/files/files.docs.js'
 import { registerTreatmentDocs } from '../modules/treatment/treatment.docs.js'
 import { registerOdontogramDocs } from '../modules/odontogram/odontogram.docs.js'
@@ -28,6 +32,10 @@ export function buildOpenApiDocument() {
   registerAvailabilityDocs(registry)
   registerBillingDocs(registry)
   registerCashDocs(registry)
+  registerCoveragesDocs(registry)
+  registerLiquidationsDocs(registry)
+  registerAuditDocs(registry)
+  registerBackupsDocs(registry)
   registerClinicalDocs(registry)
   registerFilesDocs(registry)
   registerOdontogramDocs(registry)

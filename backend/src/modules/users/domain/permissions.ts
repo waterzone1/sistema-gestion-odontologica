@@ -31,6 +31,10 @@ export const PERMISSIONS = [
   'treatment:cancel',
   'patient-notes:write',
   'exchange-rate:manage',
+  'coverages:manage',
+  'liquidations:manage',
+  'audit:read',
+  'backups:manage',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -58,6 +62,10 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'services:price',
     'billing:void-any-day',
     'exchange-rate:manage',
+    'coverages:manage',
+    'liquidations:manage',
+    'audit:read',
+    'backups:manage',
     'availability:manage',
     'appointments:override',
     'treatment:read',
@@ -97,6 +105,8 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'payments:create',
     'payments:void',
     'exchange-rate:manage',
+    'coverages:manage',
+    'liquidations:manage',
     'availability:manage',
     'treatment:read',
     'treatment:price',

@@ -1,6 +1,6 @@
 # Modelo de datos (ERD)
 
-Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException`, `ProfessionalPractice`, `ClinicalProfile`, `ClinicalFile`, `ToothFinding`, `TreatmentPlan`, `TreatmentItem`, `PatientNote` y `ExchangeRate`.
+Modelo objetivo del sistema. El schema de Prisma incorpora las entidades de forma incremental, milestone a milestone: hoy están implementadas `Organization`, `Branch`, `User`, `UserRole`, `UserBranch`, `Session`, `ProfessionalProfile`, `AuditLog`, `Patient`, `Practice`, `Appointment`, `ClinicalEntry`, `PerformedService`, `Payment`, `PaymentAllocation`, `CreditApplication`, `AvailabilityRule`, `AvailabilityException`, `ProfessionalPractice`, `ClinicalProfile`, `ClinicalFile`, `ToothFinding`, `TreatmentPlan`, `TreatmentItem`, `PatientNote`, `ExchangeRate`, `CoverageProvider`, `CoveragePlan`, `PatientCoverage`, `Agreement`, `AgreementItem`, `Liquidation` y `LiquidationItem`. Los backups no son una tabla: cada uno es un paquete con su registro en el volumen de backups, para que el historial sobreviva a una restauración.
 
 ```mermaid
 erDiagram
@@ -299,8 +299,8 @@ erDiagram
 - **Cierre de turnos:** un turno atendido queda pendiente hasta tener una prestación vigente o un cierre explícito (sesión de un ítem del plan o sin cargo con motivo). El estado se deriva; el cierre se guarda en el turno.
 - **Mensajes sobre el paciente:** `PatientNote` es de solo agregado salvo el archivado, y no lleva información clínica.
 - **Cobros:** el saldo del paciente es la suma de importes a cargo del paciente menos los pagos activos. Un pago puede quedar parcialmente sin imputar (saldo a favor). Se anula con motivo, no se borra.
-- **Coberturas:** `PatientCoverage` conserva el historial y admite una sola cobertura principal activa. Los convenios de un mismo plan no pueden tener vigencias superpuestas.
-- **Liquidaciones:** los totales reclamado y aprobado se derivan de los ítems. Una prestación pertenece a una sola liquidación activa; un ítem rechazado puede volver a presentarse.
+- **Coberturas:** `PatientCoverage` conserva el historial y admite una sola cobertura principal activa; no se edita ni se borra, se archiva. Los convenios de un mismo plan no pueden tener vigencias superpuestas (constraint de exclusión). En la prestación, `price` es lo que paga el paciente (el coseguro, si hay convenio) y `coverageAmount` lo que queda a cargo de la cobertura; ambos se congelan al registrarla.
+- **Liquidaciones:** los totales reclamado, aprobado, debitado y rechazado se derivan de los ítems. Un índice único parcial garantiza que una prestación esté en una sola liquidación activa; un ítem rechazado o una liquidación anulada la liberan para volver a presentarla. Ni las liquidaciones ni sus ítems se borran.
 - **Auditoría:** solo se agregan registros (un trigger de la base rechaza `UPDATE` y `DELETE`). Se guardan identificadores y nombres de campos en `metadata`, nunca contraseñas, tokens ni contenido clínico.
 - **Organización única:** un índice único sobre una expresión constante impide crear una segunda organización en la misma instalación.
 - **Sesiones:** del token de la cookie solo se guarda su hash SHA-256. Cada sesión tiene su propio token CSRF.

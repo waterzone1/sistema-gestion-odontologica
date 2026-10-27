@@ -28,6 +28,13 @@ export const createServiceSchema = z
     price: moneySchema.optional(),
     tooth: z.number().int().nullish(),
     surfaces: z.array(z.enum(SURFACES)).max(5).default([]),
+    applyCoverage: z.boolean().default(true).meta({ description: 'Aplica la cobertura vigente del paciente si hay convenio para la práctica' }),
+    authorizationCode: z
+      .string()
+      .trim()
+      .max(60)
+      .optional()
+      .transform((value) => (value ? value : null)),
   })
   .refine((value) => value.practiceId !== undefined || value.treatmentItemId !== undefined, {
     path: ['practiceId'],
@@ -89,7 +96,10 @@ export const serviceSchema = z
     treatmentItemId: z.uuid().nullable(),
     tooth: z.number().int().nullable().meta({ description: 'Nulo para quien no accede a datos clínicos' }),
     surfaces: z.array(z.enum(SURFACES)),
-    price: amount('Precio final. Nulo para quien no puede ver importes'),
+    price: amount('A cargo del paciente (si hay cobertura, el coseguro). Nulo para quien no puede ver importes'),
+    coverageAmount: amount('A cargo de la cobertura, pendiente de liquidar'),
+    coverage: z.object({ provider: z.string(), plan: z.string(), affiliateNumber: z.string() }).nullable(),
+    authorizationCode: z.string().nullable(),
     catalogPrice: amount('Precio del catálogo al registrarla'),
     paid: amount('Importe cubierto por pagos vigentes'),
     pending: amount('Importe que falta pagar'),

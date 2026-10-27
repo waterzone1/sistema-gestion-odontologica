@@ -136,6 +136,10 @@ components:
               - treatment:cancel
               - patient-notes:write
               - exchange-rate:manage
+              - coverages:manage
+              - liquidations:manage
+              - audit:read
+              - backups:manage
         branchIds:
           type: array
           items:
@@ -1095,7 +1099,33 @@ components:
             - string
             - "null"
           example: "25000.00"
-          description: Precio final. Nulo para quien no puede ver importes
+          description: A cargo del paciente (si hay cobertura, el coseguro). Nulo para
+            quien no puede ver importes
+        coverageAmount:
+          type:
+            - string
+            - "null"
+          example: "25000.00"
+          description: A cargo de la cobertura, pendiente de liquidar
+        coverage:
+          type:
+            - object
+            - "null"
+          properties:
+            provider:
+              type: string
+            plan:
+              type: string
+            affiliateNumber:
+              type: string
+          required:
+            - provider
+            - plan
+            - affiliateNumber
+        authorizationCode:
+          type:
+            - string
+            - "null"
         catalogPrice:
           type:
             - string
@@ -1141,6 +1171,9 @@ components:
         - tooth
         - surfaces
         - price
+        - coverageAmount
+        - coverage
+        - authorizationCode
         - catalogPrice
         - paid
         - pending
@@ -1190,6 +1223,14 @@ components:
               - O
           maxItems: 5
           default: []
+        applyCoverage:
+          type: boolean
+          default: true
+          description: Aplica la cobertura vigente del paciente si hay convenio para la
+            práctica
+        authorizationCode:
+          type: string
+          maxLength: 60
     AdjustPriceInput:
       type: object
       properties:
@@ -1810,6 +1851,936 @@ components:
         - totalArs
         - creditTotal
         - voidedCount
+    CoverageProvider:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/CoverageKind"
+        active:
+          type: boolean
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              code:
+                type:
+                  - string
+                  - "null"
+              active:
+                type: boolean
+            required:
+              - id
+              - name
+              - code
+              - active
+      required:
+        - id
+        - name
+        - kind
+        - active
+        - plans
+    CoverageKind:
+      type: string
+      enum:
+        - OBRA_SOCIAL
+        - PREPAGA
+        - OTHER
+    CreateCoverageProviderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        kind:
+          $ref: "#/components/schemas/CoverageKind"
+      required:
+        - name
+        - kind
+    UpdateCoverageProviderInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        kind:
+          $ref: "#/components/schemas/CoverageKind"
+        active:
+          type: boolean
+    CreateCoveragePlanInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        code:
+          type: string
+          maxLength: 30
+      required:
+        - name
+    UpdateCoveragePlanInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        active:
+          type: boolean
+    Agreement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+        notes:
+          type:
+            - string
+            - "null"
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              practice:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  code:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - code
+                  - name
+              insurerAmount:
+                type: string
+              patientCopay:
+                type: string
+              requiresAuthorization:
+                type: boolean
+            required:
+              - practice
+              - insurerAmount
+              - patientCopay
+              - requiresAuthorization
+      required:
+        - id
+        - planId
+        - validFrom
+        - validTo
+        - notes
+        - items
+    CreateAgreementInput:
+      type: object
+      properties:
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+        notes:
+          type: string
+          maxLength: 300
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              practiceId:
+                type: string
+                format: uuid
+              insurerAmount:
+                type: string
+                pattern: ^\d{1,12}(\.\d{1,2})?$
+                description: Lo que paga la cobertura
+              patientCopay:
+                type: string
+                pattern: ^\d{1,12}(\.\d{1,2})?$
+                description: "Coseguro: lo que paga el paciente"
+              requiresAuthorization:
+                type: boolean
+                default: false
+            required:
+              - practiceId
+              - insurerAmount
+              - patientCopay
+          minItems: 1
+          maxItems: 200
+      required:
+        - validFrom
+        - items
+    UpdateAgreementInput:
+      type: object
+      properties:
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+        notes:
+          type: string
+          maxLength: 300
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              practiceId:
+                type: string
+                format: uuid
+              insurerAmount:
+                type: string
+                pattern: ^\d{1,12}(\.\d{1,2})?$
+                description: Lo que paga la cobertura
+              patientCopay:
+                type: string
+                pattern: ^\d{1,12}(\.\d{1,2})?$
+                description: "Coseguro: lo que paga el paciente"
+              requiresAuthorization:
+                type: boolean
+                default: false
+            required:
+              - practiceId
+              - insurerAmount
+              - patientCopay
+          minItems: 1
+          maxItems: 200
+    PatientCoverage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            kind:
+              $ref: "#/components/schemas/CoverageKind"
+          required:
+            - id
+            - name
+            - kind
+        plan:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        affiliateNumber:
+          type: string
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+        notes:
+          type:
+            - string
+            - "null"
+        primary:
+          type: boolean
+        archived:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - provider
+        - plan
+        - affiliateNumber
+        - validFrom
+        - validTo
+        - notes
+        - primary
+        - archived
+        - createdAt
+    CreatePatientCoverageInput:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+        affiliateNumber:
+          type: string
+          minLength: 1
+          maxLength: 40
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+        notes:
+          type: string
+          maxLength: 300
+        primary:
+          type: boolean
+          default: true
+      required:
+        - planId
+        - affiliateNumber
+        - validFrom
+    CoverageQuote:
+      type: object
+      properties:
+        coverage:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            provider:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                kind:
+                  $ref: "#/components/schemas/CoverageKind"
+              required:
+                - id
+                - name
+                - kind
+            plan:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+              required:
+                - id
+                - name
+            affiliateNumber:
+              type: string
+          required:
+            - id
+            - provider
+            - plan
+            - affiliateNumber
+        insurerAmount:
+          type:
+            - string
+            - "null"
+        patientCopay:
+          type:
+            - string
+            - "null"
+        requiresAuthorization:
+          type: boolean
+      required:
+        - coverage
+        - insurerAmount
+        - patientCopay
+        - requiresAuthorization
+    LiquidationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/LiquidationStatus"
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        paidAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        paidAmount:
+          type:
+            - string
+            - "null"
+        paymentReference:
+          type:
+            - string
+            - "null"
+        cancelReason:
+          type:
+            - string
+            - "null"
+        totals:
+          type: object
+          properties:
+            items:
+              type: integer
+            pending:
+              type: integer
+            claimed:
+              type: string
+            approved:
+              type: string
+              description: Aprobado más lo que quedó después de los débitos
+            rejected:
+              type: string
+            debited:
+              type: string
+              description: Diferencia que la cobertura descontó en los ítems debitados
+          required:
+            - items
+            - pending
+            - claimed
+            - approved
+            - rejected
+            - debited
+      required:
+        - id
+        - provider
+        - periodFrom
+        - periodTo
+        - status
+        - createdBy
+        - createdAt
+        - submittedAt
+        - paidAt
+        - paidAmount
+        - paymentReference
+        - cancelReason
+        - totals
+    LiquidationStatus:
+      type: string
+      enum:
+        - DRAFT
+        - SUBMITTED
+        - PAID
+        - CANCELLED
+    Liquidation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/LiquidationStatus"
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        paidAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        paidAmount:
+          type:
+            - string
+            - "null"
+        paymentReference:
+          type:
+            - string
+            - "null"
+        cancelReason:
+          type:
+            - string
+            - "null"
+        totals:
+          type: object
+          properties:
+            items:
+              type: integer
+            pending:
+              type: integer
+            claimed:
+              type: string
+            approved:
+              type: string
+              description: Aprobado más lo que quedó después de los débitos
+            rejected:
+              type: string
+            debited:
+              type: string
+              description: Diferencia que la cobertura descontó en los ítems debitados
+          required:
+            - items
+            - pending
+            - claimed
+            - approved
+            - rejected
+            - debited
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              status:
+                $ref: "#/components/schemas/LiquidationItemStatus"
+              claimedAmount:
+                type: string
+              approvedAmount:
+                type:
+                  - string
+                  - "null"
+              reason:
+                type:
+                  - string
+                  - "null"
+              service:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  performedAt:
+                    type: string
+                    format: date-time
+                  patient:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      fullName:
+                        type: string
+                    required:
+                      - id
+                      - fullName
+                  practice:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                      - code
+                      - name
+                  plan:
+                    type: string
+                  affiliateNumber:
+                    type: string
+                  authorizationCode:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - id
+                  - performedAt
+                  - patient
+                  - practice
+                  - plan
+                  - affiliateNumber
+                  - authorizationCode
+            required:
+              - id
+              - status
+              - claimedAmount
+              - approvedAmount
+              - reason
+              - service
+      required:
+        - id
+        - provider
+        - periodFrom
+        - periodTo
+        - status
+        - createdBy
+        - createdAt
+        - submittedAt
+        - paidAt
+        - paidAmount
+        - paymentReference
+        - cancelReason
+        - totals
+        - items
+    LiquidationItemStatus:
+      type: string
+      enum:
+        - PENDING
+        - APPROVED
+        - DEBITED
+        - REJECTED
+    CreateLiquidationInput:
+      type: object
+      properties:
+        providerId:
+          type: string
+          format: uuid
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+      required:
+        - providerId
+        - periodFrom
+        - periodTo
+    ResolveLiquidationItemInput:
+      oneOf:
+        - type: object
+          properties:
+            status:
+              type: string
+              enum:
+                - APPROVED
+          required:
+            - status
+        - type: object
+          properties:
+            status:
+              type: string
+              enum:
+                - DEBITED
+            approvedAmount:
+              type: string
+              pattern: ^\d{1,12}(\.\d{1,2})?$
+            reason:
+              type: string
+              minLength: 3
+              maxLength: 300
+          required:
+            - status
+            - approvedAmount
+            - reason
+        - type: object
+          properties:
+            status:
+              type: string
+              enum:
+                - REJECTED
+            reason:
+              type: string
+              minLength: 3
+              maxLength: 300
+          required:
+            - status
+            - reason
+    PayLiquidationInput:
+      type: object
+      properties:
+        amount:
+          type: string
+          pattern: ^\d{1,12}(\.\d{1,2})?$
+        paidAt:
+          type: string
+          format: date-time
+        reference:
+          type: string
+          maxLength: 120
+      required:
+        - amount
+    CancelLiquidationInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 300
+      required:
+        - reason
+    AuditList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              action:
+                type: string
+              entityType:
+                type: string
+              entityId:
+                type:
+                  - string
+                  - "null"
+              actor:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  displayName:
+                    type: string
+                required:
+                  - id
+                  - displayName
+              metadata:
+                type:
+                  - object
+                  - "null"
+                additionalProperties: {}
+              createdAt:
+                type: string
+                format: date-time
+            required:
+              - id
+              - action
+              - entityType
+              - entityId
+              - actor
+              - metadata
+              - createdAt
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required:
+        - items
+        - total
+        - page
+        - pageSize
+    BackupRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+            - SCHEDULED
+            - MANUAL
+        status:
+          type: string
+          enum:
+            - RUNNING
+            - SUCCEEDED
+            - FAILED
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        size:
+          type:
+            - integer
+            - "null"
+        sha256:
+          type:
+            - string
+            - "null"
+        schemaVersion:
+          type:
+            - string
+            - "null"
+        counts:
+          type:
+            - object
+            - "null"
+          properties:
+            patients:
+              type: integer
+            appointments:
+              type: integer
+            clinicalEntries:
+              type: integer
+            services:
+              type: integer
+            payments:
+              type: integer
+            clinicalFiles:
+              type: integer
+          required:
+            - patients
+            - appointments
+            - clinicalEntries
+            - services
+            - payments
+            - clinicalFiles
+        createdBy:
+          type:
+            - string
+            - "null"
+        error:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - kind
+        - status
+        - startedAt
+        - finishedAt
+        - size
+        - sha256
+        - schemaVersion
+        - counts
+        - createdBy
+        - error
+    BackupStatus:
+      type: object
+      properties:
+        maintenance:
+          type: boolean
+        running:
+          type:
+            - string
+            - "null"
+        lastSuccess:
+          type:
+            - string
+            - "null"
+          format: date-time
+        nextScheduled:
+          type:
+            - string
+            - "null"
+          format: date-time
+        toolsAvailable:
+          type: boolean
+      required:
+        - maintenance
+        - running
+        - lastSuccess
+        - nextScheduled
+        - toolsAvailable
+    RestoreResult:
+      type: object
+      properties:
+        id:
+          type: string
+        restoredAt:
+          type: string
+          format: date-time
+        counts:
+          type: object
+          properties:
+            patients:
+              type: integer
+            appointments:
+              type: integer
+            clinicalEntries:
+              type: integer
+            services:
+              type: integer
+            payments:
+              type: integer
+            clinicalFiles:
+              type: integer
+          required:
+            - patients
+            - appointments
+            - clinicalEntries
+            - services
+            - payments
+            - clinicalFiles
+      required:
+        - id
+        - restoredAt
+        - counts
+    RestoreBackupInput:
+      type: object
+      properties:
+        confirmation:
+          type: string
+          enum:
+            - RESTAURAR
+      required:
+        - confirmation
     ClinicalEntry:
       type: object
       properties:
@@ -4705,9 +5676,1234 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/patients/{patientId}/clinical:
+  /api/coverages:
     get:
       tags: &a11
+        - Coberturas
+      summary: Obras sociales y prepagas con sus planes
+      security: *a2
+      responses:
+        "200":
+          description: Coberturas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CoverageProvider"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/providers:
+    post:
+      tags: *a11
+      summary: Da de alta una cobertura
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCoverageProviderInput"
+      responses:
+        "201":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageProvider"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe uno con ese nombre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/providers/{id}:
+    patch:
+      tags: *a11
+      summary: Modifica o desactiva una cobertura
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCoverageProviderInput"
+      responses:
+        "200":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageProvider"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe uno con ese nombre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/providers/{id}/plans:
+    post:
+      tags: *a11
+      summary: Agrega un plan a la cobertura
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCoveragePlanInput"
+      responses:
+        "201":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageProvider"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe uno con ese nombre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/plans/{id}:
+    patch:
+      tags: *a11
+      summary: Modifica o desactiva un plan
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCoveragePlanInput"
+      responses:
+        "200":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageProvider"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya existe uno con ese nombre
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/plans/{id}/agreements:
+    get:
+      tags: *a11
+      summary: Convenios del plan, del más reciente al más antiguo
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Convenios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agreement"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a11
+      summary: Crea un convenio con importes por práctica
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgreementInput"
+      responses:
+        "201":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agreement"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Se superpone con otro convenio del plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/coverages/agreements/{id}:
+    put:
+      tags: *a11
+      summary: Cierra la vigencia o reemplaza los importes del convenio
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgreementInput"
+      responses:
+        "200":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agreement"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Se superpone con otro convenio del plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/coverages:
+    get:
+      tags: *a11
+      summary: Coberturas del paciente, la vigente primero
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      responses:
+        "200":
+          description: Coberturas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatientCoverage"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a11
+      summary: Asigna una cobertura al paciente
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientCoverageInput"
+      responses:
+        "201":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientCoverage"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Plan inactivo o paciente archivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/coverages/{coverageId}/archive:
+    post:
+      tags: *a11
+      summary: Archiva una cobertura del paciente
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: coverageId
+          in: path
+      responses:
+        "201":
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientCoverage"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/coverage-quote:
+    get:
+      tags: *a11
+      summary: Qué cubre la cobertura vigente del paciente para una práctica
+      description: Los importes son nulos para quien no ve la cuenta.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: patientId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: practiceId
+          in: query
+        - schema:
+            type: string
+            format: date
+          required: false
+          name: date
+          in: query
+      responses:
+        "200":
+          description: Cobertura aplicable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverageQuote"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations:
+    get:
+      tags: &a12
+        - Liquidaciones
+      summary: Liquidaciones a coberturas, de la más reciente a la más antigua
+      security: *a2
+      responses:
+        "200":
+          description: Liquidaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LiquidationSummary"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a12
+      summary: Arma una liquidación con las prestaciones cubiertas del período
+      description: Incluye las prestaciones vigentes con importe a cargo de la
+        cobertura que todavía no están en otra liquidación activa. Las
+        rechazadas vuelven a poder liquidarse.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLiquidationInput"
+      responses:
+        "201":
+          description: Liquidación en borrador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Otra liquidación tomó alguna prestación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: No hay prestaciones para liquidar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}:
+    get:
+      tags: *a12
+      summary: Detalle de la liquidación con sus prestaciones
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Liquidación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}/export:
+    get:
+      tags: *a12
+      summary: Exporta la liquidación en CSV (separado por punto y coma)
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Archivo CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}/submit:
+    post:
+      tags: *a12
+      summary: Marca la liquidación como presentada
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Liquidación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La liquidación no está en el estado necesario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}/items/{itemId}/result:
+    post:
+      tags: *a12
+      summary: Registra si la cobertura aprobó, debitó o rechazó una prestación
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: itemId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveLiquidationItemInput"
+      responses:
+        "200":
+          description: Liquidación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La liquidación no está en el estado necesario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: El débito no es menor a lo reclamado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}/payment:
+    post:
+      tags: *a12
+      summary: Registra el pago de la cobertura
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayLiquidationInput"
+      responses:
+        "200":
+          description: Liquidación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La liquidación no está en el estado necesario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Falta el resultado de alguna prestación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/liquidations/{id}/cancel:
+    post:
+      tags: *a12
+      summary: Anula la liquidación y libera sus prestaciones
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelLiquidationInput"
+      responses:
+        "200":
+          description: Liquidación actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liquidation"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: La liquidación no está en el estado necesario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Ya tiene resultados registrados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/audit:
+    get:
+      tags:
+        - Auditoría
+      summary: Registro de auditoría, del más reciente al más antiguo
+      description: "Solo administración. Muestra quién hizo qué y cuándo, con
+        identificadores y nombres de campos: nunca contraseñas, tokens ni
+        contenido clínico."
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+          required: false
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date
+          required: false
+          name: to
+          in: query
+        - schema:
+            type: string
+            maxLength: 60
+          required: false
+          name: action
+          in: query
+        - schema:
+            type: string
+            maxLength: 60
+          required: false
+          name: entityType
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: actorUserId
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            default: 1
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          required: false
+          name: pageSize
+          in: query
+      responses:
+        "200":
+          description: Eventos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditList"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/backups:
+    get:
+      tags: &a13
+        - Backups
+      summary: Historial de backups, del más reciente al más antiguo
+      description: "Solo administración. Retención: 7 diarios, 4 semanales y los
+        últimos 10 manuales."
+      security: *a2
+      responses:
+        "200":
+          description: Backups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BackupRecord"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: *a13
+      summary: Genera un backup ahora
+      description: "Dump lógico completo de PostgreSQL más los archivos clínicos y un
+        manifest con checksums, empaquetados juntos. Corre en segundo plano:
+        consultar el historial para ver cuándo termina."
+      security: *a1
+      responses:
+        "202":
+          description: Backup iniciado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupRecord"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya hay un backup o una restauración en curso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/backups/status:
+    get:
+      tags: *a13
+      summary: "Estado: mantenimiento, backup en curso, último exitoso y próximo
+        programado"
+      security: *a2
+      responses:
+        "200":
+          description: Estado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupStatus"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/backups/{id}/download:
+    get:
+      tags: *a13
+      summary: Descarga el paquete del backup
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            pattern: ^backup-\d{8}-\d{6}-[0-9a-f]{6}$
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Archivo tar
+          content:
+            application/x-tar:
+              schema:
+                type: string
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/backups/{id}/restore:
+    post:
+      tags: *a13
+      summary: Restaura la base y los archivos desde un backup
+      description: Verifica el checksum y la versión del esquema, pone el sistema en
+        mantenimiento (las demás solicitudes reciben 503), restaura la base en
+        una sola transacción y los archivos, y verifica que los conteos
+        coincidan con el manifest.
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            pattern: ^backup-\d{8}-\d{6}-[0-9a-f]{6}$
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreBackupInput"
+      responses:
+        "200":
+          description: Restaurado y verificado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestoreResult"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Ya hay un backup o una restauración en curso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Backup dañado o de otra versión del sistema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patients/{patientId}/clinical:
+    get:
+      tags: &a14
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -4748,7 +6944,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a14
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige agregando una corrección."
@@ -4805,7 +7001,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/profile:
     get:
-      tags: *a11
+      tags: *a14
       summary: "Perfil clínico vigente: alertas, alergias, medicación y antecedentes"
       description: Solo odontólogos. La consulta queda auditada.
       security: *a2
@@ -4842,7 +7038,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     put:
-      tags: *a11
+      tags: *a14
       summary: Guarda una nueva versión del perfil clínico
       description: Cada cambio crea una versión nueva; las anteriores se conservan.
       security: *a1
@@ -4897,7 +7093,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a11
+      tags: *a14
       summary: Agrega una corrección a una nota
       description: La nota original se conserva intacta; la corrección queda vinculada
         a ella.
@@ -4960,7 +7156,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files:
     get:
-      tags: &a12
+      tags: &a15
         - Archivos clínicos
       summary: Archivos clínicos del paciente
       description: Solo odontólogos. Por defecto no incluye los archivados.
@@ -5009,7 +7205,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a12
+      tags: *a15
       summary: Sube un archivo clínico (PDF, JPG o PNG)
       description: El cuerpo es el contenido binario del archivo. El tipo se verifica
         por su contenido, no por la extensión. El tamaño máximo es configurable
@@ -5105,7 +7301,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/content:
     get:
-      tags: *a12
+      tags: *a15
       summary: Descarga o visualiza un archivo clínico
       description: Solo a través del backend, con sesión y permiso clínico. Cada
         descarga queda auditada.
@@ -5146,7 +7342,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/archive:
     post:
-      tags: *a12
+      tags: *a15
       summary: Archiva un archivo clínico (no se borra)
       security: *a1
       parameters:
@@ -5189,7 +7385,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram:
     get:
-      tags: &a13
+      tags: &a16
         - Odontograma
       summary: "Odontograma del paciente: condición actual e historial"
       description: Solo odontólogos. La condición actual se deriva de los registros;
@@ -5229,7 +7425,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram/findings:
     post:
-      tags: *a13
+      tags: *a16
       summary: Registra la condición de una pieza o de sus superficies
       description: Corona, endodoncia, implante, ausente, extracción indicada y
         prótesis se registran sobre la pieza completa. Marcar sano limpia la
@@ -5287,7 +7483,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans:
     get:
-      tags: &a14
+      tags: &a17
         - Plan de tratamiento
       summary: Planes de tratamiento del paciente
       description: El odontólogo ve piezas y superficies pero no importes; recepción y
@@ -5328,7 +7524,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a14
+      tags: *a17
       summary: Crea un plan de tratamiento
       security: *a1
       parameters:
@@ -5376,7 +7572,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items:
     post:
-      tags: *a14
+      tags: *a17
       summary: Agrega una práctica al plan, con pieza y superficies opcionales
       security: *a1
       parameters:
@@ -5442,7 +7638,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/price:
     put:
-      tags: *a14
+      tags: *a17
       summary: Fija el precio acordado de un ítem
       description: Recepción y administración. Al registrar la prestación de ese ítem
         se cobra este precio.
@@ -5510,7 +7706,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/accept:
     post:
-      tags: *a14
+      tags: *a17
       summary: Registra que el paciente aceptó el presupuesto
       description: Exige que todos los ítems vigentes estén cotizados.
       security: *a1
@@ -5566,7 +7762,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/start:
     post:
-      tags: *a14
+      tags: *a17
       summary: Marca un ítem como en curso
       security: *a1
       parameters:
@@ -5621,7 +7817,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/complete:
     post:
-      tags: *a14
+      tags: *a17
       summary: El odontólogo marca un ítem como realizado
       description: "Es un hecho clínico: no registra la prestación ni el cobro. El
         ítem queda para que recepción registre la prestación con el precio
@@ -5679,7 +7875,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/cancel:
     post:
-      tags: *a14
+      tags: *a17
       summary: Cancela un ítem con motivo (no se borra)
       security: *a1
       parameters:
@@ -5745,7 +7941,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a15
+      tags: &a18
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -5787,7 +7983,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a15
+      tags: *a18
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -5829,7 +8025,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a15
+      tags: *a18
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -5885,7 +8081,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a16
+      tags: &a19
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -5956,7 +8152,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a16
+      tags: *a19
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -6013,7 +8209,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a16
+      tags: *a19
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -6049,7 +8245,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a16
+      tags: *a19
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -6111,7 +8307,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a16
+      tags: *a19
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
@@ -6168,7 +8364,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/reactivate:
     post:
-      tags: *a16
+      tags: *a19
       summary: Reactiva un turno cancelado o ausente
       description: Vuelve a Pendiente si el horario sigue libre. Aplica las mismas
         reglas de disponibilidad que al dar un turno nuevo.
@@ -6225,7 +8421,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/close:
     post:
-      tags: *a16
+      tags: *a19
       summary: Cierra un turno atendido sin prestación propia
       description: Lo marca como sesión de un ítem del plan de tratamiento (ya cobrado
         o en curso) o sin cargo con motivo. Registrar una prestación desde el

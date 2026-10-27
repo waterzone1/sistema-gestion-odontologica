@@ -10,6 +10,7 @@ import { hasPermission } from '../users/domain/permissions.js'
 import { currentRate } from '../cash/cash.service.js'
 import { listUnclosedAppointments } from '../appointments/appointments.service.js'
 import { patientName } from '../patients/domain/name.js'
+import { resolveCoverage } from '../coverages/coverages.service.js'
 import { cents, creditFields, paymentFields } from './billing.mapping.js'
 import { allocatePayment, convertCents, fromCents, localDay, sum, toCents, type PendingService } from './domain/balance.js'
 import type {
@@ -30,6 +31,7 @@ const MAX_AMOUNT_CENTS = 99_999_999_999_999
 
 const serviceInclude = {
   practice: { select: { id: true, code: true, name: true } },
+  patientCoverage: { select: { affiliateNumber: true, plan: { select: { name: true, provider: { select: { name: true } } } } } },
   professional: { select: { id: true, user: { select: { displayName: true } } } },
   allocations: {
     select: {
@@ -120,6 +122,15 @@ function toServiceDto(service: ServiceRecord, viewer: Viewer): ServiceDto {
     tooth: viewer.showClinical ? service.tooth : null,
     surfaces: viewer.showClinical ? service.surfaces : [],
     price: show(price),
+    coverageAmount: show(cents(service.coverageAmount)),
+    coverage: service.patientCoverage
+      ? {
+          provider: service.patientCoverage.plan.provider.name,
+          plan: service.patientCoverage.plan.name,
+          affiliateNumber: service.patientCoverage.affiliateNumber,
+        }
+      : null,
+    authorizationCode: service.authorizationCode,
     catalogPrice: show(cents(service.catalogPrice)),
     paid: show(paid),
     pending: show(pending),
@@ -285,7 +296,18 @@ export async function createService(
         throw new AppError(422, 'INVALID_APPOINTMENT', 'El turno no corresponde a este paciente y profesional')
       }
     }
-    const price = input.price ?? item?.agreedPrice?.toFixed(2) ?? practice.basePrice.toFixed(2)
+    const coverage = input.applyCoverage
+      ? await resolveCoverage(tx, patientId, practice.id, localDay(performedAt, viewer.timeZone))
+      : null
+    if (coverage?.requiresAuthorization && !input.authorizationCode) {
+      throw new AppError(422, 'AUTHORIZATION_REQUIRED', 'La cobertura exige un número de autorización para esta práctica')
+    }
+    const price =
+      input.price ?? item?.agreedPrice?.toFixed(2) ?? coverage?.patientCopay.toFixed(2) ?? practice.basePrice.toFixed(2)
+    const coverageAmount = coverage?.insurerAmount.toFixed(2) ?? '0.00'
+    if (toCents(price) + toCents(coverageAmount) === 0) {
+      throw new AppError(422, 'ZERO_AMOUNT', 'La prestación no tiene ningún importe')
+    }
     const service = await tx.performedService.create({
       data: {
         organizationId: actor.organizationId,
@@ -296,6 +318,9 @@ export async function createService(
         treatmentItemId: item?.id ?? null,
         ...location,
         price,
+        coverageAmount,
+        patientCoverageId: coverage?.coverage.id ?? null,
+        authorizationCode: input.authorizationCode,
         catalogPrice: practice.basePrice,
         performedAt,
         createdById: actor.userId,
@@ -372,6 +397,10 @@ export async function voidService(
     if (!service) throw new AppError(404, 'NOT_FOUND', 'La prestación no existe')
     if (service.voidedAt) throw new AppError(409, 'ALREADY_VOIDED', 'La prestación ya está anulada')
     assertVoidAllowed(viewer, 'services:void', service.createdAt)
+    const liquidated = await tx.liquidationItem.findFirst({ where: { serviceId, active: true } })
+    if (liquidated) {
+      throw new AppError(422, 'IN_LIQUIDATION', 'La prestación está en una liquidación: anulá la liquidación o registrá el rechazo antes')
+    }
     if (service.treatmentItemId) {
       const item = await tx.treatmentItem.findUniqueOrThrow({ where: { id: service.treatmentItemId } })
       if (item.completedAt === null) {

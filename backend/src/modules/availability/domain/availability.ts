@@ -74,6 +74,13 @@ export function fromLocal(day: string, minute: number, timeZone: string): Date {
   return new Date(guess)
 }
 
+export const dayOf = (day: string) => new Date(`${day}T00:00:00.000Z`)
+export const isoDay = (date: Date) => date.toISOString().slice(0, 10)
+
+export function localDayRange(from: string, to: string, timeZone: string) {
+  return { gte: fromLocal(from, 0, timeZone), lt: fromLocal(addDays(to, 1), 0, timeZone) }
+}
+
 export function addDays(day: string, days: number): string {
   const [year, month, date] = day.split('-').map(Number) as [number, number, number]
   return new Date(Date.UTC(year, month - 1, date) + days * DAY_MS).toISOString().slice(0, 10)

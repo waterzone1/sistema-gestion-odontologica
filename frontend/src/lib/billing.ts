@@ -14,8 +14,9 @@ export function normalizeAmount(input: string): string {
   return input.trim().replace(/\s/g, '').replace(',', '.')
 }
 
-export function isValidAmount(input: string): boolean {
-  return /^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$/.test(normalizeAmount(input))
+export function isValidAmount(input: string, { allowZero = false } = {}): boolean {
+  const pattern = allowZero ? /^\d{1,12}(\.\d{1,2})?$/ : /^(?!0+(\.0+)?$)\d{1,12}(\.\d{1,2})?$/
+  return pattern.test(normalizeAmount(input))
 }
 
 export const CURRENCY_LABELS: Record<Currency, string> = { ARS: 'Pesos', USD: 'Dólares' }
