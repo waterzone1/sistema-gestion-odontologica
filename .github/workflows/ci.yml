@@ -57,6 +57,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-16
+      - run: echo "PG_BIN_DIR=/usr/lib/postgresql/16/bin" >> "$GITHUB_ENV"
       - run: npm run db:generate
       - run: npm run db:deploy
       - run: npm run lint

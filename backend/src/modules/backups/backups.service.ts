@@ -11,6 +11,7 @@ import {
   fileDigest,
   packDirectory,
   pgToolsAvailable,
+  pgToolsMajor,
   restoreDatabase,
   unpack,
   type BackupConfig,
@@ -107,6 +108,20 @@ function audit(db: Db, context: Context, actor: Actor, entry: Pick<AuditEntry, '
   return recordAudit(db, { ...entry, entityType: 'Backup', organizationId: context.organizationId, actorUserId: actor.userId })
 }
 
+async function assertMatchingTools(db: Db, config: BackupConfig) {
+  const rows = await db.$queryRaw<{ major: number }[]>`SELECT current_setting('server_version_num')::int / 10000 AS major`
+  const server = rows[0]?.major ?? null
+  const tools = await pgToolsMajor(config)
+  if (tools === null) throw new AppError(422, 'PG_TOOLS_MISSING', 'Este servidor no tiene las herramientas de PostgreSQL para generar backups')
+  if (tools !== server) {
+    throw new AppError(
+      422,
+      'PG_VERSION_MISMATCH',
+      `Las herramientas de PostgreSQL (versión ${tools}) no coinciden con la base (versión ${String(server)}): el backup no se podría restaurar`,
+    )
+  }
+}
+
 function assertIdle() {
   if (state.running || state.maintenance) throw new AppError(409, 'BACKUP_BUSY', 'Ya hay un backup o una restauración en curso')
 }
@@ -189,6 +204,7 @@ export async function startBackup(
   kind: BackupRecord['kind'],
 ): Promise<{ record: BackupRecord; done: Promise<BackupRecord> }> {
   assertIdle()
+  await assertMatchingTools(db, config)
   await mkdir(config.dir, { recursive: true })
   const context = await contextOf(db)
   const now = new Date()
