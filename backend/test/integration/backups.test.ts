@@ -135,7 +135,8 @@ describe.skipIf(!herramientas)('backups: generar y restaurar de verdad', () => {
     await writeFile(path.join(TEST_FILES.dir, '2026', '10', 'radiografia'), 'contenido cambiado')
     await writeFile(path.join(TEST_FILES.dir, 'nuevo'), 'no estaba')
 
-    const res = await as(app, admin).post(`/api/backups/${backup.id}/restore`, { confirmation: 'RESTAURAR' }).expect(200)
+    const res = await as(app, admin).post(`/api/backups/${backup.id}/restore`, { confirmation: 'RESTAURAR' })
+    expect(res.status, JSON.stringify(res.body)).toBe(200)
     expect(res.body).toMatchObject({ counts: { patients: 1 } })
     expect(await db.patient.count()).toBe(1)
     expect((await db.patient.findUniqueOrThrow({ where: { id: original.id } })).phone).not.toBe('11 0000-0000')
