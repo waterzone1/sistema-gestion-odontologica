@@ -9,6 +9,7 @@ import { dayOf, isoDay, localDayRange } from '../availability/domain/availabilit
 import { cents } from '../billing/billing.mapping.js'
 import { fromCents, sum, toCents } from '../billing/domain/balance.js'
 import { patientName } from '../patients/domain/name.js'
+import { toCsv } from '../../shared/csv.js'
 import type {
   CreateLiquidationInput,
   LiquidationDto,
@@ -254,16 +255,9 @@ export async function cancelLiquidation(db: Db, actor: AuthContext, id: string, 
   })
 }
 
-const BOM = String.fromCharCode(0xfeff)
-
 const ITEM_STATUS_TEXT = { PENDING: 'Pendiente', APPROVED: 'Aprobada', DEBITED: 'Debitada', REJECTED: 'Rechazada' } as const
 
 const csvMoney = (value: Prisma.Decimal) => value.toFixed(2).replace('.', ',')
-
-function csvCell(value: string): string {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value
-  return /[";\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
-}
 
 export async function exportLiquidation(db: Db, actor: AuthContext, id: string): Promise<{ filename: string; content: string }> {
   return db.$transaction(async (tx) => {
@@ -286,7 +280,7 @@ export async function exportLiquidation(db: Db, actor: AuthContext, id: string):
       item.reason ?? '',
     ])
     await audit(tx, actor, { action: 'LIQUIDATION_EXPORTED', entityId: id })
-    const content = `${BOM}${[header, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n')}\r\n`
+    const content = toCsv([header, ...rows])
     const slug = liquidation.provider.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     return { filename: `liquidacion-${slug || 'cobertura'}-${isoDay(liquidation.periodFrom)}.csv`, content }
   })

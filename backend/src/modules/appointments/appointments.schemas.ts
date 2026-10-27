@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const appointmentStatusSchema = z
+export const appointmentStatusSchema = z
   .enum(['SCHEDULED', 'CONFIRMED', 'ATTENDED', 'NO_SHOW', 'CANCELLED'])
   .meta({ id: 'AppointmentStatus' })
 

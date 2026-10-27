@@ -71,7 +71,8 @@ export async function provisionUser(admin: ApiSession, user: NewUser): Promise<s
     currentPassword: temporary,
     newPassword: user.password,
   })
-  await session.dispose()
   if (changed.status() !== 204) throw new Error(`no se pudo fijar la clave de ${user.username}`)
+  await session.post('/api/auth/onboarding/complete')
+  await session.dispose()
   return id
 }

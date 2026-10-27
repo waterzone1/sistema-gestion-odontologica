@@ -1,6 +1,5 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Building2, CalendarDays, ClipboardList, UserRound, Users } from 'lucide-react'
 import Link from 'next/link'
 import { Debtors } from '@/components/billing/debtors'
@@ -9,20 +8,12 @@ import { ConfirmTomorrow } from '@/components/dashboard/confirm-tomorrow'
 import { DentistPanel } from '@/components/dashboard/dentist-panel'
 import { TodayAppointments } from '@/components/appointments/today-appointments'
 import { PageHeader } from '@/components/page-header'
-import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { sessionKey, useSession } from '@/hooks/use-session'
-import { api } from '@/lib/api'
+import { useSession } from '@/hooks/use-session'
 import { can, ROLE_LABELS } from '@/lib/permissions'
 
 export default function DashboardPage() {
-  const client = useQueryClient()
   const session = useSession()
-  const dismiss = useMutation({
-    mutationFn: () => api.post('/api/auth/onboarding/complete'),
-    onSuccess: () => client.invalidateQueries({ queryKey: sessionKey }),
-  })
 
   const user = session.data?.user
   if (!user) return null
@@ -48,18 +39,6 @@ export default function DashboardPage() {
           </div>
         }
       />
-
-      {!user.onboardingCompleted && (
-        <Alert variant="info" title="Bienvenido/a al sistema" className="mb-6">
-          <p>
-            Desde el menú vas a acceder a las secciones que tu rol tiene habilitadas. A medida que se sumen
-            módulos, van a aparecer acá.
-          </p>
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => dismiss.mutate()} disabled={dismiss.isPending}>
-            Entendido
-          </Button>
-        </Alert>
-      )}
 
       {can(user, 'clinical:read') && <DentistPanel />}
       {can(user, 'appointments:read') && <TodayAppointments user={user} />}

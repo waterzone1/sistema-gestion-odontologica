@@ -35,6 +35,7 @@ export const PERMISSIONS = [
   'liquidations:manage',
   'audit:read',
   'backups:manage',
+  'reports:read',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -66,6 +67,7 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'liquidations:manage',
     'audit:read',
     'backups:manage',
+    'reports:read',
     'availability:manage',
     'appointments:override',
     'treatment:read',
@@ -107,6 +109,7 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'exchange-rate:manage',
     'coverages:manage',
     'liquidations:manage',
+    'reports:read',
     'availability:manage',
     'treatment:read',
     'treatment:price',

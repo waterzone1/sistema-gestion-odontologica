@@ -14,6 +14,7 @@ import { appointmentsRouter } from './modules/appointments/appointments.routes.j
 import { authRouter } from './modules/auth/auth.routes.js'
 import { branchesRouter } from './modules/branches/branches.routes.js'
 import { healthRouter } from './modules/health/health.routes.js'
+import { patientImportsRouter } from './modules/patients/import.routes.js'
 import { patientNotesRouter } from './modules/patients/notes.routes.js'
 import { patientsRouter } from './modules/patients/patients.routes.js'
 import { setupRouter } from './modules/organizations/setup.routes.js'
@@ -23,6 +24,8 @@ import { cashRouter, exchangeRatesRouter } from './modules/cash/cash.routes.js'
 import { coveragesRouter, patientCoveragesRouter } from './modules/coverages/coverages.routes.js'
 import { liquidationsRouter } from './modules/liquidations/liquidations.routes.js'
 import { auditRouter } from './modules/audit/audit.routes.js'
+import { remindersRouter } from './modules/reminders/reminders.routes.js'
+import { reportsRouter } from './modules/reports/reports.routes.js'
 import type { BackupConfig } from './modules/backups/backups.archive.js'
 import { backupsRouter } from './modules/backups/backups.routes.js'
 import { maintenanceActive } from './modules/backups/backups.service.js'
@@ -107,7 +110,10 @@ export function createApp({
   app.use('/api/coverages', coveragesRouter(db))
   app.use('/api/liquidations', liquidationsRouter(db))
   app.use('/api/audit', auditRouter(db))
+  app.use('/api/reports', reportsRouter(db))
+  app.use('/api/reminders', remindersRouter(db))
   app.use('/api/backups', backupsRouter(db, backups, logger))
+  app.use('/api/patient-imports', patientImportsRouter(db))
   app.use('/api/patients', patientsRouter(db))
   app.use('/api/practices', practicesRouter(db))
   app.use('/api/appointments', appointmentsRouter(db))

@@ -427,32 +427,39 @@ export async function changeAppointmentStatus(
     throw new AppError(403, 'FORBIDDEN', 'No tenés permiso para realizar esta acción')
   }
 
-  return db.$transaction(async (tx) => {
-    const current = await findVisibleOrFail(tx, actor, id)
-    const from: AppointmentStatus = current.status
-    if (!canTransition(from, input.status)) {
-      throw new AppError(409, 'INVALID_TRANSITION', 'El turno no puede pasar a ese estado desde el actual')
-    }
+  return db.$transaction(async (tx) => toDto(await transitionStatus(tx, actor, id, input), actor))
+}
 
-    const updated = await tx.appointment.update({
-      where: { id },
-      data: {
-        status: input.status,
-        ...(input.status === 'CANCELLED' ? { cancellationReason: input.cancellationReason ?? null } : {}),
-      },
-      include,
-    })
-    await recordAudit(tx, {
-      action: 'APPOINTMENT_STATUS_CHANGED',
-      entityType: 'Appointment',
-      entityId: id,
-      organizationId: actor.organizationId,
-      actorUserId: actor.userId,
-      branchId: current.branch.id,
-      metadata: { desde: from, hacia: input.status },
-    })
-    return toDto(updated, actor)
+export async function transitionStatus(
+  tx: Prisma.TransactionClient,
+  actor: AuthContext,
+  id: string,
+  input: ChangeStatusInput,
+  extra: Record<string, string | boolean> = {},
+) {
+  const current = await findVisibleOrFail(tx, actor, id)
+  const from: AppointmentStatus = current.status
+  if (!canTransition(from, input.status)) {
+    throw new AppError(409, 'INVALID_TRANSITION', 'El turno no puede pasar a ese estado desde el actual')
+  }
+  const updated = await tx.appointment.update({
+    where: { id },
+    data: {
+      status: input.status,
+      ...(input.status === 'CANCELLED' ? { cancellationReason: input.cancellationReason ?? null } : {}),
+    },
+    include,
   })
+  await recordAudit(tx, {
+    action: 'APPOINTMENT_STATUS_CHANGED',
+    entityType: 'Appointment',
+    entityId: id,
+    organizationId: actor.organizationId,
+    actorUserId: actor.userId,
+    branchId: current.branch.id,
+    metadata: { desde: from, hacia: input.status, ...extra },
+  })
+  return updated
 }
 
 export async function reactivateAppointment(

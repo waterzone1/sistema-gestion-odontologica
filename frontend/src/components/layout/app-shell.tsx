@@ -1,15 +1,17 @@
 'use client'
 
-import { LogOut } from 'lucide-react'
+import { CircleHelp, LogOut, Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { GlobalSearch } from '@/components/layout/global-search'
+import { TutorialDialog } from '@/components/layout/tutorial-dialog'
 import { Button } from '@/components/ui/button'
 import { LoadingBlock } from '@/components/page-header'
 import { useLogout, useSession } from '@/hooks/use-session'
-import { SERVER_UNREACHABLE } from '@/lib/api'
+import { SERVER_UNREACHABLE, type SessionUser } from '@/lib/api'
 import { visibleNav } from '@/lib/nav'
-import { ROLE_LABELS } from '@/lib/permissions'
+import { can, ROLE_LABELS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -37,8 +39,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
   if (isPending || !data || mustChange) return <LoadingBlock label="Cargando…" />
 
-  const { user } = data
+  return (
+    <Shell user={data.user} pathname={pathname} onLogout={() => logout.mutate()} loggingOut={logout.isPending}>
+      {children}
+    </Shell>
+  )
+}
+
+function Shell({
+  user,
+  pathname,
+  onLogout,
+  loggingOut,
+  children,
+}: {
+  user: SessionUser
+  pathname: string
+  onLogout: () => void
+  loggingOut: boolean
+  children: ReactNode
+}) {
   const groups = visibleNav(user)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(!user.onboardingCompleted)
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
@@ -62,36 +85,57 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-col">
         <header className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3">
-          <span className="text-sm font-semibold md:hidden">SGO</span>
-          <span className="hidden md:block" />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="md:hidden"
+              aria-label={menuOpen ? 'Cerrar el menú' : 'Abrir el menú'}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((value) => !value)}
+            >
+              {menuOpen ? <X className="size-4" aria-hidden /> : <Menu className="size-4" aria-hidden />}
+            </Button>
+            {can(user, 'patients:read') && <GlobalSearch />}
+          </div>
           <div className="flex items-center gap-3">
-            <div className="text-right leading-tight">
+            <Button variant="outline" size="sm" aria-label="Ayuda" onClick={() => setHelpOpen(true)}>
+              <CircleHelp className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Ayuda</span>
+            </Button>
+            <div className="hidden text-right leading-tight sm:block">
               <p className="text-sm font-medium">{user.displayName}</p>
               <p className="text-xs text-muted-foreground">
                 {user.roles.map((role) => ROLE_LABELS[role]).join(' · ')}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => logout.mutate()}
-              disabled={logout.isPending}
-              aria-label="Cerrar sesión"
-            >
+            <Button variant="outline" size="sm" onClick={onLogout} disabled={loggingOut} aria-label="Cerrar sesión">
               <LogOut className="size-4" aria-hidden />
               <span className="hidden sm:inline">Salir</span>
             </Button>
           </div>
         </header>
 
-        <nav aria-label="Principal (móvil)" className="flex gap-1 overflow-x-auto border-b bg-card px-3 py-2 md:hidden">
-          {groups.flatMap((group) => group.items).map((item) => (
-            <NavLink key={item.href} {...item} active={pathname.startsWith(item.href)} />
-          ))}
-        </nav>
+        {menuOpen && (
+          <nav aria-label="Principal (móvil)" className="space-y-4 border-b bg-card px-3 py-3 md:hidden">
+            {groups.map((group) => (
+              <div key={group.label ?? 'inicio'} className="space-y-1">
+                {group.label && (
+                  <p className="px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                )}
+                <div className="grid grid-cols-2 gap-1" onClick={() => setMenuOpen(false)}>
+                  {group.items.map((item) => (
+                    <NavLink key={item.href} {...item} active={pathname.startsWith(item.href)} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+        )}
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
       </div>
+      <TutorialDialog user={user} open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   )
 }

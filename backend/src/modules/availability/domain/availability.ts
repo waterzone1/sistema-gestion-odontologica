@@ -74,6 +74,9 @@ export function fromLocal(day: string, minute: number, timeZone: string): Date {
   return new Date(guess)
 }
 
+const pad = (value: number) => String(value).padStart(2, '0')
+export const minuteToTime = (minute: number) => `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`
+
 export const dayOf = (day: string) => new Date(`${day}T00:00:00.000Z`)
 export const isoDay = (date: Date) => date.toISOString().slice(0, 10)
 

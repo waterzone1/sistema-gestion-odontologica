@@ -1,4 +1,6 @@
 import {
+  BarChart3,
+  BellRing,
   Building2,
   DatabaseBackup,
   FileSpreadsheet,
@@ -37,6 +39,8 @@ const NAV: NavGroup[] = [
       { href: '/patients', label: 'Pacientes', icon: UserRound, permission: 'patients:read' },
       { href: '/cash', label: 'Caja', icon: Wallet, permission: 'account:read' },
       { href: '/liquidations', label: 'Liquidaciones', icon: FileSpreadsheet, permission: 'liquidations:manage' },
+      { href: '/reminders', label: 'Recordatorios', icon: BellRing, permission: 'appointments:manage' },
+      { href: '/reports', label: 'Reportes', icon: BarChart3, permission: 'reports:read' },
       { href: '/professionals', label: 'Profesionales', icon: Stethoscope, permission: 'availability:manage' },
     ],
   },

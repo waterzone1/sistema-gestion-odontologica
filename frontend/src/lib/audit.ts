@@ -18,6 +18,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   PATIENT_UPDATED: 'Paciente modificado',
   PATIENT_ARCHIVED: 'Paciente archivado',
   PATIENT_UNARCHIVED: 'Paciente reactivado',
+  PATIENTS_IMPORTED: 'Importación de pacientes',
+  REMINDERS_GENERATED: 'Recordatorios generados',
   PATIENT_NOTE_CREATED: 'Mensaje sobre paciente',
   PATIENT_NOTE_ARCHIVED: 'Mensaje archivado',
   PATIENT_COVERAGE_SAVED: 'Cobertura de paciente',

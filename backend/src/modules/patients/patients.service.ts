@@ -90,6 +90,22 @@ export async function getPatient(db: Db, actor: AuthContext, id: string): Promis
   return toPatientDto(await findPatientOrFail(db, actor.organizationId, id))
 }
 
+export function newPatientData(organizationId: string, input: CreatePatientInput) {
+  const phone = input.phone ?? null
+  return {
+    organizationId,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    documentType: input.documentType,
+    documentNumber: input.documentNumber,
+    birthDate: toDate(input.birthDate),
+    phone,
+    email: input.email ?? null,
+    address: input.address ?? null,
+    searchText: buildSearchText({ firstName: input.firstName, lastName: input.lastName, documentNumber: input.documentNumber, phone }),
+  }
+}
+
 export async function createPatient(
   db: Db,
   actor: AuthContext,
@@ -97,29 +113,10 @@ export async function createPatient(
 ): Promise<PatientDto> {
   const documentNumber = input.documentNumber
   assertDocument(input.documentType, documentNumber)
-  const phone = input.phone ?? null
 
   try {
     return await db.$transaction(async (tx) => {
-      const patient = await tx.patient.create({
-        data: {
-          organizationId: actor.organizationId,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          documentType: input.documentType,
-          documentNumber,
-          birthDate: toDate(input.birthDate),
-          phone,
-          email: input.email ?? null,
-          address: input.address ?? null,
-          searchText: buildSearchText({
-            firstName: input.firstName,
-            lastName: input.lastName,
-            documentNumber,
-            phone,
-          }),
-        },
-      })
+      const patient = await tx.patient.create({ data: newPatientData(actor.organizationId, input) })
       await recordAudit(tx, {
         action: 'PATIENT_CREATED',
         entityType: 'Patient',

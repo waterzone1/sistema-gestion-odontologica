@@ -140,6 +140,7 @@ components:
               - liquidations:manage
               - audit:read
               - backups:manage
+              - reports:read
         branchIds:
           type: array
           items:
@@ -827,6 +828,65 @@ components:
           maxLength: 1000
       required:
         - content
+    PatientImportPreview:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              firstName:
+                type: string
+              lastName:
+                type: string
+              documentType:
+                type: string
+              documentNumber:
+                type: string
+              birthDate:
+                type: string
+              errors:
+                type: array
+                items:
+                  type: string
+            required:
+              - line
+              - firstName
+              - lastName
+              - documentType
+              - documentNumber
+              - birthDate
+              - errors
+        valid:
+          type: integer
+        invalid:
+          type: integer
+      required:
+        - rows
+        - valid
+        - invalid
+    PatientImportInput:
+      type: object
+      properties:
+        csv:
+          type: string
+          minLength: 1
+          maxLength: 1000000
+      required:
+        - csv
+    PatientImportResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        skipped:
+          type: integer
+      required:
+        - created
+        - skipped
     ProfessionalAvailability:
       type: object
       properties:
@@ -1798,13 +1858,7 @@ components:
             type: object
             properties:
               method:
-                type: string
-                enum:
-                  - CASH
-                  - TRANSFER
-                  - CARD
-                  - MERCADOPAGO
-                  - OTHER
+                $ref: "#/components/schemas/PaymentMethod"
               currency:
                 $ref: "#/components/schemas/Currency"
               count:
@@ -2631,6 +2685,281 @@ components:
         - total
         - page
         - pageSize
+    AppointmentsReport:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            total:
+              type: integer
+            scheduled:
+              type: integer
+            confirmed:
+              type: integer
+            attended:
+              type: integer
+            noShow:
+              type: integer
+            cancelled:
+              type: integer
+          required:
+            - total
+            - scheduled
+            - confirmed
+            - attended
+            - noShow
+            - cancelled
+        byProfessional:
+          type: array
+          items:
+            type: object
+            properties:
+              total:
+                type: integer
+              scheduled:
+                type: integer
+              confirmed:
+                type: integer
+              attended:
+                type: integer
+              noShow:
+                type: integer
+              cancelled:
+                type: integer
+              professional:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  displayName:
+                    type: string
+                required:
+                  - id
+                  - displayName
+            required:
+              - total
+              - scheduled
+              - confirmed
+              - attended
+              - noShow
+              - cancelled
+              - professional
+      required:
+        - totals
+        - byProfessional
+    CollectionsReport:
+      type: object
+      properties:
+        totalArs:
+          type: string
+        byDay:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+              amountArs:
+                type: string
+            required:
+              - date
+              - count
+              - amountArs
+        byMethod:
+          type: array
+          items:
+            type: object
+            properties:
+              method:
+                $ref: "#/components/schemas/PaymentMethod"
+              currency:
+                $ref: "#/components/schemas/Currency"
+              count:
+                type: integer
+              originalTotal:
+                type: string
+              amountArs:
+                type: string
+            required:
+              - method
+              - currency
+              - count
+              - originalTotal
+              - amountArs
+      required:
+        - totalArs
+        - byDay
+        - byMethod
+    ServicesReport:
+      type: object
+      properties:
+        byProfessional:
+          type: array
+          items:
+            type: object
+            properties:
+              professional:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  displayName:
+                    type: string
+                required:
+                  - id
+                  - displayName
+              count:
+                type: integer
+              patientAmount:
+                type: string
+              coverageAmount:
+                type: string
+            required:
+              - professional
+              - count
+              - patientAmount
+              - coverageAmount
+        byPractice:
+          type: array
+          items:
+            type: object
+            properties:
+              practice:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  code:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - code
+                  - name
+              count:
+                type: integer
+              patientAmount:
+                type: string
+              coverageAmount:
+                type: string
+            required:
+              - practice
+              - count
+              - patientAmount
+              - coverageAmount
+      required:
+        - byProfessional
+        - byPractice
+    RemindersDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        reminders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reminder"
+      required:
+        - date
+        - reminders
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - PENDING
+            - SENT
+            - CONFIRMED
+            - CANCELLED
+            - FAILED
+        phone:
+          type:
+            - string
+            - "null"
+        message:
+          type: string
+        whatsappUrl:
+          type:
+            - string
+            - "null"
+          description: Link para abrir WhatsApp con el mensaje escrito
+        failureReason:
+          type:
+            - string
+            - "null"
+        sentAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        confirmedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        patient:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            fullName:
+              type: string
+          required:
+            - id
+            - fullName
+        appointment:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              $ref: "#/components/schemas/AppointmentStatus"
+            startsAt:
+              type: string
+              format: date-time
+            professional:
+              type: string
+            branch:
+              type: string
+          required:
+            - id
+            - status
+            - startsAt
+            - professional
+            - branch
+      required:
+        - id
+        - status
+        - phone
+        - message
+        - whatsappUrl
+        - failureReason
+        - sentAt
+        - confirmedAt
+        - patient
+        - appointment
+    GenerateRemindersInput:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Por defecto, mañana
     BackupRecord:
       type: object
       properties:
@@ -4814,9 +5143,125 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
-  /api/professionals/{professionalId}/availability:
+  /api/patient-imports/template:
     get:
       tags: &a8
+        - Pacientes
+      summary: Plantilla CSV para importar pacientes
+      security: *a2
+      responses:
+        "200":
+          description: CSV separado por punto y coma
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patient-imports/preview:
+    post:
+      tags: *a8
+      summary: Revisa un CSV de pacientes y devuelve los errores por fila, sin
+        importar nada
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientImportInput"
+      responses:
+        "200":
+          description: Vista previa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientImportPreview"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Encabezado incompleto, archivo vacío o sin filas válidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/patient-imports:
+    post:
+      tags: *a8
+      summary: Importa las filas válidas del CSV
+      description: Las filas con errores, los documentos repetidos y los pacientes que
+        ya existen se omiten.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientImportInput"
+      responses:
+        "201":
+          description: Resultado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientImportResult"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Otro usuario cargó alguno de esos documentos mientras tanto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Encabezado incompleto, archivo vacío o sin filas válidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/professionals/{professionalId}/availability:
+    get:
+      tags: &a9
         - Disponibilidad
       summary: Horario semanal y excepciones vigentes de un profesional
       security: *a2
@@ -4854,7 +5299,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/availability/rules:
     put:
-      tags: *a8
+      tags: *a9
       summary: Reemplaza el horario semanal
       description: Solo administración. Las franjas son por sede y en la hora del
         consultorio; no pueden superponerse el mismo día aunque sean de sedes
@@ -4911,7 +5356,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/exceptions:
     post:
-      tags: *a8
+      tags: *a9
       summary: Registra un bloqueo, vacaciones, ausencia u horario extraordinario
       description: Administración y recepción. Devuelve los turnos activos que quedan
         dentro del período para reprogramarlos; no los cancela.
@@ -4967,7 +5412,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/professionals/{professionalId}/exceptions/{exceptionId}/revoke:
     post:
-      tags: *a8
+      tags: *a9
       summary: Deja sin efecto una excepción
       description: "La excepción no se borra: queda registrada como revocada."
       security: *a1
@@ -5007,7 +5452,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/availability:
     get:
-      tags: *a8
+      tags: *a9
       summary: Franjas disponibles y bloqueadas de una sede para mostrar en la agenda
       security: *a2
       parameters:
@@ -5062,7 +5507,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services:
     get:
-      tags: &a9
+      tags: &a10
         - Prestaciones y cobros
       summary: Prestaciones realizadas al paciente
       security: *a2
@@ -5101,7 +5546,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a9
+      tags: *a10
       summary: Registra una prestación realizada
       description: La registra un odontólogo (siempre a su nombre), recepción o
         administración (eligiendo el profesional). El precio es el del catálogo
@@ -5160,7 +5605,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/price:
     post:
-      tags: *a9
+      tags: *a10
       summary: Ajusta el precio de una prestación
       description: Recepción y administración. No puede quedar por debajo de lo ya
         pagado. Queda auditado con el precio anterior.
@@ -5228,7 +5673,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/services/{serviceId}/void:
     post:
-      tags: *a9
+      tags: *a10
       summary: Anula una prestación
       description: Recepción solo lo cargado en el día; administración siempre. La
         prestación se conserva marcada como anulada, con el motivo.
@@ -5290,7 +5735,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/account:
     get:
-      tags: *a9
+      tags: *a10
       summary: Cuenta corriente del paciente
       description: El saldo se calcula siempre como prestaciones vigentes menos pagos
         vigentes; no se guarda. Un saldo negativo es saldo a favor.
@@ -5329,7 +5774,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments:
     post:
-      tags: *a9
+      tags: *a10
       summary: Registra un cobro
       description: Un cobro puede combinar varios medios de pago y usar saldo a favor
         si quien cobra lo elige; ese uso queda registrado como un movimiento
@@ -5390,7 +5835,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/payments/{paymentId}/void:
     post:
-      tags: *a9
+      tags: *a10
       summary: Anula un pago
       description: Recepción solo lo cargado en el día; administración siempre. El
         pago se conserva marcado como anulado, con el motivo, y deja de contar
@@ -5453,7 +5898,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/credits/{creditId}/void:
     post:
-      tags: *a9
+      tags: *a10
       summary: Anula un uso de saldo a favor
       description: Recepción solo lo cargado en el día; administración siempre. El
         saldo a favor vuelve a quedar disponible.
@@ -5515,7 +5960,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/debtors:
     get:
-      tags: *a9
+      tags: *a10
       summary: Pacientes con saldo pendiente
       description: Los 20 mayores saldos a cobrar.
       security: *a2
@@ -5542,7 +5987,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/billing/pending:
     get:
-      tags: *a9
+      tags: *a10
       summary: Pendientes de facturar
       description: Turnos atendidos sin prestación ni cierre, e ítems del plan que el
         odontólogo marcó realizados y todavía no tienen la prestación
@@ -5569,7 +6014,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/exchange-rates:
     get:
-      tags: &a10
+      tags: &a11
         - Caja y cotización
       summary: Cotización del dólar vigente e historial
       security: *a2
@@ -5593,7 +6038,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a10
+      tags: *a11
       summary: Carga una nueva cotización del dólar
       description: "Queda como vigente para los cobros en dólares. Los cambios no se
         editan ni se borran: se agrega uno nuevo y queda auditado."
@@ -5630,7 +6075,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/cash:
     get:
-      tags: *a10
+      tags: *a11
       summary: Caja del día
       description: Cobros del día con su moneda, cotización y equivalente en pesos;
         las anulaciones se listan pero no suman. El uso de saldo a favor se
@@ -5678,7 +6123,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages:
     get:
-      tags: &a11
+      tags: &a12
         - Coberturas
       summary: Obras sociales y prepagas con sus planes
       security: *a2
@@ -5705,7 +6150,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/providers:
     post:
-      tags: *a11
+      tags: *a12
       summary: Da de alta una cobertura
       security: *a1
       requestBody:
@@ -5752,7 +6197,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/providers/{id}:
     patch:
-      tags: *a11
+      tags: *a12
       summary: Modifica o desactiva una cobertura
       security: *a1
       parameters:
@@ -5806,7 +6251,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/providers/{id}/plans:
     post:
-      tags: *a11
+      tags: *a12
       summary: Agrega un plan a la cobertura
       security: *a1
       parameters:
@@ -5860,7 +6305,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/plans/{id}:
     patch:
-      tags: *a11
+      tags: *a12
       summary: Modifica o desactiva un plan
       security: *a1
       parameters:
@@ -5914,7 +6359,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/plans/{id}/agreements:
     get:
-      tags: *a11
+      tags: *a12
       summary: Convenios del plan, del más reciente al más antiguo
       security: *a2
       parameters:
@@ -5952,7 +6397,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a12
       summary: Crea un convenio con importes por práctica
       security: *a1
       parameters:
@@ -6006,7 +6451,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/coverages/agreements/{id}:
     put:
-      tags: *a11
+      tags: *a12
       summary: Cierra la vigencia o reemplaza los importes del convenio
       security: *a1
       parameters:
@@ -6060,7 +6505,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/coverages:
     get:
-      tags: *a11
+      tags: *a12
       summary: Coberturas del paciente, la vigente primero
       security: *a2
       parameters:
@@ -6098,7 +6543,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a11
+      tags: *a12
       summary: Asigna una cobertura al paciente
       security: *a1
       parameters:
@@ -6152,7 +6597,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/coverages/{coverageId}/archive:
     post:
-      tags: *a11
+      tags: *a12
       summary: Archiva una cobertura del paciente
       security: *a1
       parameters:
@@ -6201,7 +6646,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/coverage-quote:
     get:
-      tags: *a11
+      tags: *a12
       summary: Qué cubre la cobertura vigente del paciente para una práctica
       description: Los importes son nulos para quien no ve la cuenta.
       security: *a2
@@ -6251,7 +6696,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations:
     get:
-      tags: &a12
+      tags: &a13
         - Liquidaciones
       summary: Liquidaciones a coberturas, de la más reciente a la más antigua
       security: *a2
@@ -6277,7 +6722,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a12
+      tags: *a13
       summary: Arma una liquidación con las prestaciones cubiertas del período
       description: Incluye las prestaciones vigentes con importe a cargo de la
         cobertura que todavía no están en otra liquidación activa. Las
@@ -6327,7 +6772,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}:
     get:
-      tags: *a12
+      tags: *a13
       summary: Detalle de la liquidación con sus prestaciones
       security: *a2
       parameters:
@@ -6364,7 +6809,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}/export:
     get:
-      tags: *a12
+      tags: *a13
       summary: Exporta la liquidación en CSV (separado por punto y coma)
       security: *a2
       parameters:
@@ -6401,7 +6846,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}/submit:
     post:
-      tags: *a12
+      tags: *a13
       summary: Marca la liquidación como presentada
       security: *a1
       parameters:
@@ -6450,7 +6895,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}/items/{itemId}/result:
     post:
-      tags: *a12
+      tags: *a13
       summary: Registra si la cobertura aprobó, debitó o rechazó una prestación
       security: *a1
       parameters:
@@ -6516,7 +6961,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}/payment:
     post:
-      tags: *a12
+      tags: *a13
       summary: Registra el pago de la cobertura
       security: *a1
       parameters:
@@ -6576,7 +7021,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/liquidations/{id}/cancel:
     post:
-      tags: *a12
+      tags: *a13
       summary: Anula la liquidación y libera sus prestaciones
       security: *a1
       parameters:
@@ -6714,9 +7159,412 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/reports/appointments:
+    get:
+      tags: &a14
+        - Reportes
+      summary: Turnos por estado y por profesional, con ausentismo y cancelaciones
+      description: Administración y recepción. Período en días de la zona horaria del
+        consultorio, de hasta un año.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: to
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: branchId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: professionalId
+          in: query
+      responses:
+        "200":
+          description: Reporte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentsReport"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reports/collections:
+    get:
+      tags: *a14
+      summary: Cobranzas vigentes por día y por medio de pago
+      description: Administración y recepción. Período en días de la zona horaria del
+        consultorio, de hasta un año.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: to
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: branchId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: professionalId
+          in: query
+      responses:
+        "200":
+          description: Reporte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionsReport"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reports/services:
+    get:
+      tags: *a14
+      summary: Prestaciones por profesional y por práctica
+      description: Administración y recepción. Período en días de la zona horaria del
+        consultorio, de hasta un año.
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: to
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: branchId
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: professionalId
+          in: query
+      responses:
+        "200":
+          description: Reporte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicesReport"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reports/debtors:
+    get:
+      tags: *a14
+      summary: Todos los pacientes con saldo pendiente, de mayor a menor
+      security: *a2
+      responses:
+        "200":
+          description: Pacientes con saldo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Debtor"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reminders:
+    get:
+      tags: &a15
+        - Recordatorios
+      summary: Recordatorios de turnos de un día
+      security: *a2
+      parameters:
+        - schema:
+            type: string
+            format: date
+          required: true
+          name: date
+          in: query
+      responses:
+        "200":
+          description: Recordatorios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemindersDay"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reminders/generate:
+    post:
+      tags: *a15
+      summary: Genera los recordatorios que falten para los turnos de un día
+      description: "Uno por turno pendiente o confirmado. Si el paciente no tiene un
+        celular válido, queda como fallido con el motivo. No se envía nada solo:
+        recepción lo manda por WhatsApp."
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateRemindersInput"
+      responses:
+        "200":
+          description: Recordatorios del día
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemindersDay"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reminders/{id}/sent:
+    post:
+      tags: *a15
+      summary: Marca el recordatorio como enviado
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Recordatorio actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Estado no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reminders/{id}/confirm:
+    post:
+      tags: *a15
+      summary: Registra que el paciente confirmó y confirma el turno
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Recordatorio actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Estado no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/reminders/{id}/cancel:
+    post:
+      tags: *a15
+      summary: Descarta el recordatorio
+      security: *a1
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Recordatorio actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: El recurso no existe (o pertenece a otra organización)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Estado no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/backups:
     get:
-      tags: &a13
+      tags: &a16
         - Backups
       summary: Historial de backups, del más reciente al más antiguo
       description: "Solo administración. Retención: 7 diarios, 4 semanales y los
@@ -6744,7 +7592,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a13
+      tags: *a16
       summary: Genera un backup ahora
       description: "Dump lógico completo de PostgreSQL más los archivos clínicos y un
         manifest con checksums, empaquetados juntos. Corre en segundo plano:
@@ -6777,7 +7625,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/status:
     get:
-      tags: *a13
+      tags: *a16
       summary: "Estado: mantenimiento, backup en curso, último exitoso y próximo
         programado"
       security: *a2
@@ -6802,7 +7650,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/{id}/download:
     get:
-      tags: *a13
+      tags: *a16
       summary: Descarga el paquete del backup
       security: *a2
       parameters:
@@ -6839,7 +7687,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/{id}/restore:
     post:
-      tags: *a13
+      tags: *a16
       summary: Restaura la base y los archivos desde un backup
       description: Verifica el checksum y la versión del esquema, pone el sistema en
         mantenimiento (las demás solicitudes reciben 503), restaura la base en
@@ -6903,7 +7751,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical:
     get:
-      tags: &a14
+      tags: &a17
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -6944,7 +7792,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a14
+      tags: *a17
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige agregando una corrección."
@@ -7001,7 +7849,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/profile:
     get:
-      tags: *a14
+      tags: *a17
       summary: "Perfil clínico vigente: alertas, alergias, medicación y antecedentes"
       description: Solo odontólogos. La consulta queda auditada.
       security: *a2
@@ -7038,7 +7886,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     put:
-      tags: *a14
+      tags: *a17
       summary: Guarda una nueva versión del perfil clínico
       description: Cada cambio crea una versión nueva; las anteriores se conservan.
       security: *a1
@@ -7093,7 +7941,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a14
+      tags: *a17
       summary: Agrega una corrección a una nota
       description: La nota original se conserva intacta; la corrección queda vinculada
         a ella.
@@ -7156,7 +8004,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files:
     get:
-      tags: &a15
+      tags: &a18
         - Archivos clínicos
       summary: Archivos clínicos del paciente
       description: Solo odontólogos. Por defecto no incluye los archivados.
@@ -7205,7 +8053,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a15
+      tags: *a18
       summary: Sube un archivo clínico (PDF, JPG o PNG)
       description: El cuerpo es el contenido binario del archivo. El tipo se verifica
         por su contenido, no por la extensión. El tamaño máximo es configurable
@@ -7301,7 +8149,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/content:
     get:
-      tags: *a15
+      tags: *a18
       summary: Descarga o visualiza un archivo clínico
       description: Solo a través del backend, con sesión y permiso clínico. Cada
         descarga queda auditada.
@@ -7342,7 +8190,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/archive:
     post:
-      tags: *a15
+      tags: *a18
       summary: Archiva un archivo clínico (no se borra)
       security: *a1
       parameters:
@@ -7385,7 +8233,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram:
     get:
-      tags: &a16
+      tags: &a19
         - Odontograma
       summary: "Odontograma del paciente: condición actual e historial"
       description: Solo odontólogos. La condición actual se deriva de los registros;
@@ -7425,7 +8273,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram/findings:
     post:
-      tags: *a16
+      tags: *a19
       summary: Registra la condición de una pieza o de sus superficies
       description: Corona, endodoncia, implante, ausente, extracción indicada y
         prótesis se registran sobre la pieza completa. Marcar sano limpia la
@@ -7483,7 +8331,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans:
     get:
-      tags: &a17
+      tags: &a20
         - Plan de tratamiento
       summary: Planes de tratamiento del paciente
       description: El odontólogo ve piezas y superficies pero no importes; recepción y
@@ -7524,7 +8372,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a17
+      tags: *a20
       summary: Crea un plan de tratamiento
       security: *a1
       parameters:
@@ -7572,7 +8420,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items:
     post:
-      tags: *a17
+      tags: *a20
       summary: Agrega una práctica al plan, con pieza y superficies opcionales
       security: *a1
       parameters:
@@ -7638,7 +8486,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/price:
     put:
-      tags: *a17
+      tags: *a20
       summary: Fija el precio acordado de un ítem
       description: Recepción y administración. Al registrar la prestación de ese ítem
         se cobra este precio.
@@ -7706,7 +8554,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/accept:
     post:
-      tags: *a17
+      tags: *a20
       summary: Registra que el paciente aceptó el presupuesto
       description: Exige que todos los ítems vigentes estén cotizados.
       security: *a1
@@ -7762,7 +8610,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/start:
     post:
-      tags: *a17
+      tags: *a20
       summary: Marca un ítem como en curso
       security: *a1
       parameters:
@@ -7817,7 +8665,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/complete:
     post:
-      tags: *a17
+      tags: *a20
       summary: El odontólogo marca un ítem como realizado
       description: "Es un hecho clínico: no registra la prestación ni el cobro. El
         ítem queda para que recepción registre la prestación con el precio
@@ -7875,7 +8723,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/cancel:
     post:
-      tags: *a17
+      tags: *a20
       summary: Cancela un ítem con motivo (no se borra)
       security: *a1
       parameters:
@@ -7941,7 +8789,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a18
+      tags: &a21
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -7983,7 +8831,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a18
+      tags: *a21
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -8025,7 +8873,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a18
+      tags: *a21
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -8081,7 +8929,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a19
+      tags: &a22
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -8152,7 +9000,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a19
+      tags: *a22
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -8209,7 +9057,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a19
+      tags: *a22
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -8245,7 +9093,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a19
+      tags: *a22
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -8307,7 +9155,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a19
+      tags: *a22
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
@@ -8364,7 +9212,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/reactivate:
     post:
-      tags: *a19
+      tags: *a22
       summary: Reactiva un turno cancelado o ausente
       description: Vuelve a Pendiente si el horario sigue libre. Aplica las mismas
         reglas de disponibilidad que al dar un turno nuevo.
@@ -8421,7 +9269,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/close:
     post:
-      tags: *a19
+      tags: *a22
       summary: Cierra un turno atendido sin prestación propia
       description: Lo marca como sesión de un ítem del plan de tratamiento (ya cobrado
         o en curso) o sin cargo con motivo. Registrar una prestación desde el

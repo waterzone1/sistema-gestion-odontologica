@@ -47,6 +47,13 @@ test('la configuración inicial crea la organización y deja al administrador ad
   await admin.getByRole('button', { name: 'Finalizar' }).click()
 
   await expect(admin).toHaveURL(/\/dashboard$/)
+  const tutorial = admin.getByRole('dialog', { name: 'Bienvenido/a' })
+  await expect(tutorial).toBeVisible()
+  await tutorial.getByRole('button', { name: 'Siguiente' }).click()
+  await expect(admin.getByRole('dialog', { name: 'Menú y buscador' })).toBeVisible()
+  await admin.screenshot({ path: captura('02b-tutorial') })
+  await admin.getByRole('dialog').getByRole('button', { name: 'Saltear' }).click()
+  await expect(admin.getByRole('dialog')).toHaveCount(0)
   await expect(admin.getByRole('heading', { name: 'Hola, Marta Gómez' })).toBeVisible()
   await expect(admin.getByRole('link', { name: 'Usuarios' }).first()).toBeVisible()
   await admin.screenshot({ path: captura('03-dashboard-admin'), fullPage: true })
@@ -91,6 +98,7 @@ test('recepción debe cambiar la clave temporal y no ve la administración', asy
   await recepcion.getByRole('button', { name: 'Guardar contraseña' }).click()
 
   await expect(recepcion).toHaveURL(/\/dashboard$/)
+  await recepcion.getByRole('dialog', { name: 'Bienvenido/a' }).getByRole('button', { name: 'Saltear' }).click()
   await expect(recepcion.getByRole('heading', { name: 'Hola, Lucía Fernández' })).toBeVisible()
   await expect(recepcion.getByRole('link', { name: 'Usuarios' })).toHaveCount(0)
   await expect(recepcion.getByRole('link', { name: 'Sedes' })).toHaveCount(0)
