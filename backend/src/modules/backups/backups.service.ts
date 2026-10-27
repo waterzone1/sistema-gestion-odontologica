@@ -278,7 +278,10 @@ export async function restoreBackup(
 
     const counts = await databaseCounts(db)
     if (JSON.stringify(counts) !== JSON.stringify(manifest.counts)) {
-      throw new AppError(500, 'RESTORE_VERIFICATION_FAILED', 'La restauración terminó pero los datos no coinciden con el backup')
+      throw new AppError(500, 'RESTORE_VERIFICATION_FAILED', 'La restauración terminó pero los datos no coinciden con el backup', {
+        esperado: manifest.counts,
+        obtenido: counts,
+      })
     }
     if (session && (await db.user.findUnique({ where: { id: session.userId } }))) {
       await db.session.upsert({ where: { id: session.id }, create: session, update: {} })
@@ -287,6 +290,11 @@ export async function restoreBackup(
     await audit(db, context, actor, { action: 'BACKUP_RESTORED', entityId: id, metadata: { backup: id } })
     logger.warn({ backup: id }, 'restauracion terminada')
     return { id, restoredAt, counts }
+  } catch (err) {
+    if (err instanceof AppError) throw err
+    logger.error({ err, backup: id }, 'fallo la restauracion')
+    const message = err instanceof Error ? err.message : String(err)
+    throw new AppError(500, 'RESTORE_FAILED', `La restauración falló: ${message.slice(0, 400)}`)
   } finally {
     state.maintenance = false
     state.running = null
