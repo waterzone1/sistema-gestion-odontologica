@@ -21,6 +21,7 @@ import { setupRouter } from './modules/organizations/setup.routes.js'
 import type { SetupTokenStore } from './modules/organizations/setupToken.js'
 import { agendaAvailabilityRouter, professionalAvailabilityRouter } from './modules/availability/availability.routes.js'
 import { cashRouter, exchangeRatesRouter } from './modules/cash/cash.routes.js'
+import { organizationRouter } from './modules/organizations/organization.routes.js'
 import { coveragesRouter, patientCoveragesRouter } from './modules/coverages/coverages.routes.js'
 import { liquidationsRouter } from './modules/liquidations/liquidations.routes.js'
 import { auditRouter } from './modules/audit/audit.routes.js'
@@ -106,6 +107,7 @@ export function createApp({
   app.use('/api/debtors', debtorsRouter(db))
   app.use('/api/billing/pending', pendingBillingRouter(db))
   app.use('/api/exchange-rates', exchangeRatesRouter(db))
+  app.use('/api/organization', organizationRouter(db))
   app.use('/api/cash', cashRouter(db))
   app.use('/api/coverages', coveragesRouter(db))
   app.use('/api/liquidations', liquidationsRouter(db))

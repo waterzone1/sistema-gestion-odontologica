@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { ADMIN_PASSWORD } from './api'
+import { ADMIN_PASSWORD, silenceTours } from './api'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -50,8 +50,11 @@ test('la configuración inicial crea la organización y deja al administrador ad
   const tutorial = admin.getByRole('dialog', { name: 'Bienvenido/a' })
   await expect(tutorial).toBeVisible()
   await tutorial.getByRole('button', { name: 'Siguiente' }).click()
-  await expect(admin.getByRole('dialog', { name: 'Menú y buscador' })).toBeVisible()
+  await expect(admin.getByRole('dialog', { name: 'Menú' })).toBeVisible()
+  await admin.getByRole('dialog').getByRole('button', { name: 'Siguiente' }).click()
+  await expect(admin.getByRole('dialog', { name: 'Buscador de pacientes' })).toBeVisible()
   await admin.screenshot({ path: captura('02b-tutorial') })
+  await silenceTours('marta', CLAVE_ADMIN)
   await admin.getByRole('dialog').getByRole('button', { name: 'Saltear' }).click()
   await expect(admin.getByRole('dialog')).toHaveCount(0)
   await expect(admin.getByRole('heading', { name: 'Hola, Marta Gómez' })).toBeVisible()
@@ -98,6 +101,7 @@ test('recepción debe cambiar la clave temporal y no ve la administración', asy
   await recepcion.getByRole('button', { name: 'Guardar contraseña' }).click()
 
   await expect(recepcion).toHaveURL(/\/dashboard$/)
+  await silenceTours('lucia', CLAVE_NUEVA)
   await recepcion.getByRole('dialog', { name: 'Bienvenido/a' }).getByRole('button', { name: 'Saltear' }).click()
   await expect(recepcion.getByRole('heading', { name: 'Hola, Lucía Fernández' })).toBeVisible()
   await expect(recepcion.getByRole('link', { name: 'Usuarios' })).toHaveCount(0)

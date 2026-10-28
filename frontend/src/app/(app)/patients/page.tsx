@@ -67,7 +67,7 @@ function PatientsList({ initialQuery }: { initialQuery: string }) {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row" data-tour="patients-search">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden />
           <Input
@@ -108,7 +108,7 @@ function PatientsList({ initialQuery }: { initialQuery: string }) {
 
       {patients.data && patients.data.items.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+          <div className="overflow-x-auto rounded-lg border bg-card shadow-sm" data-tour="patients-list">
             <table className="w-full min-w-[40rem] text-left text-sm">
               <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>

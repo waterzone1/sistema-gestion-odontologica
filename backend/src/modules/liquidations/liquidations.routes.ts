@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { authOf, requirePermission } from '../../middleware/access.js'
+import { authOf, requireModule, requirePermission } from '../../middleware/access.js'
 import type { Db } from '../../shared/db.js'
 import {
   cancelLiquidationSchema,
@@ -14,6 +14,7 @@ import * as liquidations from './liquidations.service.js'
 export function liquidationsRouter(db: Db): Router {
   const router = Router()
   const manage = requirePermission('liquidations:manage')
+  router.use(requireModule('coverages'))
 
   router.get('/', manage, async (req: Request, res: Response) => {
     res.json(await liquidations.listLiquidations(db, authOf(req)))

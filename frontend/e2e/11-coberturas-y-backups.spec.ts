@@ -21,6 +21,16 @@ async function abrirFichaDeRossi(page: Page, pestania: string) {
   await page.getByRole('tab', { name: pestania }).click()
 }
 
+test('el administrador activa el módulo de coberturas y liquidaciones', async ({ page }) => {
+  await ingresar(page, ADMIN)
+  await expect(page.getByRole('link', { name: 'Coberturas' })).toHaveCount(0)
+  await page.goto('/settings')
+  await page.getByLabel('Coberturas y liquidaciones').click()
+  await expect(page.getByLabel('Coberturas y liquidaciones')).toBeChecked()
+  await expect(page.getByRole('link', { name: 'Coberturas' }).first()).toBeVisible()
+  await page.getByRole('region', { name: 'Consultorio: módulos' }).screenshot({ path: captura('44b-modulo-coberturas') })
+})
+
 test('recepción carga una prepaga con plan y convenio', async ({ page }) => {
   await ingresar(page, RECEPCION)
   await page.goto('/coverages')

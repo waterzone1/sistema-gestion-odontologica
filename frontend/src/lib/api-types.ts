@@ -5307,6 +5307,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organization/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationModules"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationModules"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backups": {
         parameters: {
             query?: never;
@@ -7656,12 +7718,15 @@ export interface components {
             username: string;
             displayName: string;
             roles: components["schemas"]["Role"][];
-            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void" | "services:price" | "billing:void-any-day" | "availability:manage" | "appointments:override" | "treatment:read" | "treatment:write" | "treatment:price" | "treatment:cancel" | "patient-notes:write" | "exchange-rate:manage" | "coverages:manage" | "liquidations:manage" | "audit:read" | "backups:manage" | "reports:read")[];
+            permissions: ("users:manage" | "branches:manage" | "professionals:manage" | "professionals:read" | "patients:read" | "patients:write" | "practices:read" | "practices:manage" | "appointments:read" | "appointments:manage" | "appointments:attend" | "clinical:read" | "clinical:write" | "services:read" | "services:write" | "services:void" | "account:read" | "payments:create" | "payments:void" | "services:price" | "billing:void-any-day" | "availability:manage" | "appointments:override" | "treatment:read" | "treatment:write" | "treatment:price" | "treatment:cancel" | "patient-notes:write" | "exchange-rate:manage" | "coverages:manage" | "liquidations:manage" | "audit:read" | "backups:manage" | "reports:read" | "organization:manage")[];
             branchIds: string[];
             mustChangePassword: boolean;
             onboardingCompleted: boolean;
             theme: components["schemas"]["ThemePreference"];
             preferences: components["schemas"]["UserPreferences"];
+            modules: {
+                coverages: boolean;
+            };
         };
         Role: "ADMIN" | "DENTIST" | "RECEPTIONIST";
         ThemePreference: "SYSTEM" | "LIGHT" | "DARK";
@@ -7674,6 +7739,7 @@ export interface components {
             agendaSlotMinutes: 15 | 30;
             showSaturday: boolean;
             showSunday: boolean;
+            toursSeen: string[];
         };
         SetupInput: {
             setupToken: string;
@@ -7711,6 +7777,7 @@ export interface components {
                 agendaSlotMinutes?: 15 | 30;
                 showSaturday?: boolean;
                 showSunday?: boolean;
+                toursSeen?: string[];
             };
         };
         User: {
@@ -7796,6 +7863,7 @@ export interface components {
             documentNumber: string | null;
             birthDate: string | null;
             phone: string | null;
+            phoneHasWhatsapp: boolean;
             email: string | null;
             address: string | null;
             archivedAt: string | null;
@@ -7809,6 +7877,7 @@ export interface components {
             documentNumber: string;
             birthDate: string;
             phone?: string | null;
+            phoneHasWhatsapp: boolean;
             email?: string | null;
             address?: string | null;
         };
@@ -7819,6 +7888,7 @@ export interface components {
             documentNumber?: string;
             birthDate?: string;
             phone?: string | null;
+            phoneHasWhatsapp?: boolean;
             email?: string | null;
             address?: string | null;
         };
@@ -8347,6 +8417,7 @@ export interface components {
                     id: string;
                     displayName: string;
                 } | null;
+                subject: string | null;
                 metadata: {
                     [key: string]: unknown;
                 } | null;
@@ -8441,6 +8512,9 @@ export interface components {
         };
         GenerateRemindersInput: {
             date?: string;
+        };
+        OrganizationModules: {
+            coverages: boolean;
         };
         BackupRecord: {
             id: string;

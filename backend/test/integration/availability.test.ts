@@ -268,6 +268,21 @@ describe('practicas por profesional', () => {
     expect((await as(app, recepcion).post('/api/appointments', turno(LUNES, 11))).status).toBe(201)
   })
 
+  it('reprogramar sin cambiar practica ni profesional no vuelve a advertir por la practica', async () => {
+    await as(app, admin).put(reglas(), horarioBase()).expect(200)
+    const consulta = await seedPractice(db, seed, { code: 'CON' })
+    const blanqueo = await seedPractice(db, seed, { code: 'BLA' })
+    const usuario = await db.professionalProfile.findUniqueOrThrow({ where: { id: perfilId } })
+    await as(app, admin).put(`/api/professionals/${usuario.userId}`, { licenseNumber: 'MP-77', practiceIds: [consulta.id] }).expect(200)
+    const creado = await as(app, recepcion).post('/api/appointments', turno(LUNES, 10, { practiceId: blanqueo.id, acknowledgeWarnings: true }))
+    const id = (creado.body as { id: string }).id
+
+    const movido = await as(app, recepcion).patch(`/api/appointments/${id}`, { startsAt: hora(LUNES, 11), endsAt: hora(LUNES, 11, 30) })
+    expect(movido.status).toBe(200)
+    const otraPractica = await as(app, recepcion).patch(`/api/appointments/${id}`, { practiceId: blanqueo.id, startsAt: hora(LUNES, 12), endsAt: hora(LUNES, 12, 30) })
+    expect(otraPractica.status).toBe(200)
+  })
+
   it('valida email y practicas inexistentes', async () => {
     const usuario = await db.professionalProfile.findUniqueOrThrow({ where: { id: perfilId } })
     const email = await as(app, admin).put(`/api/professionals/${usuario.userId}`, { licenseNumber: 'MP-1', email: 'no-es-email' })

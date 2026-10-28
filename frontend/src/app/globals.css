@@ -129,7 +129,15 @@
 }
 
 .fc .fc-timeGridWeek-view .fc-scrollgrid {
-  min-width: 42rem;
+  min-width: 56rem;
+}
+
+.fc .fc-timegrid-slot {
+  height: 2.25rem;
+}
+
+.fc .fc-timegrid-event .fc-event-main {
+  container-type: inline-size;
 }
 
 @media (max-width: 639px) {
@@ -177,7 +185,7 @@
 }
 
 .fc .fc-turno.fc-estado-attended {
-  opacity: 0.55;
+  opacity: 0.6;
 }
 
 .fc .fc-turno.fc-estado-no_show {

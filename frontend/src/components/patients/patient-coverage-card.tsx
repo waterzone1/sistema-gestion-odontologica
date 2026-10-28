@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
-import { Input, MaskedInput, Select } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
 import { useAddPatientCoverage, useArchivePatientCoverage, useCoverageProviders, usePatientCoverages } from '@/hooks/use-coverages'
 import type { PatientCoverage } from '@/lib/api'
-import { formatDate, maskDate, parseDateText, toDateText } from '@/lib/format'
+import { formatDate, parseDateText, toDateText } from '@/lib/format'
+import { DateInput } from '@/components/ui/date-input'
 
 interface Props {
   patientId: string
@@ -144,10 +145,10 @@ function CoverageForm({ patientId, onDone }: { patientId: string; onDone: () => 
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Desde" htmlFor="coverage-from">
-            <MaskedInput id="coverage-from" mask={maskDate} placeholder="dd/mm/aaaa" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateInput id="coverage-from" value={from} onChange={(e) => setFrom(e.target.value)} />
           </Field>
           <Field label="Hasta (opcional)" htmlFor="coverage-to">
-            <MaskedInput id="coverage-to" mask={maskDate} placeholder="dd/mm/aaaa" value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateInput id="coverage-to" value={to} onChange={(e) => setTo(e.target.value)} />
           </Field>
         </div>
       </div>

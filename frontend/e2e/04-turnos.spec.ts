@@ -70,7 +70,7 @@ test('recepción crea un turno desde la ficha del paciente', async () => {
 test('el sistema no deja crear un turno que se pisa con otro del mismo profesional', async () => {
   const dialogo = await nuevoTurno(page, manana(10, 15))
   await dialogo.getByRole('button', { name: 'Crear turno' }).click()
-  await expect(dialogo.getByText('El profesional ya tiene un turno en ese horario')).toBeVisible()
+  await expect(dialogo.getByText(/El profesional ya tiene un turno de \d{2}:\d{2} a \d{2}:\d{2}/)).toBeVisible()
   await page.screenshot({ path: captura('14-turno-choque') })
   await dialogo.getByRole('button', { name: 'Cancelar' }).click()
 })

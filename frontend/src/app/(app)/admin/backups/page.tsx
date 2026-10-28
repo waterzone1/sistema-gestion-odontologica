@@ -91,7 +91,7 @@ export default function BackupsPage() {
       {backups.data && backups.data.length === 0 ? (
         <EmptyState title="Todavía no hay backups" />
       ) : (
-        <ul className="divide-y rounded-lg border bg-card shadow-sm">
+        <ul className="divide-y rounded-lg border bg-card shadow-sm" data-tour="backups-list">
           {(backups.data ?? []).map((backup) => (
             <li key={backup.id} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">

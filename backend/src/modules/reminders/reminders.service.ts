@@ -21,21 +21,37 @@ const include = {
       branch: { select: { name: true } },
     },
   },
-  patient: { select: { id: true, firstName: true, lastName: true } },
+  patient: { select: { id: true, firstName: true, lastName: true, phone: true, phoneHasWhatsapp: true } },
 } satisfies Prisma.ReminderInclude
 
 type ReminderRecord = Prisma.ReminderGetPayload<{ include: typeof include }>
 
+const NO_PHONE = 'El paciente no tiene un celular válido cargado'
+const NO_WHATSAPP = 'El paciente no usa WhatsApp: avisale por llamada'
+
+function contactOf(reminder: ReminderRecord) {
+  const unsent = reminder.status === 'PENDING' || reminder.status === 'FAILED'
+  const phone = unsent ? reminder.patient.phone : reminder.phone
+  const reachable = whatsappNumber(phone) !== null
+  return {
+    phone,
+    status: unsent ? (reachable ? 'PENDING' : 'FAILED') : reminder.status,
+    whatsapp: reachable && reminder.patient.phoneHasWhatsapp,
+    failureReason: unsent ? (!reachable ? NO_PHONE : reminder.patient.phoneHasWhatsapp ? null : NO_WHATSAPP) : reminder.failureReason,
+  } as const
+}
+
 function toDto(reminder: ReminderRecord, timeZone: string): ReminderDto {
   const moved = localDay(reminder.appointment.startsAt, timeZone) !== isoDay(reminder.scheduledFor)
   const cancelled = reminder.status !== 'CONFIRMED' && (reminder.appointment.status === 'CANCELLED' || moved)
+  const contact = contactOf(reminder)
   return {
     id: reminder.id,
-    status: cancelled ? 'CANCELLED' : reminder.status,
-    phone: reminder.phone,
+    status: cancelled ? 'CANCELLED' : contact.status,
+    phone: contact.phone,
     message: reminder.message,
-    whatsappUrl: reminder.status === 'FAILED' || cancelled ? null : whatsappLink(reminder.phone, reminder.message),
-    failureReason: moved && reminder.status !== 'CONFIRMED' ? 'El turno se reprogramó: generá el recordatorio del día nuevo' : reminder.failureReason,
+    whatsappUrl: cancelled || contact.status === 'FAILED' || !contact.whatsapp ? null : whatsappLink(contact.phone, reminder.message),
+    failureReason: moved && reminder.status !== 'CONFIRMED' ? 'El turno se reprogramó: generá el recordatorio del día nuevo' : contact.failureReason,
     sentAt: reminder.sentAt?.toISOString() ?? null,
     confirmedAt: reminder.confirmedAt?.toISOString() ?? null,
     patient: { id: reminder.patient.id, fullName: patientName(reminder.patient) },
@@ -91,7 +107,7 @@ export async function generateReminders(db: Db, actor: AuthContext, day?: string
             phone: appointment.patient.phone,
             message,
             scheduledFor: dayOf(target),
-            ...(valid ? {} : { status: 'FAILED' as const, failureReason: 'El paciente no tiene un celular válido cargado' }),
+            ...(valid ? {} : { status: 'FAILED' as const, failureReason: NO_PHONE }),
           }
         }),
         skipDuplicates: true,
@@ -129,12 +145,13 @@ async function dtoOf(tx: Pick<Db, 'organization'>, actor: AuthContext, reminder:
 export async function markSent(db: Db, actor: AuthContext, id: string): Promise<ReminderDto> {
   return db.$transaction(async (tx) => {
     const reminder = await findOrFail(tx, actor, id)
-    if (reminder.status !== 'PENDING' && reminder.status !== 'SENT') {
+    const contact = contactOf(reminder)
+    if (contact.status !== 'PENDING' && contact.status !== 'SENT') {
       throw new AppError(409, 'INVALID_REMINDER_STATUS', 'Ese recordatorio ya no se puede enviar')
     }
     const updated = await tx.reminder.update({
       where: { id },
-      data: { status: 'SENT', sentAt: reminder.sentAt ?? new Date(), sentById: actor.userId },
+      data: { status: 'SENT', phone: contact.phone, failureReason: null, sentAt: reminder.sentAt ?? new Date(), sentById: actor.userId },
       include,
     })
     return dtoOf(tx, actor, updated)

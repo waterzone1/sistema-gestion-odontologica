@@ -105,3 +105,34 @@ describe('recordatorios de turnos', () => {
     expect(nuevo.reminders.map((r) => r.status)).toEqual(['PENDING'])
   })
 })
+
+describe('telefono vigente y whatsapp', () => {
+  const generar = async () => ((await as(app, recepcion).post('/api/reminders/generate', {}).expect(200)).body as Dia).reminders
+  const paciente = (nombre: string) => db.patient.findFirstOrThrow({ where: { firstName: nombre } })
+
+  it('si se corrige el telefono antes de enviar, el recordatorio usa el numero nuevo', async () => {
+    await generar()
+    const ana = await paciente('Ana')
+    const beto = await paciente('Beto')
+    await as(app, recepcion).patch(`/api/patients/${ana.id}`, { phone: '11 6666-0000' }).expect(200)
+    await as(app, recepcion).patch(`/api/patients/${beto.id}`, { phone: '11 7777-0000' }).expect(200)
+    const [primero, segundo] = ((await as(app, recepcion).get(`/api/reminders?date=${manana}`).expect(200)).body as Dia).reminders
+    expect(primero?.whatsappUrl).toMatch(/^https:\/\/wa\.me\/5491166660000/)
+    expect(segundo?.status).toBe('PENDING')
+    expect(segundo?.whatsappUrl).toMatch(/5491177770000/)
+
+    await as(app, recepcion).post(`/api/reminders/${primero?.id}/sent`).expect(200)
+    await as(app, recepcion).patch(`/api/patients/${ana.id}`, { phone: '11 8888-0000' }).expect(200)
+    const enviado = await db.reminder.findUniqueOrThrow({ where: { id: primero?.id ?? '' } })
+    expect(enviado.phone).toBe('11 6666-0000')
+  })
+
+  it('sin whatsapp no ofrece el link pero se puede marcar como avisado', async () => {
+    const ana = await paciente('Ana')
+    await as(app, recepcion).patch(`/api/patients/${ana.id}`, { phoneHasWhatsapp: false }).expect(200)
+    const [primero] = await generar()
+    expect([primero?.status, primero?.whatsappUrl]).toEqual(['PENDING', null])
+    expect(primero?.failureReason).toContain('llamada')
+    await as(app, recepcion).post(`/api/reminders/${primero?.id}/sent`).expect(200)
+  })
+})

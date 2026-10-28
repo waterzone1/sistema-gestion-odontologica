@@ -1,3 +1,8 @@
+import { STATUS_LABELS } from './appointments'
+import { PAYMENT_METHOD_LABELS } from './billing'
+import { formatMoney } from './format'
+import { ROLE_LABELS } from './permissions'
+
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   SETUP_COMPLETED: 'Instalación inicial',
   LOGIN_SUCCESS: 'Ingreso',
@@ -70,15 +75,87 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   BACKUP_COMPLETED: 'Backup completado',
   BACKUP_FAILED: 'Backup fallido',
   BACKUP_RESTORED: 'Restauración desde backup',
+  ORGANIZATION_MODULES_UPDATED: 'Módulos de la organización',
 }
 
 export function auditActionLabel(action: string): string {
   return AUDIT_ACTION_LABELS[action] ?? action
 }
 
-export function metadataText(metadata: Record<string, unknown> | null): string {
-  if (!metadata) return ''
-  return Object.entries(metadata)
-    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
-    .join(' · ')
+const FIELD_LABELS: Record<string, string> = {
+  firstName: 'nombre',
+  lastName: 'apellido',
+  documentType: 'tipo de documento',
+  documentNumber: 'documento',
+  birthDate: 'fecha de nacimiento',
+  phone: 'teléfono',
+  phoneHasWhatsapp: 'WhatsApp',
+  email: 'email',
+  address: 'dirección',
+  notes: 'notas',
+  startsAt: 'horario',
+  endsAt: 'horario',
+  professionalId: 'profesional',
+  practiceId: 'práctica',
+  branchId: 'sede',
+  branchIds: 'sedes',
+  active: 'activo',
+  displayName: 'nombre',
+  roles: 'roles',
+  licenseNumber: 'matrícula',
+  color: 'color',
+  name: 'nombre',
+  code: 'código',
+  basePrice: 'precio',
+  defaultDurationMinutes: 'duración',
+  practiceIds: 'prácticas',
+}
+
+const RESULT_LABELS: Record<string, string> = { APPROVED: 'aprobada', DEBITED: 'con débito', REJECTED: 'rechazada' }
+
+const money = (value: unknown, currency: unknown = 'ARS') =>
+  typeof value === 'string' || typeof value === 'number' ? formatMoney(String(value), currency === 'USD' ? 'USD' : 'ARS') : ''
+
+const statusLabel = (value: unknown) =>
+  typeof value === 'string' && value in STATUS_LABELS ? STATUS_LABELS[value as keyof typeof STATUS_LABELS].toLowerCase() : String(value)
+
+const list = (value: unknown) => (Array.isArray(value) ? value.map(String) : [String(value)])
+
+export function auditDetails(metadata: Record<string, unknown> | null): string[] {
+  if (!metadata) return []
+  const m = metadata
+  const details: string[] = []
+  if (m['desde'] !== undefined && m['hacia'] !== undefined) details.push(`De ${statusLabel(m['desde'])} a ${statusLabel(m['hacia'])}`)
+  else if (m['hacia'] !== undefined) details.push(`Pasó a ${statusLabel(m['hacia'])}`)
+  if (Array.isArray(m['campos'])) {
+    const fields = [...new Set(m['campos'].map((field) => FIELD_LABELS[String(field)] ?? String(field)))]
+    if (fields.length > 0) details.push(`Cambió: ${fields.join(', ')}`)
+  }
+  if (m['reprogramado'] === true) details.push('Reprogramado')
+  if (m['reactivado'] === true) details.push('Reactivado')
+  if (m['porRecordatorio'] === true) details.push('Confirmado desde recordatorios')
+  if (m['before'] !== undefined && m['after'] !== undefined) details.push(`De ${money(m['before'])} a ${money(m['after'])} por dólar`)
+  if (m['rate'] !== undefined) details.push(`Cotización ${money(m['rate'])}`)
+  if (m['precioAntes'] !== undefined && m['precioDespues'] !== undefined) details.push(`De ${money(m['precioAntes'])} a ${money(m['precioDespues'])}`)
+  if (m['originalAmount'] !== undefined) details.push(money(m['originalAmount'], m['currency']))
+  else if (m['amount'] !== undefined) details.push(money(m['amount']))
+  if (typeof m['method'] === 'string') details.push(PAYMENT_METHOD_LABELS[m['method'] as keyof typeof PAYMENT_METHOD_LABELS] ?? m['method'])
+  if (m['price'] !== undefined) details.push(`Importe ${money(m['price'])}`)
+  if (m['precio'] !== undefined) details.push(`Precio ${money(m['precio'])}`)
+  if (m['importe'] !== undefined) details.push(`Importe ${money(m['importe'])}`)
+  if (m['aprobado'] !== undefined) details.push(`Aprobado ${money(m['aprobado'])}`)
+  if (m['estado'] !== undefined) details.push(`Resultado: ${RESULT_LABELS[String(m['estado'])] ?? String(m['estado'])}`)
+  if (m['codigo'] !== undefined) details.push(`Código ${String(m['codigo'])}`)
+  if (m['pieza'] !== undefined) details.push(`Pieza ${String(m['pieza'])}`)
+  if (m['username'] !== undefined) details.push(`Usuario ${String(m['username'])}`)
+  if (m['roles'] !== undefined) details.push(`Roles: ${list(m['roles']).map((role) => ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role).join(', ')}`)
+  if (m['cantidad'] !== undefined) details.push(`${String(m['cantidad'])} en total`)
+  if (m['importados'] !== undefined) details.push(`${String(m['importados'])} importados`)
+  if (m['omitidos'] !== undefined) details.push(`${String(m['omitidos'])} omitidos`)
+  if (m['sesionesRevocadas'] !== undefined) details.push(`${String(m['sesionesRevocadas'])} sesiones cerradas`)
+  if (m['coberturas'] !== undefined) details.push(m['coberturas'] ? 'Coberturas activadas' : 'Coberturas desactivadas')
+  if (Array.isArray(m['advertencias'])) details.push(...m['advertencias'].map(String))
+  const reason = m['motivo'] ?? m['reason']
+  if (typeof reason === 'string' && reason !== '') details.push(`Motivo: ${reason}`)
+  return details
 }

@@ -222,6 +222,7 @@ describe('cambio de contraseña', () => {
       agendaSlotMinutes: 30,
       showSaturday: true,
       showSunday: true,
+      toursSeen: [],
     })
     await as(app, admin)
       .put('/api/auth/preferences', { preferences: { homePage: '/agenda', menuOrder: ['/agenda', '/patients'], agendaSlotMinutes: 15 } })

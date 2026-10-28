@@ -40,11 +40,13 @@ export default function DashboardPage() {
         }
       />
 
+      <div data-tour="dashboard-content" className="space-y-6">
       {can(user, 'clinical:read') && <DentistPanel />}
       {can(user, 'appointments:read') && <TodayAppointments user={user} />}
       {can(user, 'appointments:manage') && <ConfirmTomorrow />}
       {can(user, 'services:write') && <PendingBilling />}
       {can(user, 'account:read') && <Debtors />}
+      </div>
 
       {shortcuts.length > 0 ? (
         <section aria-label="Accesos directos" className="mt-6 grid gap-3 sm:grid-cols-2">

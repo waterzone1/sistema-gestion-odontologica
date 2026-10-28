@@ -1,4 +1,5 @@
 import { request, type APIRequestContext, type APIResponse } from '@playwright/test'
+import { TOUR_IDS } from '../src/lib/tours'
 
 const ORIGIN = 'https://localhost:8443'
 
@@ -73,6 +74,14 @@ export async function provisionUser(admin: ApiSession, user: NewUser): Promise<s
   })
   if (changed.status() !== 204) throw new Error(`no se pudo fijar la clave de ${user.username}`)
   await session.post('/api/auth/onboarding/complete')
+  await session.put('/api/auth/preferences', { preferences: { toursSeen: TOUR_IDS } })
   await session.dispose()
   return id
+}
+
+export async function silenceTours(username: string, password: string): Promise<void> {
+  const session = await apiLogin(username, password)
+  const saved = await session.put('/api/auth/preferences', { preferences: { toursSeen: TOUR_IDS } })
+  if (!saved.ok()) throw new Error(`no se pudieron marcar los recorridos de ${username}`)
+  await session.dispose()
 }

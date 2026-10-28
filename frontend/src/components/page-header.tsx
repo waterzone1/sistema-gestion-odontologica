@@ -9,11 +9,15 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-1">
+      <div className="space-y-1" data-tour="page-title">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex shrink-0 gap-2" data-tour="page-actions">
+          {actions}
+        </div>
+      )}
     </header>
   )
 }

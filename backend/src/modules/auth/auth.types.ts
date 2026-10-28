@@ -1,4 +1,4 @@
-import type { Permission, Role } from '../users/domain/permissions.js'
+import type { EnabledModules, Permission, Role } from '../users/domain/permissions.js'
 import type { UserPreferences } from './auth.schemas.js'
 
 export interface AuthContext {
@@ -15,4 +15,5 @@ export interface AuthContext {
   onboardingCompleted: boolean
   theme: 'SYSTEM' | 'LIGHT' | 'DARK'
   preferences: UserPreferences
+  modules: EnabledModules
 }

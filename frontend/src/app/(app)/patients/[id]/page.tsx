@@ -72,7 +72,7 @@ export default function PatientPage() {
       </Link>
 
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
+        <div className="space-y-1" data-tour="page-title">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             {fullName(data)}
             {data.archivedAt && <Badge variant="muted">Archivado</Badge>}
@@ -109,7 +109,7 @@ export default function PatientPage() {
         )}
       </header>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} label="Secciones de la ficha del paciente">
+      <Tabs items={tabs} active={tab} onChange={setTab} label="Secciones de la ficha del paciente" anchor="patient-tabs">
         {tab === 'turnos' && (
           <PatientAppointments
             patient={{ id: data.id, fullName: fullName(data), archived: data.archivedAt !== null }}

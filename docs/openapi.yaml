@@ -141,6 +141,7 @@ components:
               - audit:read
               - backups:manage
               - reports:read
+              - organization:manage
         branchIds:
           type: array
           items:
@@ -154,6 +155,14 @@ components:
           $ref: "#/components/schemas/ThemePreference"
         preferences:
           $ref: "#/components/schemas/UserPreferences"
+        modules:
+          type: object
+          properties:
+            coverages:
+              type: boolean
+          required:
+            - coverages
+          description: Módulos que la organización tiene activados
       required:
         - id
         - username
@@ -165,6 +174,7 @@ components:
         - onboardingCompleted
         - theme
         - preferences
+        - modules
     Role:
       type: string
       enum:
@@ -217,6 +227,13 @@ components:
           type: boolean
         showSunday:
           type: boolean
+        toursSeen:
+          type: array
+          items:
+            type: string
+            pattern: ^[a-z-]{1,40}$
+          maxItems: 40
+          description: Recorridos guiados que el usuario ya vio
       required:
         - menuOrder
         - homePage
@@ -226,6 +243,7 @@ components:
         - agendaSlotMinutes
         - showSaturday
         - showSunday
+        - toursSeen
     SetupInput:
       type: object
       properties:
@@ -360,6 +378,13 @@ components:
               type: boolean
             showSunday:
               type: boolean
+            toursSeen:
+              type: array
+              items:
+                type: string
+                pattern: ^[a-z-]{1,40}$
+              maxItems: 40
+              description: Recorridos guiados que el usuario ya vio
     User:
       type: object
       properties:
@@ -669,6 +694,8 @@ components:
           type:
             - string
             - "null"
+        phoneHasWhatsapp:
+          type: boolean
         email:
           type:
             - string
@@ -693,6 +720,7 @@ components:
         - documentNumber
         - birthDate
         - phone
+        - phoneHasWhatsapp
         - email
         - address
         - archivedAt
@@ -730,6 +758,11 @@ components:
             - string
             - "null"
           maxLength: 40
+        phoneHasWhatsapp:
+          type: boolean
+          default: true
+          description: Si el teléfono usa WhatsApp. Sin WhatsApp, el recordatorio se avisa
+            por llamada
         email:
           type:
             - string
@@ -770,6 +803,10 @@ components:
             - string
             - "null"
           maxLength: 40
+        phoneHasWhatsapp:
+          type: boolean
+          description: Si el teléfono usa WhatsApp. Sin WhatsApp, el recordatorio se avisa
+            por llamada
         email:
           type:
             - string
@@ -2658,6 +2695,12 @@ components:
                 required:
                   - id
                   - displayName
+              subject:
+                type:
+                  - string
+                  - "null"
+                description: "A quién o a qué afecta, en palabras: paciente, turno, práctica,
+                  usuario"
               metadata:
                 type:
                   - object
@@ -2672,6 +2715,7 @@ components:
               - entityType
               - entityId
               - actor
+              - subject
               - metadata
               - createdAt
         total:
@@ -2960,6 +3004,14 @@ components:
           type: string
           format: date
           description: Por defecto, mañana
+    OrganizationModules:
+      type: object
+      properties:
+        coverages:
+          type: boolean
+          description: Coberturas, convenios y liquidaciones a obras sociales y prepagas
+      required:
+        - coverages
     BackupRecord:
       type: object
       properties:
@@ -7558,6 +7610,45 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "409":
           description: Estado no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/organization/modules:
+    put:
+      tags:
+        - Organización
+      summary: Activa o desactiva módulos opcionales
+      description: Solo administración. Con coberturas desactivadas se ocultan y
+        rechazan coberturas, convenios y liquidaciones, y las prestaciones
+        nuevas se cobran completas al paciente. Los datos cargados se conservan.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationModules"
+      responses:
+        "200":
+          description: Módulos vigentes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationModules"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
           content:
             application/json:
               schema:

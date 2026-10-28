@@ -1,6 +1,6 @@
 import type { Db } from '../../shared/db.js'
 import { generateToken, hashToken } from '../../shared/tokens.js'
-import { effectivePermissions } from '../users/domain/permissions.js'
+import { effectivePermissions, withModules } from '../users/domain/permissions.js'
 import type { AuthContext } from './auth.types.js'
 import { readPreferences } from './auth.schemas.js'
 import { absoluteExpiry, sessionState, shouldTouch } from './domain/session.js'
@@ -46,7 +46,7 @@ export async function resolveSession(
 ): Promise<AuthContext | null> {
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { user: { include: { roles: true, branches: true } } },
+    include: { user: { include: { roles: true, branches: true, organization: { select: { coveragesEnabled: true } } } } },
   })
   if (!session) return null
   if (sessionState(session, now) !== 'valid') return null
@@ -57,6 +57,7 @@ export async function resolveSession(
   }
 
   const roles = session.user.roles.map((r) => r.role)
+  const modules = { coverages: session.user.organization.coveragesEnabled }
   return {
     userId: session.user.id,
     organizationId: session.user.organizationId,
@@ -65,12 +66,13 @@ export async function resolveSession(
     username: session.user.username,
     displayName: session.user.displayName,
     roles,
-    permissions: effectivePermissions(roles),
+    permissions: withModules(effectivePermissions(roles), modules),
     branchIds: session.user.branches.map((b) => b.branchId),
     mustChangePassword: session.user.mustChangePassword,
     onboardingCompleted: session.user.onboardingCompleted,
     theme: session.user.theme,
     preferences: readPreferences(session.user.preferences),
+    modules,
   }
 }
 

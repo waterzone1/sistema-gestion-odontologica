@@ -296,7 +296,7 @@ export async function createService(
         throw new AppError(422, 'INVALID_APPOINTMENT', 'El turno no corresponde a este paciente y profesional')
       }
     }
-    const coverage = input.applyCoverage
+    const coverage = input.applyCoverage && actor.modules.coverages
       ? await resolveCoverage(tx, patientId, practice.id, localDay(performedAt, viewer.timeZone))
       : null
     if (coverage?.requiresAuthorization && !input.authorizationCode) {

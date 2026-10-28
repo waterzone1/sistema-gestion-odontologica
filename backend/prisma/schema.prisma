@@ -8,12 +8,13 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String
-  timezone  String   @default("America/Argentina/Buenos_Aires")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id               String   @id @default(uuid(7)) @db.Uuid
+  name             String
+  timezone         String   @default("America/Argentina/Buenos_Aires")
+  active           Boolean  @default(true)
+  coveragesEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
   branches          Branch[]
   users             User[]
@@ -168,20 +169,21 @@ enum DocumentType {
 }
 
 model Patient {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  organizationId String       @db.Uuid
-  firstName      String
-  lastName       String
-  documentType   DocumentType @default(DNI)
-  documentNumber String?
-  birthDate      DateTime?    @db.Date
-  phone          String?
-  email          String?
-  address        String?
-  searchText     String
-  archivedAt     DateTime?    @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  id               String       @id @default(uuid(7)) @db.Uuid
+  organizationId   String       @db.Uuid
+  firstName        String
+  lastName         String
+  documentType     DocumentType @default(DNI)
+  documentNumber   String?
+  birthDate        DateTime?    @db.Date
+  phone            String?
+  phoneHasWhatsapp Boolean      @default(true)
+  email            String?
+  address          String?
+  searchText       String
+  archivedAt       DateTime?    @db.Timestamptz(3)
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
 
   organization       Organization        @relation(fields: [organizationId], references: [id])
   appointments       Appointment[]

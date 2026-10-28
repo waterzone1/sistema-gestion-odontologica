@@ -1,6 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { useSession } from '@/hooks/use-session'
 import { api, type Agreement, type CoverageProvider, type CoverageQuote, type PatientCoverage } from '@/lib/api'
 
 const providersKey = ['coverages'] as const
@@ -91,9 +92,10 @@ export function useArchivePatientCoverage(patientId: string) {
 }
 
 export function useCoverageQuote(patientId: string, practiceId: string | null) {
+  const enabled = useSession().data?.user.modules.coverages ?? false
   return useQuery({
     queryKey: [...quoteKey(patientId), practiceId],
     queryFn: () => api.get<CoverageQuote>(`/api/patients/${patientId}/coverage-quote?practiceId=${practiceId ?? ''}`),
-    enabled: practiceId !== null && practiceId !== '',
+    enabled: enabled && practiceId !== null && practiceId !== '',
   })
 }

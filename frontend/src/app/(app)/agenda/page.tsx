@@ -8,7 +8,7 @@ import listPlugin from '@fullcalendar/list'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, Plus, UserX } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -16,10 +16,11 @@ import {
   type AppointmentDefaults,
 } from '@/components/appointments/appointment-form-dialog'
 import { AppointmentDialog } from '@/components/appointments/appointment-dialog'
+import { AgendaLegend, AppointmentCell } from '@/components/appointments/agenda-cell'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormError } from '@/components/form-error'
 import { LoadingBlock, PageHeader } from '@/components/page-header'
-import { MaskedInput, Select } from '@/components/ui/input'
+import { Select } from '@/components/ui/input'
 import { useBranches } from '@/hooks/use-admin'
 import { appointmentsKey, useAppointments } from '@/hooks/use-appointments'
 import { useAgendaAvailability } from '@/hooks/use-availability'
@@ -29,10 +30,10 @@ import { useSession } from '@/hooks/use-session'
 import { api, ApiError, errorMessage, type Appointment } from '@/lib/api'
 import { appointmentEvents, availabilityEvents, availableIntervals, hiddenDays, noticeEvents, type StatusFilter } from '@/lib/agenda'
 import { STATUS_LABELS } from '@/lib/appointments'
-import { formatDateTime, formatTime, maskDate, pad, parseDateText } from '@/lib/format'
+import { formatDateTime, formatTime, pad, parseDateText } from '@/lib/format'
 import { can, visibleBranches } from '@/lib/permissions'
-import { colorVar } from '@/lib/professional-colors'
 import { Button } from '@/components/ui/button'
+import { DateInput } from '@/components/ui/date-input'
 
 function nextSlot(): Date {
   const now = new Date()
@@ -152,9 +153,9 @@ export default function AgendaPage() {
             </Button>
           )
         }
-      />
+ />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap" data-tour="agenda-filters">
         <Select
           aria-label="Sede"
           className="sm:w-56"
@@ -207,14 +208,12 @@ export default function AgendaPage() {
             if (day) calendar.current?.getApi().gotoDate(day)
           }}
         >
-          <MaskedInput
+          <DateInput
             aria-label="Ir a la fecha"
-            placeholder="dd/mm/aaaa"
-            className="w-32"
-            mask={maskDate}
+            className="w-40"
             value={jumpTo}
             onChange={(event) => setJumpTo(event.target.value)}
-          />
+ />
           <Button type="submit" variant="outline" disabled={!parseDateText(jumpTo)}>
             Ir
           </Button>
@@ -228,7 +227,7 @@ export default function AgendaPage() {
       )}
       {appointments.isError && <FormError error={appointments.error} className="mb-4" />}
 
-      <div className="overflow-x-auto rounded-lg border bg-card p-2 shadow-sm sm:p-4">
+      <div className="overflow-x-auto rounded-lg border bg-card p-2 shadow-sm sm:p-4" data-tour="agenda-calendar">
         <FullCalendar
           ref={calendar}
           key={compact ? 'lista' : 'grilla'}
@@ -272,38 +271,12 @@ export default function AgendaPage() {
                 </span>
               ) : null
             }
-            const StatusIcon =
-              appointment.status === 'ATTENDED' ? Check : appointment.status === 'NO_SHOW' ? UserX : appointment.status === 'CANCELLED' ? Ban : null
-            const detail = [appointment.practice?.name, professionalId ? null : appointment.professional.displayName]
-              .filter(Boolean)
-              .join(' · ')
-            return (
-              <div
-                className="h-full min-w-0 overflow-hidden px-1 py-0.5 text-xs leading-tight"
-                title={[`${formatTime(appointment.startsAt)} ${appointment.patient.fullName}`, detail].filter(Boolean).join(' · ')}
-              >
-                <p className="flex items-center gap-1 truncate font-semibold">
-                  {StatusIcon && <StatusIcon className="size-3 shrink-0" aria-label={STATUS_LABELS[appointment.status]} />}
-                  <span className="truncate">
-                    {formatTime(appointment.startsAt)} {appointment.patient.fullName}
-                  </span>
-                </p>
-                <p className="truncate opacity-90">{detail}</p>
-              </div>
-            )
+            return <AppointmentCell appointment={appointment} list={arg.view.type.startsWith('list')} />
           }}
-        />
+ />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="Referencias">
-        {legend.map((professional) => (
-          <span key={professional.id} className="flex items-center gap-1.5">
-            <span aria-hidden className="size-2.5 rounded-full" style={{ backgroundColor: colorVar(professional.color) }} />
-            {professional.displayName}
-          </span>
-        ))}
-        <span>Borde: pendiente · Lleno: confirmado · Atenuado con ✓: atendido · Tachado: ausente o cancelado</span>
-      </div>
+      <AgendaLegend professionals={legend} />
 
       <ConfirmDialog
         open={moving !== null}
@@ -318,7 +291,7 @@ export default function AgendaPage() {
         pending={move.isPending}
         error={move.error ? errorMessage(move.error) ?? undefined : undefined}
         onConfirm={() => moving && move.mutate({ ...moving, acknowledge: moveWarned })}
-      />
+ />
       <AppointmentDialog
         appointment={selected}
         onOpenChange={(open) => !open && setSelected(null)}
@@ -328,7 +301,7 @@ export default function AgendaPage() {
           setSelected(null)
           setEditing(appointment)
         }}
-      />
+ />
       <AppointmentFormDialog
         open={creating !== null || editing !== null}
         onOpenChange={(open) => {
@@ -342,7 +315,7 @@ export default function AgendaPage() {
         branches={myBranches}
         professionals={professionals.data ?? []}
         practices={practices.data ?? []}
-      />
+ />
     </>
   )
 }

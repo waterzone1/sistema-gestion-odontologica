@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { coverageInput, coverageReady } from '@/components/billing/coverage-notice'
 import type { CoverageQuote } from '@/lib/api'
-import { auditActionLabel, metadataText } from '@/lib/audit'
+import { auditActionLabel, auditDetails } from '@/lib/audit'
+import { formatMoney } from '@/lib/format'
 import { visibleNav } from '@/lib/nav'
 
 const cotizacion = (requiresAuthorization: boolean): CoverageQuote => ({
@@ -41,8 +42,13 @@ describe('auditoria', () => {
   })
 
   it('muestra los metadatos como texto', () => {
-    expect(metadataText({ campos: ['phone', 'email'], reprogramado: false })).toBe('campos: phone, email · reprogramado: false')
-    expect(metadataText(null)).toBe('')
+    expect(auditDetails({ campos: ['phone', 'email', 'startsAt', 'endsAt'], reprogramado: true, patientId: 'x' })).toEqual([
+      'Cambió: teléfono, email, horario',
+      'Reprogramado',
+    ])
+    expect(auditDetails({ desde: 'SCHEDULED', hacia: 'CANCELLED', motivo: 'Viaja' })).toEqual(['De pendiente a cancelado', 'Motivo: Viaja'])
+    expect(auditDetails({ amount: '1500.00', method: 'CASH', patientId: 'x' })).toEqual([formatMoney('1500.00'), 'Efectivo'])
+    expect(auditDetails(null)).toEqual([])
   })
 })
 

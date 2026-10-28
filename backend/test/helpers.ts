@@ -81,7 +81,7 @@ export interface Seed {
 }
 
 export async function seedInstall(db: Db): Promise<Seed> {
-  const organization = await db.organization.create({ data: { name: 'Consultorio de Prueba' } })
+  const organization = await db.organization.create({ data: { name: 'Consultorio de Prueba', coveragesEnabled: true } })
   const branch = await db.branch.create({
     data: { organizationId: organization.id, name: 'Sede Central' },
   })

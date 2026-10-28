@@ -10,13 +10,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
-import { MaskedInput, Select } from '@/components/ui/input'
+import { Select } from '@/components/ui/input'
 import { useCoverageProviders } from '@/hooks/use-coverages'
 import { useCreateLiquidation, useLiquidations } from '@/hooks/use-liquidations'
 import { useSession } from '@/hooks/use-session'
-import { formatDate, formatMoney, maskDate, parseDateText, toDateText } from '@/lib/format'
+import { formatDate, formatMoney, parseDateText, toDateText } from '@/lib/format'
 import { LIQUIDATION_STATUS_LABELS, liquidationVariant } from '@/lib/liquidations'
 import { can } from '@/lib/permissions'
+import { DateInput } from '@/components/ui/date-input'
 
 export default function LiquidationsPage() {
   const router = useRouter()
@@ -44,11 +45,11 @@ export default function LiquidationsPage() {
             Nueva liquidación
           </Button>
         }
-      />
+ />
       {liquidations.data.length === 0 ? (
         <EmptyState title="Todavía no hay liquidaciones" />
       ) : (
-        <ul className="divide-y rounded-lg border bg-card shadow-sm">
+        <ul className="divide-y rounded-lg border bg-card shadow-sm" data-tour="liquidations-list">
           {liquidations.data.map((liquidation) => (
             <li key={liquidation.id}>
               <Link
@@ -113,10 +114,10 @@ function NewLiquidationForm({ onDone, onCancel }: { onDone: (id: string) => void
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Desde" htmlFor="liquidation-from">
-          <MaskedInput id="liquidation-from" mask={maskDate} placeholder="dd/mm/aaaa" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <DateInput id="liquidation-from" value={from} onChange={(e) => setFrom(e.target.value)} />
         </Field>
         <Field label="Hasta" htmlFor="liquidation-to">
-          <MaskedInput id="liquidation-to" mask={maskDate} placeholder="dd/mm/aaaa" value={to} onChange={(e) => setTo(e.target.value)} />
+          <DateInput id="liquidation-to" value={to} onChange={(e) => setTo(e.target.value)} />
         </Field>
       </div>
       <FormError error={create.error} />

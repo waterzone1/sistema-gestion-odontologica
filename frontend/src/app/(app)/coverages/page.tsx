@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
-import { Input, MaskedInput, Select } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
 import { usePractices } from '@/hooks/use-catalog'
 import {
   useAgreements,
@@ -22,8 +22,9 @@ import {
 import { useSession } from '@/hooks/use-session'
 import type { Agreement, CoverageKind, CoverageProvider } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
-import { formatDate, formatMoney, maskDate, parseDateText, toDateText } from '@/lib/format'
+import { formatDate, formatMoney, parseDateText, toDateText } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { DateInput } from '@/components/ui/date-input'
 
 const KIND_LABELS: Record<CoverageKind, string> = { OBRA_SOCIAL: 'Obra social', PREPAGA: 'Prepaga', OTHER: 'Otra' }
 
@@ -55,12 +56,12 @@ export default function CoveragesPage() {
             Nueva cobertura
           </Button>
         }
-      />
+ />
       <FormError error={saveProvider.error} className="mb-4" />
       {providers.data.length === 0 ? (
         <EmptyState title="Todavía no hay coberturas" description="Creá la primera con «Nueva cobertura»." />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]" data-tour="coverages-list">
           <div className="space-y-3">
             {providers.data.map((provider) => (
               <ProviderCard
@@ -69,7 +70,7 @@ export default function CoveragesPage() {
                 selectedPlanId={selectedPlan?.id ?? null}
                 onSelectPlan={setSelectedPlan}
                 onToggle={() => saveProvider.mutate({ id: provider.id, active: !provider.active })}
-              />
+ />
             ))}
           </div>
           {selectedPlan ? (
@@ -194,7 +195,7 @@ function ProviderCard({
           maxLength={80}
           value={planName}
           onChange={(e) => setPlanName(e.target.value)}
-        />
+ />
         <Button type="submit" variant="outline" size="sm" className="h-9" disabled={planName.trim().length < 2 || savePlan.isPending}>
           Agregar plan
         </Button>
@@ -315,10 +316,10 @@ function AgreementForm({ planId, agreement, onDone }: { planId: string; agreemen
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Vigente desde" htmlFor="agreement-from">
-          <MaskedInput id="agreement-from" mask={maskDate} placeholder="dd/mm/aaaa" disabled={agreement !== null} value={from} onChange={(e) => setFrom(e.target.value)} />
+          <DateInput id="agreement-from" disabled={agreement !== null} value={from} onChange={(e) => setFrom(e.target.value)} />
         </Field>
         <Field label="Hasta (opcional)" htmlFor="agreement-to">
-          <MaskedInput id="agreement-to" mask={maskDate} placeholder="dd/mm/aaaa" value={to} onChange={(e) => setTo(e.target.value)} />
+          <DateInput id="agreement-to" value={to} onChange={(e) => setTo(e.target.value)} />
         </Field>
       </div>
       <fieldset className="space-y-2">
@@ -346,7 +347,7 @@ function AgreementForm({ planId, agreement, onDone }: { planId: string; agreemen
                 type="checkbox"
                 checked={row.requiresAuthorization}
                 onChange={(e) => update(row.key, { requiresAuthorization: e.target.checked })}
-              />
+ />
               Autorización
             </label>
             <Button

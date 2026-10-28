@@ -15,8 +15,9 @@ import { Input, MaskedInput, Select } from '@/components/ui/input'
 import { appointmentsKey } from '@/hooks/use-appointments'
 import { useSession } from '@/hooks/use-session'
 import { api, ApiError, type Appointment, type Branch, type Practice, type Professional } from '@/lib/api'
-import { fullName, maskDate, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
+import { fullName, maskTime, parseDateTimeText, toDateText, toTimeText } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { DateInput } from '@/components/ui/date-input'
 
 const schema = z.object({
   branchId: z.string().min(1, 'Elegí la sede'),
@@ -183,7 +184,7 @@ function AppointmentForm({
           value={patient}
           onChange={setPatient}
           disabled={editing || defaults?.lockPatient === true}
-        />
+ />
       </Field>
       {!patient && (
         <Button type="button" variant="outline" size="sm" onClick={() => setCreatingPatient(true)}>
@@ -198,7 +199,7 @@ function AppointmentForm({
           setPatient({ id: created.id, fullName: fullName(created) })
           setCreatingPatient(false)
         }}
-      />
+ />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Sede" htmlFor="branchId" error={errors.branchId?.message}>
@@ -260,7 +261,7 @@ function AppointmentForm({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Fecha" htmlFor="date" error={errors.date?.message}>
-          <MaskedInput id="date" placeholder="dd/mm/aaaa" mask={maskDate} {...register('date', { onChange: resetChecks })} aria-invalid={!!errors.date} />
+          <DateInput id="date"  {...register('date', { onChange: resetChecks })} aria-invalid={!!errors.date} />
         </Field>
         <Field label="Hora" htmlFor="time" error={errors.time?.message}>
           <MaskedInput id="time" placeholder="hh:mm" mask={maskTime} {...register('time', { onChange: resetChecks })} aria-invalid={!!errors.time} />
@@ -274,7 +275,7 @@ function AppointmentForm({
             step={5}
             {...register('durationMinutes', { valueAsNumber: true, onChange: resetChecks })}
             aria-invalid={!!errors.durationMinutes}
-          />
+ />
         </Field>
       </div>
 
@@ -309,7 +310,7 @@ function AppointmentForm({
             placeholder="Por ejemplo, urgencia por dolor agudo"
             value={overrideReason}
             onChange={(event) => setOverrideReason(event.target.value)}
-          />
+ />
         </Field>
       )}
 

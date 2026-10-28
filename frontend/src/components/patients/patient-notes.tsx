@@ -22,7 +22,7 @@ export function PatientNotes({ patientId, canWrite }: Props) {
   const [content, setContent] = useState('')
 
   return (
-    <section aria-label="Mensajes del equipo" className="rounded-lg border bg-card p-5 shadow-sm sm:col-span-2">
+    <section aria-label="Mensajes del equipo" data-tour="patient-notes" className="rounded-lg border bg-card p-5 shadow-sm sm:col-span-2">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <MessageSquare className="size-4" aria-hidden />
