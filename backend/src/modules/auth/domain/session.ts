@@ -1,4 +1,3 @@
-export const SESSION_IDLE_MS = 8 * 60 * 60 * 1000
 export const SESSION_ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000
 const TOUCH_INTERVAL_MS = 60 * 1000
 
@@ -10,10 +9,10 @@ interface SessionTimes {
   revokedAt: Date | null
 }
 
-export function sessionState(session: SessionTimes, now: Date): SessionState {
+export function sessionState(session: SessionTimes, now: Date, idleMs: number): SessionState {
   if (session.revokedAt) return 'revoked'
   if (now >= session.expiresAt) return 'expired'
-  if (now.getTime() - session.lastSeenAt.getTime() >= SESSION_IDLE_MS) return 'idle'
+  if (now.getTime() - session.lastSeenAt.getTime() >= idleMs) return 'idle'
   return 'valid'
 }
 

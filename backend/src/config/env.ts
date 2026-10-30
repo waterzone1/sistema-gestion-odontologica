@@ -14,7 +14,6 @@ const envSchema = z.object({
   FILES_DIR: z.string().min(1).default('data/files'),
   FILE_MAX_MB: z.coerce.number().int().min(1).max(200).default(20),
   BACKUP_DIR: z.string().min(1).default('data/backups'),
-  BACKUP_HOUR: z.coerce.number().int().min(0).max(23).default(3),
   BACKUP_SCHEDULE: z.enum(['on', 'off']).default('on'),
   PG_BIN_DIR: z.string().min(1).optional(),
 })

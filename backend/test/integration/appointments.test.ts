@@ -171,6 +171,21 @@ describe('superposicion de turnos', () => {
     expect(await db.appointment.count({ where: { status: 'CANCELLED' } })).toBe(1)
   })
 
+  it('un turno ausente libera el horario y reactivarlo detecta el choque', async () => {
+    const creado = await as(app, recepcion).post('/api/appointments', turno())
+    const id = (creado.body as { id: string }).id
+    await as(app, recepcion).post(`/api/appointments/${id}/status`, { status: 'NO_SHOW' }).expect(200)
+    await as(app, recepcion).post('/api/appointments', turno()).expect(201)
+    const reactivado = await as(app, recepcion).post(`/api/appointments/${id}/reactivate`, {})
+    expect([reactivado.status, codigo(reactivado)]).toEqual([409, 'APPOINTMENT_CONFLICT'])
+  })
+
+  it('el choque dice con que turno se pisa', async () => {
+    await as(app, recepcion).post('/api/appointments', turno())
+    const pisado = await as(app, recepcion).post('/api/appointments', turno({ startsAt: iso(mas(dia(13), 30)), endsAt: iso(mas(dia(14), 30)) }))
+    expect((pisado.body as { error: { message: string } }).error.message).toMatch(/turno de \d{2}:\d{2} a \d{2}:\d{2}$/)
+  })
+
   it('la base de datos impone la regla aunque se salte la aplicacion', async () => {
     await seedAppointment(db, seed, { patientId: paciente.id, professionalId: perfilA, createdById: adminId, startsAt: dia(13), endsAt: dia(14) })
     await expect(
@@ -211,6 +226,7 @@ describe('listado y visibilidad', () => {
     expect(ids(await as(app, recepcion).get(`/api/appointments?${rangoDia}`))).toEqual([enA.id])
     expect(ids(await as(app, admin).get(`/api/appointments?${rangoDia}`))).toEqual([enA.id, enB.id])
     expect((await as(app, recepcion).get(`/api/appointments/${enB.id}`)).status).toBe(404)
+    expect(ids(await as(app, recepcion).get(`/api/appointments?${rangoDia}&branchId=${seed.secondBranchId}`))).toEqual([])
   })
 
   it('el odontologo ve solo sus turnos', async () => {

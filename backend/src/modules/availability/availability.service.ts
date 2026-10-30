@@ -4,7 +4,7 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { patientName } from '../patients/domain/name.js'
-import { checkAvailability, expandRules, rulesProblem, type AvailabilityResult, type Rule } from './domain/availability.js'
+import { checkAvailability, expandRules, rulesProblem, type AvailabilityResult, type Rule, minuteToTime } from './domain/availability.js'
 import type {
   AgendaAvailabilityDto,
   AgendaAvailabilityQuery,
@@ -21,8 +21,6 @@ type ExceptionRecord = NonNullable<Awaited<ReturnType<Db['availabilityException'
 const HISTORY_DAYS = 30
 const DAY_MS = 86_400_000
 
-const pad = (value: number) => String(value).padStart(2, '0')
-const toTime = (minute: number) => `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`
 const toMinute = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number) as [number, number]
   return hours * 60 + minutes
@@ -82,8 +80,8 @@ export async function getProfessionalAvailability(
       id: rule.id,
       branchId: rule.branchId,
       weekday: rule.weekday,
-      start: toTime(rule.startMinute),
-      end: toTime(rule.endMinute),
+      start: minuteToTime(rule.startMinute),
+      end: minuteToTime(rule.endMinute),
     })),
     exceptions: exceptions.map(toExceptionDto),
   }

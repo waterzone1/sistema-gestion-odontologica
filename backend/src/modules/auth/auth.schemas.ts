@@ -29,6 +29,7 @@ const preferenceFields = {
   agendaSlotMinutes: z.union([z.literal(15), z.literal(30)]),
   showSaturday: z.boolean(),
   showSunday: z.boolean(),
+  toursSeen: z.array(z.string().regex(/^[a-z-]{1,40}$/)).max(40).meta({ description: 'Recorridos guiados que el usuario ya vio' }),
 }
 
 const partialPreferencesSchema = z.object(preferenceFields).partial()
@@ -42,6 +43,7 @@ const DEFAULT_PREFERENCES: z.infer<typeof userPreferencesSchema> = {
   agendaSlotMinutes: 30,
   showSaturday: true,
   showSunday: true,
+  toursSeen: [],
 }
 
 const userPreferencesSchema = z.object(preferenceFields).meta({ id: 'UserPreferences' })
@@ -66,6 +68,7 @@ const sessionUserSchema = z
     onboardingCompleted: z.boolean(),
     theme: themeSchema,
     preferences: userPreferencesSchema,
+    modules: z.object({ coverages: z.boolean() }).meta({ description: 'Módulos que la organización tiene activados' }),
   })
   .meta({ id: 'SessionUser' })
 

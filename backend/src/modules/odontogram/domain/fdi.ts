@@ -46,6 +46,7 @@ export function findingProblem(tooth: number, condition: Condition, surfaces: re
 }
 
 export interface Finding {
+  id: string
   tooth: number
   surface: Surface | null
   condition: Condition
@@ -53,7 +54,7 @@ export interface Finding {
 }
 
 export function currentState<T extends Finding>(findings: readonly T[]): T[] {
-  const sorted = [...findings].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  const sorted = [...findings].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
   const latest = new Map<string, T>()
   for (const finding of sorted) {
     if (finding.surface === null) {

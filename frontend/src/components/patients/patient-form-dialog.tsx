@@ -9,10 +9,11 @@ import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Field } from '@/components/ui/field'
-import { Input, MaskedInput, Select } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
 import { patientsKey } from '@/hooks/use-patients'
 import { api, ApiError, type Patient } from '@/lib/api'
-import { formatDate, maskDate, parseDateText } from '@/lib/format'
+import { formatDate, parseDateText } from '@/lib/format'
+import { DateInput } from '@/components/ui/date-input'
 
 const DOCUMENT_TYPES = [
   { value: 'DNI', label: 'DNI' },
@@ -33,6 +34,7 @@ const schema = z.object({
     .min(1, 'Ingresá la fecha de nacimiento')
     .refine((value) => parseDateText(value) !== null, 'Usá el formato dd/mm/aaaa con una fecha válida'),
   phone: z.string().trim(),
+  phoneHasWhatsapp: z.boolean(),
   email: z
     .string()
     .trim()
@@ -89,6 +91,7 @@ function PatientForm({
       documentNumber: patient?.documentNumber ?? '',
       birthDate: patient?.birthDate ? formatDate(patient.birthDate) : '',
       phone: patient?.phone ?? '',
+      phoneHasWhatsapp: patient?.phoneHasWhatsapp ?? true,
       email: patient?.email ?? '',
       address: patient?.address ?? '',
     },
@@ -154,16 +157,15 @@ function PatientForm({
               inputMode="text"
               {...register('documentNumber')}
               aria-invalid={!!errors.documentNumber}
-            />
+ />
           </Field>
           <Field label="Fecha de nacimiento" htmlFor="birthDate" error={errors.birthDate?.message}>
-            <MaskedInput
+            <DateInput
               id="birthDate"
-              placeholder="dd/mm/aaaa"
-              mask={maskDate}
+              toYear={new Date().getFullYear()}
               {...register('birthDate')}
               aria-invalid={!!errors.birthDate}
-            />
+ />
           </Field>
         </div>
       </fieldset>
@@ -173,6 +175,10 @@ function PatientForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Teléfono (opcional)" htmlFor="phone">
             <Input id="phone" type="tel" {...register('phone')} />
+            <label className="mt-1.5 flex items-center gap-2 text-sm">
+              <input type="checkbox" {...register('phoneHasWhatsapp')} />
+              Tiene WhatsApp
+            </label>
           </Field>
           <Field label="Email (opcional)" htmlFor="email" error={errors.email?.message}>
             <Input id="email" type="email" {...register('email')} aria-invalid={!!errors.email} />

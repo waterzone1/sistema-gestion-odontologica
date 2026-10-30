@@ -25,6 +25,7 @@ function toPatientDto(patient: PatientRecord): PatientDto {
     documentNumber: patient.documentNumber,
     birthDate: patient.birthDate ? patient.birthDate.toISOString().slice(0, 10) : null,
     phone: patient.phone,
+    phoneHasWhatsapp: patient.phoneHasWhatsapp,
     email: patient.email,
     address: patient.address,
     archivedAt: patient.archivedAt ? patient.archivedAt.toISOString() : null,
@@ -90,6 +91,23 @@ export async function getPatient(db: Db, actor: AuthContext, id: string): Promis
   return toPatientDto(await findPatientOrFail(db, actor.organizationId, id))
 }
 
+export function newPatientData(organizationId: string, input: CreatePatientInput) {
+  const phone = input.phone ?? null
+  return {
+    organizationId,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    documentType: input.documentType,
+    documentNumber: input.documentNumber,
+    birthDate: toDate(input.birthDate),
+    phone,
+    phoneHasWhatsapp: input.phoneHasWhatsapp,
+    email: input.email ?? null,
+    address: input.address ?? null,
+    searchText: buildSearchText({ firstName: input.firstName, lastName: input.lastName, documentNumber: input.documentNumber, phone }),
+  }
+}
+
 export async function createPatient(
   db: Db,
   actor: AuthContext,
@@ -97,29 +115,10 @@ export async function createPatient(
 ): Promise<PatientDto> {
   const documentNumber = input.documentNumber
   assertDocument(input.documentType, documentNumber)
-  const phone = input.phone ?? null
 
   try {
     return await db.$transaction(async (tx) => {
-      const patient = await tx.patient.create({
-        data: {
-          organizationId: actor.organizationId,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          documentType: input.documentType,
-          documentNumber,
-          birthDate: toDate(input.birthDate),
-          phone,
-          email: input.email ?? null,
-          address: input.address ?? null,
-          searchText: buildSearchText({
-            firstName: input.firstName,
-            lastName: input.lastName,
-            documentNumber,
-            phone,
-          }),
-        },
-      })
+      const patient = await tx.patient.create({ data: newPatientData(actor.organizationId, input) })
       await recordAudit(tx, {
         action: 'PATIENT_CREATED',
         entityType: 'Patient',
@@ -165,6 +164,7 @@ export async function updatePatient(
           documentType,
           documentNumber,
           phone,
+          ...(input.phoneHasWhatsapp !== undefined ? { phoneHasWhatsapp: input.phoneHasWhatsapp } : {}),
           ...(input.birthDate !== undefined ? { birthDate: toDate(input.birthDate) } : {}),
           ...(input.email !== undefined ? { email: input.email } : {}),
           ...(input.address !== undefined ? { address: input.address } : {}),

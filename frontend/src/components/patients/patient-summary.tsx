@@ -21,7 +21,9 @@ export function PatientSummary({ patient, user }: Props) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <PatientNotes patientId={patient.id} canWrite={can(user, 'patient-notes:write') && patient.archivedAt === null} />
-      <PatientCoverageCard patientId={patient.id} canWrite={can(user, 'patients:write') && patient.archivedAt === null} />
+      {user.modules.coverages && (
+        <PatientCoverageCard patientId={patient.id} canWrite={can(user, 'patients:write') && patient.archivedAt === null} />
+      )}
       {can(user, 'appointments:read') && <NextAppointment patientId={patient.id} />}
       {can(user, 'account:read') && <Balance patientId={patient.id} />}
       {can(user, 'clinical:read') && <LastEvolution patientId={patient.id} />}

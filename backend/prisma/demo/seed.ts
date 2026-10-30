@@ -25,6 +25,12 @@ const PRACTICES = [
   { code: 'END', name: 'Endodoncia unirradicular', price: '95000.00', minutes: 30 },
   { code: 'BLA', name: 'Blanqueamiento', price: '120000.00', minutes: 30 },
 ]
+const COVERAGE = { provider: 'OSDE', plan: '210', copays: { CON: ['8000.00', '4000.00'], LIM: ['18000.00', '7000.00'], OBT: ['28000.00', '10000.00'] } }
+const TEAM_NOTES = [
+  'Prefiere turnos a primera hora.',
+  'Avisar si se atrasa: viene desde lejos.',
+  'Pidió factura a nombre de la empresa.',
+]
 const NOTES = [
   'Control de rutina. Sin hallazgos relevantes. Se indica higiene con cepillado suave.',
   'Caries oclusal. Se realiza restauración con resina. Sin complicaciones.',
@@ -119,6 +125,7 @@ async function main() {
       const lastName = LAST_NAMES[(index * 7 + 3) % LAST_NAMES.length] as string
       const documentNumber = String(30000000 + index * 137)
       const phone = `11 5${String(100 + index).padStart(3, '0')}-${String(1000 + index * 13).slice(0, 4)}`
+      const birthDate = new Date(Date.UTC(1960 + ((index * 7) % 50), index % 12, 1 + (index % 27)))
       patients.push(
         await db.patient.create({
           data: {
@@ -126,11 +133,44 @@ async function main() {
             firstName,
             lastName,
             documentNumber,
+            birthDate,
             phone,
             searchText: buildSearchText({ firstName, lastName, documentNumber, phone }),
           },
         }),
       )
+    }
+
+    const provider = await db.coverageProvider.create({
+      data: { organizationId: organization.id, name: COVERAGE.provider, kind: 'PREPAGA', plans: { create: [{ name: COVERAGE.plan }] } },
+      include: { plans: true },
+    })
+    const plan = provider.plans[0]
+    if (!plan) throw new Error('No se pudo crear el plan de demostración')
+    await db.agreement.create({
+      data: {
+        planId: plan.id,
+        validFrom: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
+        items: {
+          create: Object.entries(COVERAGE.copays).map(([code, [insurerAmount, patientCopay]]) => ({
+            practiceId: practices.find((practice) => practice.code === code)?.id ?? '',
+            insurerAmount: insurerAmount ?? '0',
+            patientCopay: patientCopay ?? '0',
+          })),
+        },
+      },
+    })
+    const coverageOf = new Map<string, string>()
+    for (const patient of patients.filter((_, index) => index % 3 === 0)) {
+      const coverage = await db.patientCoverage.create({
+        data: {
+          patientId: patient.id,
+          planId: plan.id,
+          affiliateNumber: `61-${patient.documentNumber ?? ''}-0`,
+          validFrom: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
+        },
+      })
+      coverageOf.set(patient.id, coverage.id)
     }
 
     const startOfToday = new Date()
@@ -183,6 +223,8 @@ async function main() {
           })
           notes += 1
 
+          const coverageId = coverageOf.get(patient.id)
+          const copay = coverageId ? COVERAGE.copays[practice.code as keyof typeof COVERAGE.copays] : undefined
           const service = await db.performedService.create({
             data: {
               organizationId: organization.id,
@@ -190,7 +232,9 @@ async function main() {
               professionalId: profile.id,
               practiceId: practice.id,
               appointmentId: appointment.id,
-              price: practice.basePrice,
+              price: copay?.[1] ?? practice.basePrice,
+              coverageAmount: copay?.[0] ?? '0',
+              patientCoverageId: copay ? coverageId : null,
               catalogPrice: practice.basePrice,
               performedAt: endsAt,
               createdById: dentistUsers[profileIndex]?.id ?? admin.id,
@@ -220,6 +264,61 @@ async function main() {
       }
     }
 
+    await db.exchangeRate.create({
+      data: { organizationId: organization.id, currency: 'USD', rate: '1250.00', setById: admin.id },
+    })
+
+    for (const [index, patient] of patients.slice(1, 4).entries()) {
+      await db.patientNote.create({
+        data: { patientId: patient.id, authorId: admin.id, content: TEAM_NOTES[index] ?? 'Sin novedades.' },
+      })
+    }
+
+    const endodoncia = practices.find((practice) => practice.code === 'END')
+    const obturacion = practices.find((practice) => practice.code === 'OBT')
+    for (const [index, patient] of patients.slice(4, 7).entries()) {
+      const profile = profiles[index % profiles.length]
+      if (!profile || !endodoncia || !obturacion) break
+      await db.treatmentPlan.create({
+        data: {
+          organizationId: organization.id,
+          patientId: patient.id,
+          professionalId: profile.id,
+          title: 'Rehabilitación',
+          ...(index === 0 ? { status: 'ACCEPTED' as const, acceptedAt: new Date(), acceptedById: admin.id } : {}),
+          items: {
+            create: [
+              { practiceId: endodoncia.id, tooth: 36, agreedPrice: index === 0 ? '90000.00' : null },
+              { practiceId: obturacion.id, tooth: 46, surfaces: ['O', 'M'], agreedPrice: index === 0 ? '35000.00' : null },
+            ],
+          },
+        },
+      })
+      await db.toothFinding.createMany({
+        data: [
+          { patientId: patient.id, professionalId: profile.id, tooth: 36, surface: 'O', condition: 'CARIES' },
+          { patientId: patient.id, professionalId: profile.id, tooth: 18, condition: 'MISSING' },
+        ],
+      })
+    }
+
+    const covered = await db.performedService.findMany({
+      where: { organizationId: organization.id, patientCoverageId: { not: null }, performedAt: { lt: new Date() } },
+      select: { id: true, coverageAmount: true },
+    })
+    if (covered.length > 0) {
+      await db.liquidation.create({
+        data: {
+          organizationId: organization.id,
+          providerId: provider.id,
+          periodFrom: new Date(Date.now() - 15 * DAY_MS),
+          periodTo: new Date(),
+          createdById: admin.id,
+          items: { create: covered.map((service) => ({ serviceId: service.id, claimedAmount: service.coverageAmount })) },
+        },
+      })
+    }
+
     process.stdout.write(
       [
         `Pacientes: ${patients.length}`,
@@ -227,6 +326,8 @@ async function main() {
         `Notas clínicas: ${notes}`,
         `Prestaciones: ${services}`,
         `Pagos: ${payments}`,
+        `Pacientes con ${COVERAGE.provider} ${COVERAGE.plan}: ${coverageOf.size}`,
+        `Prestaciones en la liquidación en borrador: ${covered.length}`,
         '',
         'Usuarios de demostración (misma clave para los tres):',
         '  demo.paz         odontóloga',

@@ -79,6 +79,7 @@ describe('login', () => {
     }
     const bloqueado = await login(app, 'admin', 'mal-mal-mal-1')
     expect(bloqueado.status).toBe(429)
+    expect((await login(app, '  ADMIN ', 'mal-mal-mal-1')).status).toBe(429)
     expect((await login(app, 'recepcion', PASSWORD)).status).toBe(200)
   })
 
@@ -222,6 +223,7 @@ describe('cambio de contraseña', () => {
       agendaSlotMinutes: 30,
       showSaturday: true,
       showSunday: true,
+      toursSeen: [],
     })
     await as(app, admin)
       .put('/api/auth/preferences', { preferences: { homePage: '/agenda', menuOrder: ['/agenda', '/patients'], agendaSlotMinutes: 15 } })

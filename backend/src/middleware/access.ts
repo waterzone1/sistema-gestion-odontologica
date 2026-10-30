@@ -51,6 +51,15 @@ export function requirePermission(permission: Permission): GuardedHandler {
   )
 }
 
+export function requireModule(module: 'coverages'): RequestHandler {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (req.auth && !req.auth.modules[module]) {
+      throw new AppError(403, 'MODULE_DISABLED', 'El módulo de coberturas y liquidaciones está desactivado. Se activa desde Configuración.')
+    }
+    next()
+  }
+}
+
 export function authOf(req: Request) {
   if (!req.auth) throw new AppError(401, 'UNAUTHENTICATED', 'Necesitás iniciar sesión')
   return req.auth

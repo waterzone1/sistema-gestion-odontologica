@@ -52,6 +52,17 @@ describe('pantalla de auditoria', () => {
     expect(logins.items.map((i) => i.actor?.displayName)).toContain('Marta Admin')
   })
 
+  it('cada evento dice en palabras a quien afecta, sin mostrar contenido clinico', async () => {
+    await as(app, odontologo).post(`/api/patients/${pacienteId}/clinical`, { content: 'Dolor en pieza 36' }).expect(201)
+    await as(app, recepcion).patch(`/api/patients/${pacienteId}`, { phone: '11 4000-0000' }).expect(200)
+    const lista = (await as(app, admin).get('/api/audit').expect(200)).body as { items: { action: string; subject: string | null }[] }
+    const sujeto = (accion: string) => lista.items.find((item) => item.action === accion)?.subject
+    const paciente = await db.patient.findUniqueOrThrow({ where: { id: pacienteId } })
+    expect(sujeto('PATIENT_UPDATED')).toBe(`${paciente.lastName}, ${paciente.firstName}`)
+    expect(sujeto('CLINICAL_ENTRY_CREATED')).toBe(`Historia clínica de ${paciente.lastName}, ${paciente.firstName}`)
+    expect(JSON.stringify(lista)).not.toContain('Dolor en pieza 36')
+  })
+
   it('recepcion y odontologos no acceden', async () => {
     expect((await as(app, recepcion).get('/api/audit')).status).toBe(403)
     expect((await as(app, odontologo).get('/api/audit')).status).toBe(403)

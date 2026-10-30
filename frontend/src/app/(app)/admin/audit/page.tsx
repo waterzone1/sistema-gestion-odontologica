@@ -8,12 +8,13 @@ import { EmptyState, LoadingBlock, PageHeader } from '@/components/page-header'
 import { Pagination } from '@/components/pagination'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
-import { MaskedInput, Select } from '@/components/ui/input'
+import { Select } from '@/components/ui/input'
 import { useSession } from '@/hooks/use-session'
 import { api, type AuditList } from '@/lib/api'
-import { AUDIT_ACTION_LABELS, auditActionLabel, metadataText } from '@/lib/audit'
-import { formatDateTime, maskDate, parseDateText } from '@/lib/format'
+import { AUDIT_ACTION_LABELS, auditActionLabel, auditDetails } from '@/lib/audit'
+import { formatDateTime, parseDateText } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { DateInput } from '@/components/ui/date-input'
 
 const PAGE_SIZE = 50
 
@@ -57,9 +58,10 @@ export default function AuditPage() {
     <>
       <PageHeader
         title="Auditoría"
-        description="Quién hizo qué y cuándo. Se guardan identificadores y nombres de campos, nunca contraseñas ni contenido clínico."
-      />
+        description="Quién hizo qué, a quién y cuándo. Nunca se guardan contraseñas ni contenido clínico."
+ />
       <form
+        data-tour="audit-filters"
         className="mb-4 grid gap-3 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end"
         onSubmit={(event) => {
           event.preventDefault()
@@ -68,10 +70,10 @@ export default function AuditPage() {
         }}
       >
         <Field label="Desde" htmlFor="audit-from">
-          <MaskedInput id="audit-from" mask={maskDate} placeholder="dd/mm/aaaa" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
+          <DateInput id="audit-from" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
         </Field>
         <Field label="Hasta" htmlFor="audit-to">
-          <MaskedInput id="audit-to" mask={maskDate} placeholder="dd/mm/aaaa" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />
+          <DateInput id="audit-to" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />
         </Field>
         <Field label="Acción" htmlFor="audit-action">
           <Select id="audit-action" value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })}>
@@ -95,23 +97,25 @@ export default function AuditPage() {
       ) : audit.data && audit.data.items.length === 0 ? (
         <EmptyState title="No hay eventos con esos filtros" />
       ) : (
-        <ul className="divide-y rounded-lg border bg-card shadow-sm">
-          {(audit.data?.items ?? []).map((item) => (
-            <li key={item.id} className="px-4 py-2 text-sm">
-              <p>
-                <span className="font-medium">{auditActionLabel(item.action)}</span>
-                <span className="text-muted-foreground">
-                  {' '}
-                  · {item.actor?.displayName ?? 'Sistema'} · {formatDateTime(item.createdAt)}
-                </span>
-              </p>
-              <p className="break-all text-xs text-muted-foreground">
-                {item.entityType}
-                {item.entityId && ` ${item.entityId}`}
-                {item.metadata && ` · ${metadataText(item.metadata)}`}
-              </p>
-            </li>
-          ))}
+        <ul className="divide-y rounded-lg border bg-card shadow-sm" data-tour="audit-list">
+          {(audit.data?.items ?? []).map((item) => {
+            const details = auditDetails(item.metadata)
+            return (
+              <li key={item.id} className="grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
+                <div className="min-w-0">
+                  <p>
+                    <span className="font-medium">{auditActionLabel(item.action)}</span>
+                    {item.subject && <span> · {item.subject}</span>}
+                  </p>
+                  {details.length > 0 && <p className="text-xs text-muted-foreground">{details.join(' · ')}</p>}
+                </div>
+                <p className="text-xs text-muted-foreground sm:text-right">
+                  <span className="block font-medium text-foreground">{item.actor?.displayName ?? 'Sistema'}</span>
+                  {formatDateTime(item.createdAt)}
+                </p>
+              </li>
+            )
+          })}
         </ul>
       )}
       {audit.data && totalPages > 1 && (
@@ -121,7 +125,7 @@ export default function AuditPage() {
           totalPages={totalPages}
           summary={`${audit.data.total} eventos`}
           onChange={setPage}
-        />
+ />
       )}
     </>
   )

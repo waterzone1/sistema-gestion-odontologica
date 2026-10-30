@@ -26,12 +26,13 @@ const patientFields = {
   documentNumber: documentNumberSchema,
   birthDate: birthDateSchema,
   phone: phoneSchema,
+  phoneHasWhatsapp: z.boolean().meta({ description: 'Si el teléfono usa WhatsApp. Sin WhatsApp, el recordatorio se avisa por llamada' }),
   email: emailSchema,
   address: optionalText(200),
 }
 
 export const createPatientSchema = z
-  .object({ ...patientFields, documentType: documentTypeSchema.default('DNI') })
+  .object({ ...patientFields, documentType: documentTypeSchema.default('DNI'), phoneHasWhatsapp: patientFields.phoneHasWhatsapp.default(true) })
   .meta({ id: 'CreatePatientInput' })
 
 export const updatePatientSchema = z
@@ -62,6 +63,7 @@ export const patientSchema = z
     documentNumber: z.string().nullable(),
     birthDate: z.iso.date().nullable(),
     phone: z.string().nullable(),
+    phoneHasWhatsapp: z.boolean(),
     email: z.string().nullable(),
     address: z.string().nullable(),
     archivedAt: z.iso.datetime().nullable(),

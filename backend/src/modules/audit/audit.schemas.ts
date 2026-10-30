@@ -24,6 +24,7 @@ export const auditListSchema = z
         entityType: z.string(),
         entityId: z.string().nullable(),
         actor: z.object({ id: z.uuid(), displayName: z.string() }).nullable(),
+        subject: z.string().nullable().meta({ description: 'A quién o a qué afecta, en palabras: paciente, turno, práctica, usuario' }),
         metadata: z.record(z.string(), z.unknown()).nullable(),
         createdAt: z.iso.datetime(),
       }),

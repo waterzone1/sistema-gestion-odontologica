@@ -1,5 +1,4 @@
 import type { Currency, MovementMethod } from './api'
-import { formatMoney } from './format'
 
 export const PAYMENT_METHOD_LABELS: Record<MovementMethod, string> = {
   CASH: 'Efectivo',
@@ -28,11 +27,6 @@ export function toPesosCents(amountCents: number, currency: Currency, rateCents:
   if (currency === 'ARS') return amountCents
   if (rateCents === null) return null
   return Math.round((amountCents * rateCents) / 100)
-}
-
-export function paymentAmountText(payment: { amount: string; currency: Currency; originalAmount: string; exchangeRate: string }): string {
-  if (payment.currency === 'ARS') return formatMoney(payment.amount)
-  return `${formatMoney(payment.originalAmount, payment.currency)} (a ${formatMoney(payment.exchangeRate)}) = ${formatMoney(payment.amount)}`
 }
 
 export const PRICE_PRESETS = [25, 10, -10, -25] as const

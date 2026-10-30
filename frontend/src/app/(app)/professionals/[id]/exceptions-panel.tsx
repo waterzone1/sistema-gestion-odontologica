@@ -19,7 +19,8 @@ import {
 } from '@/hooks/use-availability'
 import type { AvailabilityException, AvailabilityExceptionResult, Branch } from '@/lib/api'
 import { EXCEPTION_LABELS } from '@/lib/availability'
-import { formatDateTime, maskDate, maskTime, parseDateTimeText, toDateText } from '@/lib/format'
+import { formatDateTime, maskTime, parseDateTimeText, toDateText } from '@/lib/format'
+import { DateInput } from '@/components/ui/date-input'
 
 interface Props {
   professionalId: string
@@ -99,7 +100,7 @@ export function ExceptionsPanel({ professionalId, branches }: Props) {
                 setCreating(false)
               }}
               onCancel={() => setCreating(false)}
-            />
+ />
           </DialogContent>
         )}
       </Dialog>
@@ -112,7 +113,7 @@ export function ExceptionsPanel({ professionalId, branches }: Props) {
         pending={revoke.isPending}
         error={revoke.error ? 'No se pudo completar la acción' : undefined}
         onConfirm={() => revoking && revoke.mutate(revoking.id, { onSuccess: () => setRevoking(null) })}
-      />
+ />
     </div>
   )
 }
@@ -187,13 +188,13 @@ function ExceptionForm({
           </Select>
         </Field>
         <Field label="Desde (fecha)" htmlFor="exception-from-date">
-          <MaskedInput id="exception-from-date" placeholder="dd/mm/aaaa" mask={maskDate} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          <DateInput id="exception-from-date"  value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
         </Field>
         <Field label="Desde (hora)" htmlFor="exception-from-time">
           <MaskedInput id="exception-from-time" placeholder="hh:mm" mask={maskTime} value={fromTime} onChange={(e) => setFromTime(e.target.value)} />
         </Field>
         <Field label="Hasta (fecha)" htmlFor="exception-to-date">
-          <MaskedInput id="exception-to-date" placeholder="dd/mm/aaaa" mask={maskDate} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          <DateInput id="exception-to-date"  value={toDate} onChange={(e) => setToDate(e.target.value)} />
         </Field>
         <Field label="Hasta (hora)" htmlFor="exception-to-time" error={rangeError ?? undefined}>
           <MaskedInput id="exception-to-time" placeholder="hh:mm" mask={maskTime} value={toTime} onChange={(e) => setToTime(e.target.value)} />

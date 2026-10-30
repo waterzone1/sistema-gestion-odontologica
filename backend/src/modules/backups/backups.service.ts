@@ -17,7 +17,8 @@ import {
   type BackupConfig,
 } from './backups.archive.js'
 import { backupRecordSchema, type BackupCounts, type BackupRecord, type BackupStatusDto, type RestoreResultDto } from './backups.schemas.js'
-import { backupsToDelete } from './domain/retention.js'
+import { backupSlots, readSettings } from '../organizations/domain/settings.js'
+import { backupsToDelete, type RetentionPolicy } from './domain/retention.js'
 
 interface Manifest {
   id: string
@@ -33,12 +34,12 @@ interface Actor {
   displayName: string | null
 }
 
-const state = { maintenance: false, running: null as string | null, nextScheduled: null as string | null }
+const state = { maintenance: false, running: null as string | null, scheduler: false }
 
 export const maintenanceActive = () => state.maintenance
 
-export function setNextScheduled(value: Date | null) {
-  state.nextScheduled = value ? value.toISOString() : null
+export function markSchedulerActive() {
+  state.scheduler = true
 }
 
 const recordFile = (config: BackupConfig, id: string) => path.join(config.dir, `${id}.json`)
@@ -97,11 +98,17 @@ async function schemaVersion(db: Db): Promise<string> {
 interface Context {
   organizationId: string | null
   timeZone: string
+  retention: RetentionPolicy
 }
 
 async function contextOf(db: Db): Promise<Context> {
-  const organization = await db.organization.findFirst({ select: { id: true, timezone: true } })
-  return { organizationId: organization?.id ?? null, timeZone: organization?.timezone ?? 'UTC' }
+  const organization = await db.organization.findFirst({ select: { id: true, timezone: true, settings: true } })
+  const { backups } = readSettings(organization?.settings)
+  return {
+    organizationId: organization?.id ?? null,
+    timeZone: organization?.timezone ?? 'UTC',
+    retention: { daily: backups.keepDaily, weekly: backups.keepWeekly, manual: backups.keepManual },
+  }
 }
 
 function audit(db: Db, context: Context, actor: Actor, entry: Pick<AuditEntry, 'action' | 'entityId' | 'metadata'>) {
@@ -140,7 +147,7 @@ async function succeededOrFail(config: BackupConfig, id: string) {
 }
 
 async function applyRetention(config: BackupConfig, logger: Logger, context: Context) {
-  const doomed = backupsToDelete(await listBackups(config), (iso) => localDay(new Date(iso), context.timeZone))
+  const doomed = backupsToDelete(await listBackups(config), (iso) => localDay(new Date(iso), context.timeZone), context.retention)
   for (const id of doomed) {
     await rm(archiveFile(config, id), { force: true })
     await rm(recordFile(config, id), { force: true })
@@ -180,7 +187,7 @@ async function runBackup(db: Db, config: BackupConfig, logger: Logger, context: 
     }
     await writeRecord(config, done)
     await audit(db, context, actor, { action: 'BACKUP_COMPLETED', entityId: record.id, metadata: { tipo: record.kind, bytes: digest.size } })
-    if (record.kind === 'SCHEDULED') await applyRetention(config, logger, context)
+    await applyRetention(config, logger, context)
     return done
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -235,13 +242,16 @@ export async function startBackup(
 let tools: Promise<boolean> | null = null
 const toolsAvailable = (config: BackupConfig) => (tools ??= pgToolsAvailable(config))
 
-export async function backupStatus(config: BackupConfig): Promise<BackupStatusDto> {
+export async function backupStatus(db: Db, config: BackupConfig): Promise<BackupStatusDto> {
   const backups = await listBackups(config)
+  const organization = await db.organization.findFirst({ select: { timezone: true, settings: true } })
+  const next =
+    state.scheduler && organization ? backupSlots(readSettings(organization.settings).backups, new Date(), organization.timezone).next : null
   return {
     maintenance: state.maintenance,
     running: state.running,
     lastSuccess: backups.find((b) => b.status === 'SUCCEEDED')?.finishedAt ?? null,
-    nextScheduled: state.nextScheduled,
+    nextScheduled: next ? next.toISOString() : null,
     toolsAvailable: await toolsAvailable(config),
   }
 }

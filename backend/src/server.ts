@@ -35,7 +35,7 @@ const app = createApp({
   files: { dir: path.resolve(env.FILES_DIR), maxBytes: env.FILE_MAX_MB * 1024 * 1024 },
   backups,
 })
-const stopBackups = env.BACKUP_SCHEDULE === 'on' ? startBackupScheduler(db, backups, logger, env.BACKUP_HOUR) : () => undefined
+const stopBackups = env.BACKUP_SCHEDULE === 'on' ? startBackupScheduler(db, backups, logger) : () => undefined
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'servidor escuchando')

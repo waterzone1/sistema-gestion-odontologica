@@ -3,6 +3,7 @@ import { registerAppointmentsDocs } from '../modules/appointments/appointments.d
 import { registerAuthDocs } from '../modules/auth/auth.docs.js'
 import { registerBranchesDocs } from '../modules/branches/branches.docs.js'
 import { registerHealthDocs } from '../modules/health/health.docs.js'
+import { registerPatientImportDocs } from '../modules/patients/import.docs.js'
 import { registerPatientNotesDocs } from '../modules/patients/notes.docs.js'
 import { registerPatientsDocs } from '../modules/patients/patients.docs.js'
 import { registerAvailabilityDocs } from '../modules/availability/availability.docs.js'
@@ -11,6 +12,9 @@ import { registerCashDocs } from '../modules/cash/cash.docs.js'
 import { registerCoveragesDocs } from '../modules/coverages/coverages.docs.js'
 import { registerLiquidationsDocs } from '../modules/liquidations/liquidations.docs.js'
 import { registerAuditDocs } from '../modules/audit/audit.docs.js'
+import { registerRemindersDocs } from '../modules/reminders/reminders.docs.js'
+import { registerOrganizationDocs } from '../modules/organizations/organization.docs.js'
+import { registerReportsDocs } from '../modules/reports/reports.docs.js'
 import { registerBackupsDocs } from '../modules/backups/backups.docs.js'
 import { registerFilesDocs } from '../modules/files/files.docs.js'
 import { registerTreatmentDocs } from '../modules/treatment/treatment.docs.js'
@@ -29,12 +33,16 @@ export function buildOpenApiDocument() {
   registerProfessionalsDocs(registry)
   registerPatientsDocs(registry)
   registerPatientNotesDocs(registry)
+  registerPatientImportDocs(registry)
   registerAvailabilityDocs(registry)
   registerBillingDocs(registry)
   registerCashDocs(registry)
   registerCoveragesDocs(registry)
   registerLiquidationsDocs(registry)
   registerAuditDocs(registry)
+  registerReportsDocs(registry)
+  registerRemindersDocs(registry)
+  registerOrganizationDocs(registry)
   registerBackupsDocs(registry)
   registerClinicalDocs(registry)
   registerFilesDocs(registry)

@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAccount, useVoid } from '@/hooks/use-billing'
 import type { Payment } from '@/lib/api'
-import { PAYMENT_METHOD_LABELS, paymentAmountText } from '@/lib/billing'
+import { PaymentAmount } from '@/components/billing/payment-amount'
+import { PAYMENT_METHOD_LABELS } from '@/lib/billing'
 import { formatDateTime, formatMoney } from '@/lib/format'
 
 interface Props {
@@ -63,7 +64,7 @@ export function AccountTab({ patientId, canCollect }: Props) {
               <li key={payment.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 text-sm">
                   <p className="font-medium">
-                    {paymentAmountText(payment)} · {PAYMENT_METHOD_LABELS[payment.method]}
+                    <PaymentAmount payment={payment} /> · {PAYMENT_METHOD_LABELS[payment.method]}
                     {payment.externalReference && ` · ${payment.externalReference}`}
                   </p>
                   <p className="text-xs text-muted-foreground">

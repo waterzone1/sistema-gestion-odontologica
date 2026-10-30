@@ -50,7 +50,16 @@ export function MaskedInput({
       autoComplete="off"
       {...props}
       onChange={(event) => {
-        event.target.value = mask(event.target.value)
+        const element = event.target
+        const caret = element.selectionStart ?? element.value.length
+        const digitsBefore = element.value.slice(0, caret).replace(/\D/g, '').length
+        const masked = mask(element.value)
+        element.value = masked
+        let position = 0
+        for (let seen = 0; position < masked.length && seen < digitsBefore; position++) {
+          if (/\d/.test(masked[position] ?? '')) seen++
+        }
+        if (document.activeElement === element) element.setSelectionRange(position, position)
         onChange?.(event)
       }}
     />

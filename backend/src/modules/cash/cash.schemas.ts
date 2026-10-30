@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { currencySchema } from '../billing/billing.schemas.js'
+import { currencySchema, paymentMethodSchema } from '../billing/billing.schemas.js'
 
 export const setExchangeRateSchema = z
   .object({
@@ -48,7 +48,7 @@ const movementSchema = z.object({
 })
 
 const totalSchema = z.object({
-  method: z.enum(['CASH', 'TRANSFER', 'CARD', 'MERCADOPAGO', 'OTHER']),
+  method: paymentMethodSchema,
   currency: currencySchema,
   count: z.number().int(),
   originalTotal: z.string(),

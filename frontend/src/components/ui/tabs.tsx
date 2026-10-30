@@ -13,10 +13,11 @@ interface TabsProps {
   active: string
   onChange: (id: string) => void
   label: string
+  anchor?: string
   children: ReactNode
 }
 
-export function Tabs({ items, active, onChange, label, children }: TabsProps) {
+export function Tabs({ items, active, onChange, label, anchor, children }: TabsProps) {
   const move = (event: KeyboardEvent, index: number) => {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (step === 0) return
@@ -27,7 +28,7 @@ export function Tabs({ items, active, onChange, label, children }: TabsProps) {
 
   return (
     <div>
-      <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b">
+      <div role="tablist" aria-label={label} data-tour={anchor} className="flex gap-1 overflow-x-auto overflow-y-hidden border-b">
         {items.map((item, index) => {
           const selected = item.id === active
           return (

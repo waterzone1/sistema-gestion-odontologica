@@ -35,6 +35,8 @@ export const PERMISSIONS = [
   'liquidations:manage',
   'audit:read',
   'backups:manage',
+  'reports:read',
+  'organization:manage',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -66,6 +68,8 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'liquidations:manage',
     'audit:read',
     'backups:manage',
+    'reports:read',
+    'organization:manage',
     'availability:manage',
     'appointments:override',
     'treatment:read',
@@ -107,6 +111,7 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'exchange-rate:manage',
     'coverages:manage',
     'liquidations:manage',
+    'reports:read',
     'availability:manage',
     'treatment:read',
     'treatment:price',
@@ -124,6 +129,21 @@ export function effectivePermissions(
     for (const permission of map[role]) union.add(permission)
   }
   return [...union]
+}
+
+export interface EnabledModules {
+  coverages: boolean
+}
+
+const MODULE_PERMISSIONS: Record<keyof EnabledModules, readonly Permission[]> = {
+  coverages: ['coverages:manage', 'liquidations:manage'],
+}
+
+export function withModules(permissions: readonly Permission[], modules: EnabledModules): Permission[] {
+  const disabled = new Set(
+    (Object.keys(MODULE_PERMISSIONS) as (keyof EnabledModules)[]).flatMap((name) => (modules[name] ? [] : MODULE_PERMISSIONS[name])),
+  )
+  return permissions.filter((permission) => !disabled.has(permission))
 }
 
 export function hasPermission(permissions: readonly Permission[], required: Permission): boolean {

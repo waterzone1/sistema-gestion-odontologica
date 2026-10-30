@@ -48,12 +48,16 @@ export function useLogin() {
 
 export function useLogout() {
   const client = useQueryClient()
+  const forget = () => {
+    setCsrfToken(null)
+    client.clear()
+    client.setQueryData(sessionKey, null)
+  }
   return useMutation({
     mutationFn: () => api.post('/api/auth/logout'),
-    onSettled: () => {
-      setCsrfToken(null)
-      client.clear()
-      client.setQueryData(sessionKey, null)
+    onSuccess: () => forget(),
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 401) forget()
     },
   })
 }

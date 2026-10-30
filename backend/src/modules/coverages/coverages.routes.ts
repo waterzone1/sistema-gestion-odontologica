@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { authOf, requirePermission } from '../../middleware/access.js'
+import { authOf, requireModule, requirePermission } from '../../middleware/access.js'
 import type { Db } from '../../shared/db.js'
 import {
   coverageQuoteQuerySchema,
@@ -19,6 +19,7 @@ import * as coverages from './coverages.service.js'
 export function coveragesRouter(db: Db): Router {
   const router = Router()
   const manage = requirePermission('coverages:manage')
+  router.use(requireModule('coverages'))
 
   router.get('/', requirePermission('patients:read'), async (req: Request, res: Response) => {
     res.json(await coverages.listProviders(db, authOf(req)))
@@ -63,24 +64,25 @@ export function coveragesRouter(db: Db): Router {
 
 export function patientCoveragesRouter(db: Db): Router {
   const router = Router({ mergeParams: true })
+  const enabled = requireModule('coverages')
 
-  router.get('/coverages', requirePermission('patients:read'), async (req: Request, res: Response) => {
+  router.get('/coverages', requirePermission('patients:read'), enabled, async (req: Request, res: Response) => {
     const { patientId } = patientParamsSchema.parse(req.params)
     res.json(await coverages.listPatientCoverages(db, authOf(req), patientId))
   })
 
-  router.post('/coverages', requirePermission('patients:write'), async (req: Request, res: Response) => {
+  router.post('/coverages', requirePermission('patients:write'), enabled, async (req: Request, res: Response) => {
     const { patientId } = patientParamsSchema.parse(req.params)
     const input = createPatientCoverageSchema.parse(req.body)
     res.status(201).json(await coverages.addPatientCoverage(db, authOf(req), patientId, input))
   })
 
-  router.post('/coverages/:coverageId/archive', requirePermission('patients:write'), async (req: Request, res: Response) => {
+  router.post('/coverages/:coverageId/archive', requirePermission('patients:write'), enabled, async (req: Request, res: Response) => {
     const { patientId, coverageId } = patientCoverageParamsSchema.parse(req.params)
     res.json(await coverages.archivePatientCoverage(db, authOf(req), patientId, coverageId))
   })
 
-  router.get('/coverage-quote', requirePermission('services:read'), async (req: Request, res: Response) => {
+  router.get('/coverage-quote', requirePermission('services:read'), enabled, async (req: Request, res: Response) => {
     const { patientId } = patientParamsSchema.parse(req.params)
     const { practiceId, date } = coverageQuoteQuerySchema.parse(req.query)
     res.json(await coverages.quoteCoverage(db, authOf(req), patientId, practiceId, date))

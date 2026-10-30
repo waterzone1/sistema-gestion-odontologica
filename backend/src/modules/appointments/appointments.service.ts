@@ -160,6 +160,7 @@ interface SlotCheck {
   endsAt: Date
   override: { reason: string } | undefined
   acknowledgeWarnings: boolean | undefined
+  checkPractice?: boolean
 }
 
 async function practiceWarning(tx: Prisma.TransactionClient, professionalId: string, practiceId: string | null) {
@@ -178,7 +179,8 @@ async function checkAvailability(tx: Prisma.TransactionClient, actor: AuthContex
   if (availability.blocked && !slot.override) {
     throw new AppError(422, 'OUTSIDE_AVAILABILITY', availability.blocked)
   }
-  const warnings = [availability.warning, await practiceWarning(tx, slot.professionalId, slot.practiceId)].filter(
+  const practice = slot.checkPractice === false ? null : await practiceWarning(tx, slot.professionalId, slot.practiceId)
+  const warnings = [availability.warning, practice].filter(
     (warning): warning is string => warning !== null,
   )
   if (warnings.length > 0 && !slot.acknowledgeWarnings && !slot.override) {
@@ -229,6 +231,11 @@ async function auditOverride(
   })
 }
 
+const SLOT_FREEING_STATUSES = ['CANCELLED', 'NO_SHOW'] as const
+
+const clock = (date: Date, timeZone: string) =>
+  new Intl.DateTimeFormat('es-AR', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+
 async function conflictError(
   db: Pick<Db, 'appointment'>,
   professionalId: string,
@@ -239,14 +246,22 @@ async function conflictError(
   const existing = await db.appointment.findFirst({
     where: {
       professionalId,
-      status: { not: 'CANCELLED' },
+      status: { notIn: [...SLOT_FREEING_STATUSES] },
       startsAt: { lt: endsAt },
       endsAt: { gt: startsAt },
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
-    select: { id: true, startsAt: true, endsAt: true },
+    select: {
+      id: true,
+      startsAt: true,
+      endsAt: true,
+      organization: { select: { timezone: true } },
+    },
   })
-  return new AppError(409, 'APPOINTMENT_CONFLICT', 'El profesional ya tiene un turno en ese horario', {
+  const message = existing
+    ? `El profesional ya tiene un turno de ${clock(existing.startsAt, existing.organization.timezone)} a ${clock(existing.endsAt, existing.organization.timezone)}`
+    : 'El profesional ya tiene un turno en ese horario'
+  return new AppError(409, 'APPOINTMENT_CONFLICT', message, {
     appointmentId: existing?.id ?? null,
     startsAt: existing?.startsAt.toISOString() ?? null,
     endsAt: existing?.endsAt.toISOString() ?? null,
@@ -260,10 +275,9 @@ export async function listAppointments(
 ): Promise<AppointmentDto[]> {
   const appointments = await db.appointment.findMany({
     where: {
-      ...visibleWhere(actor),
+      AND: [visibleWhere(actor), query.branchId ? { branchId: query.branchId } : {}],
       startsAt: { lt: new Date(query.to) },
       endsAt: { gt: new Date(query.from) },
-      ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.professionalId ? { professionalId: query.professionalId } : {}),
       ...(query.patientId ? { patientId: query.patientId } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -364,7 +378,8 @@ export async function updateAppointment(
         startsAt.getTime() !== current.startsAt.getTime() ||
         endsAt.getTime() !== current.endsAt.getTime() ||
         professionalId !== current.professional.id
-      const slotChanged = rescheduled || branchId !== current.branch.id || practiceId !== (current.practice?.id ?? null)
+      const practiceChanged = practiceId !== (current.practice?.id ?? null) || professionalId !== current.professional.id
+      const slotChanged = rescheduled || branchId !== current.branch.id || practiceChanged
       const availability = slotChanged
         ? await checkAvailability(tx, actor, {
             professionalId,
@@ -374,6 +389,7 @@ export async function updateAppointment(
             endsAt,
             override: input.override,
             acknowledgeWarnings: input.acknowledgeWarnings,
+            checkPractice: practiceChanged,
           })
         : null
 
@@ -427,32 +443,39 @@ export async function changeAppointmentStatus(
     throw new AppError(403, 'FORBIDDEN', 'No tenés permiso para realizar esta acción')
   }
 
-  return db.$transaction(async (tx) => {
-    const current = await findVisibleOrFail(tx, actor, id)
-    const from: AppointmentStatus = current.status
-    if (!canTransition(from, input.status)) {
-      throw new AppError(409, 'INVALID_TRANSITION', 'El turno no puede pasar a ese estado desde el actual')
-    }
+  return db.$transaction(async (tx) => toDto(await transitionStatus(tx, actor, id, input), actor))
+}
 
-    const updated = await tx.appointment.update({
-      where: { id },
-      data: {
-        status: input.status,
-        ...(input.status === 'CANCELLED' ? { cancellationReason: input.cancellationReason ?? null } : {}),
-      },
-      include,
-    })
-    await recordAudit(tx, {
-      action: 'APPOINTMENT_STATUS_CHANGED',
-      entityType: 'Appointment',
-      entityId: id,
-      organizationId: actor.organizationId,
-      actorUserId: actor.userId,
-      branchId: current.branch.id,
-      metadata: { desde: from, hacia: input.status },
-    })
-    return toDto(updated, actor)
+export async function transitionStatus(
+  tx: Prisma.TransactionClient,
+  actor: AuthContext,
+  id: string,
+  input: ChangeStatusInput,
+  extra: Record<string, string | boolean> = {},
+) {
+  const current = await findVisibleOrFail(tx, actor, id)
+  const from: AppointmentStatus = current.status
+  if (!canTransition(from, input.status)) {
+    throw new AppError(409, 'INVALID_TRANSITION', 'El turno no puede pasar a ese estado desde el actual')
+  }
+  const updated = await tx.appointment.update({
+    where: { id },
+    data: {
+      status: input.status,
+      ...(input.status === 'CANCELLED' ? { cancellationReason: input.cancellationReason ?? null } : {}),
+    },
+    include,
   })
+  await recordAudit(tx, {
+    action: 'APPOINTMENT_STATUS_CHANGED',
+    entityType: 'Appointment',
+    entityId: id,
+    organizationId: actor.organizationId,
+    actorUserId: actor.userId,
+    branchId: current.branch.id,
+    metadata: { desde: from, hacia: input.status, ...extra },
+  })
+  return updated
 }
 
 export async function reactivateAppointment(

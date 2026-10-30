@@ -31,6 +31,7 @@ export function toSessionResponse(auth: AuthContext): SessionResponse {
       onboardingCompleted: auth.onboardingCompleted,
       theme: auth.theme,
       preferences: auth.preferences,
+      modules: auth.modules,
     },
     csrfToken: auth.csrfToken,
   }

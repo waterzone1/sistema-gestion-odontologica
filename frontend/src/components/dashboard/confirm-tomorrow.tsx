@@ -28,9 +28,14 @@ export function ConfirmTomorrow() {
 
   return (
     <section aria-labelledby="confirmar-manana" className="mt-6 rounded-lg border bg-card p-5 shadow-sm">
-      <h2 id="confirmar-manana" className="mb-3 text-sm font-semibold">
-        Para confirmar mañana
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 id="confirmar-manana" className="text-sm font-semibold">
+          Para confirmar mañana
+        </h2>
+        <Link href="/reminders" className="text-sm text-primary hover:underline">
+          Recordatorios por WhatsApp
+        </Link>
+      </div>
       <FormError error={appointments.error ?? confirm.error} />
       {appointments.isPending && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {appointments.data && pending.length === 0 && (

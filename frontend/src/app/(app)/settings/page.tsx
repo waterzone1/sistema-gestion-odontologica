@@ -1,19 +1,22 @@
 'use client'
 
 import { ArrowDown, ArrowUp, Monitor, Moon, Sun } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { FormError } from '@/components/form-error'
 import { LoadingBlock, PageHeader } from '@/components/page-header'
+import { Pagination, usePagedList } from '@/components/pagination'
+import { OrganizationSettingsSections } from '@/components/settings/organization-settings'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, Select } from '@/components/ui/input'
 import { useExchangeRates, useSetExchangeRate } from '@/hooks/use-billing'
 import { useSavePreferences } from '@/hooks/use-preferences'
-import { useSession } from '@/hooks/use-session'
-import type { SessionUser } from '@/lib/api'
+import { sessionKey, useSession } from '@/hooks/use-session'
+import { api, type SessionUser } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
 import { formatDateTime, formatMoney, pad } from '@/lib/format'
-import { moveInOrder, navLinks } from '@/lib/nav'
+import { moveInOrder, navLinks, visibleNav } from '@/lib/nav'
 import { can } from '@/lib/permissions'
 import { THEME_LABELS, type ThemePreference } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -36,7 +39,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Configuración" description="Preferencias de tu usuario. Se aplican en cualquier computadora donde ingreses." />
+      <PageHeader title="Configuración" description="Tus preferencias (se aplican en cualquier computadora donde ingreses) y, según tu rol, los ajustes del consultorio." />
       <FormError error={save.error} className="mb-4" />
       <div className="space-y-4">
         <Section id="tema" title="Tema">
@@ -149,6 +152,8 @@ export default function SettingsPage() {
           </fieldset>
         </Section>
 
+        {can(user, 'organization:manage') && <ModulesSection user={user} />}
+        <OrganizationSettingsSections user={user} />
         {can(user, 'account:read') && <ExchangeRateSection canEdit={can(user, 'exchange-rate:manage')} />}
       </div>
     </>
@@ -174,39 +179,50 @@ function MenuSection({ user, save }: { user: SessionUser; save: ReturnType<typeo
   const onChange = (menuOrder: string[]) => save.mutate({ preferences: { menuOrder } })
   return (
     <Section id="menu" title="Menú y pantalla de inicio" description="Ordená el menú a tu gusto y elegí qué pantalla se abre al entrar.">
-      <ol className="divide-y rounded-md border">
-        {links.map((link, index) => {
-          const Icon = link.icon
-          return (
-            <li key={link.href} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
-              <span className="flex items-center gap-2">
-                <Icon className="size-4 text-muted-foreground" aria-hidden />
-                {link.label}
-              </span>
-              <span className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`Subir ${link.label}`}
-                  disabled={pending || index === 0}
-                  onClick={() => onChange(moveInOrder(order, link.href, -1))}
-                >
-                  <ArrowUp className="size-4" aria-hidden />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`Bajar ${link.label}`}
-                  disabled={pending || index === links.length - 1}
-                  onClick={() => onChange(moveInOrder(order, link.href, 1))}
-                >
-                  <ArrowDown className="size-4" aria-hidden />
-                </Button>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
+      <div className="space-y-3">
+        {visibleNav(user).map((group, groupIndex) => (
+          <div key={group.label ?? `grupo-${groupIndex}`}>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label ?? (groupIndex === 0 ? 'Principal' : 'Otros')}</p>
+            <ol className="divide-y rounded-md border">
+              {group.items.map((link, index) => {
+                const Icon = link.icon
+                const movable = group.items.length > 1
+                return (
+                  <li key={link.href} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-4 text-muted-foreground" aria-hidden />
+                      {link.label}
+                    </span>
+                    {movable && (
+                      <span className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Subir ${link.label}`}
+                          disabled={pending || index === 0}
+                          onClick={() => onChange(moveInOrder(order, link.href, -1))}
+                        >
+                          <ArrowUp className="size-4" aria-hidden />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Bajar ${link.label}`}
+                          disabled={pending || index === group.items.length - 1}
+                          onClick={() => onChange(moveInOrder(order, link.href, 1))}
+                        >
+                          <ArrowDown className="size-4" aria-hidden />
+                        </Button>
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Cada sección del menú se ordena por separado.</p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <Field label="Pantalla al entrar" htmlFor="pref-home" className="sm:w-64">
           <Select
@@ -232,11 +248,45 @@ function MenuSection({ user, save }: { user: SessionUser; save: ReturnType<typeo
   )
 }
 
+function ModulesSection({ user }: { user: SessionUser }) {
+  const client = useQueryClient()
+  const toggle = useMutation({
+    mutationFn: (coverages: boolean) => api.put('/api/organization/modules', { coverages }),
+    onSuccess: () => client.invalidateQueries({ queryKey: sessionKey }),
+  })
+  const enabled = user.modules.coverages
+  return (
+    <section aria-labelledby="modulos" data-tour="settings-modules" className="rounded-lg border bg-card p-5 shadow-sm">
+      <h2 id="modulos" className="text-sm font-semibold">
+        Consultorio: módulos
+      </h2>
+      <p className="text-xs text-muted-foreground">Funciones opcionales para todo el consultorio. Solo las cambia administración.</p>
+      <label className="mt-3 flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={enabled}
+          disabled={toggle.isPending}
+          onChange={(event) => toggle.mutate(event.target.checked)}
+        />
+        <span>
+          <span className="block font-medium">Coberturas y liquidaciones</span>
+          <span className="block text-xs text-muted-foreground">
+            Obras sociales y prepagas, convenios con coseguro y liquidaciones. Apagado, las prestaciones se cobran completas al paciente; lo ya cargado se conserva.
+          </span>
+        </span>
+      </label>
+      <FormError error={toggle.error} className="mt-3" />
+    </section>
+  )
+}
+
 function ExchangeRateSection({ canEdit }: { canEdit: boolean }) {
   const rates = useExchangeRates(true)
   const setRate = useSetExchangeRate()
   const [value, setValue] = useState('')
   const current = rates.data?.current
+  const history = usePagedList(rates.data?.history ?? [], 10)
 
   return (
     <Section id="consultorio" title="Consultorio: cotización del dólar" description="Es una sola para todo el consultorio y se usa en los cobros en dólares.">
@@ -279,12 +329,21 @@ function ExchangeRateSection({ canEdit }: { canEdit: boolean }) {
         <details className="mt-3 text-sm">
           <summary className="cursor-pointer text-muted-foreground">Historial de cambios</summary>
           <ul className="mt-2 space-y-1">
-            {rates.data.history.map((rate) => (
+            {history.items.map((rate) => (
               <li key={rate.id} className="text-xs">
                 {formatMoney(rate.rate)} · {rate.setBy} · {formatDateTime(rate.createdAt)}
               </li>
             ))}
           </ul>
+          {history.totalPages > 1 && (
+            <Pagination
+              label="Paginación del historial de cotizaciones"
+              page={history.page}
+              totalPages={history.totalPages}
+              summary={`${rates.data.history.length} cambios`}
+              onChange={history.setPage}
+            />
+          )}
         </details>
       )}
     </Section>

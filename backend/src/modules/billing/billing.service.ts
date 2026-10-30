@@ -296,7 +296,7 @@ export async function createService(
         throw new AppError(422, 'INVALID_APPOINTMENT', 'El turno no corresponde a este paciente y profesional')
       }
     }
-    const coverage = input.applyCoverage
+    const coverage = input.applyCoverage && actor.modules.coverages
       ? await resolveCoverage(tx, patientId, practice.id, localDay(performedAt, viewer.timeZone))
       : null
     if (coverage?.requiresAuthorization && !input.authorizationCode) {
@@ -676,7 +676,7 @@ export async function voidCreditApplication(
   })
 }
 
-export async function listDebtors(db: Db, actor: AuthContext): Promise<DebtorDto[]> {
+export async function listDebtors(db: Db, actor: AuthContext, limit = DEBTORS_LIMIT): Promise<DebtorDto[]> {
   const rows = await db.$queryRaw<{ patientId: string; firstName: string; lastName: string; pending: Prisma.Decimal }[]>`
     SELECT s."patientId", p."firstName", p."lastName", SUM(s.price - COALESCE(a.paid, 0)) AS pending
     FROM "PerformedService" s
@@ -693,7 +693,7 @@ export async function listDebtors(db: Db, actor: AuthContext): Promise<DebtorDto
     GROUP BY s."patientId", p."firstName", p."lastName"
     HAVING SUM(s.price - COALESCE(a.paid, 0)) > 0
     ORDER BY pending DESC, s."patientId"
-    LIMIT ${DEBTORS_LIMIT}`
+    LIMIT ${limit}`
   return rows.map((row) => ({
     patientId: row.patientId,
     fullName: patientName(row),

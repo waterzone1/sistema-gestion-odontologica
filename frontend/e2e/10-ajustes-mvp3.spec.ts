@@ -77,7 +77,10 @@ test('recepción carga la cotización y cobra en dólares; la caja lo muestra po
   await expect(cobro.getByText(/Equivale a \$\s5\.000,00/)).toBeVisible()
   await page.screenshot({ path: captura('41-cobro-en-dolares') })
   await cobro.getByRole('button', { name: 'Registrar pago' }).click()
-  await expect(page.getByRole('region', { name: 'Pagos', exact: true }).getByText(/US\$\s5,00 \(a \$\s1\.000,00\) = \$\s5\.000,00/)).toBeVisible()
+  const pagos = page.getByRole('region', { name: 'Pagos', exact: true })
+  await expect(pagos.getByText(/US\$\s5,00/).first()).toBeVisible()
+  await pagos.getByRole('button', { name: 'Ver la conversión a pesos' }).first().click()
+  await expect(pagos.getByText(/a \$\s1\.000,00 = \$\s5\.000,00/)).toBeVisible()
 
   await page.goto('/cash')
   const totales = page.getByRole('region', { name: 'Totales del día' })

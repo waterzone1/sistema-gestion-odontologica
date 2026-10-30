@@ -17,7 +17,7 @@ export function loginRateLimiter({ max, windowMs }: LoginRateLimit) {
     skipSuccessfulRequests: true,
     keyGenerator: (req) => {
       const body = req.body as { username?: unknown } | undefined
-      const username = typeof body?.username === 'string' ? body.username.toLowerCase() : ''
+      const username = typeof body?.username === 'string' ? body.username.trim().toLowerCase() : ''
       return `${ipKeyGenerator(req.ip ?? '')}|${username}`
     },
     handler: (_req, res) => {

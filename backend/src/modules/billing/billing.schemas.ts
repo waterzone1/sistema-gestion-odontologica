@@ -46,7 +46,7 @@ export const adjustPriceSchema = z.object({ price: moneySchema }).meta({ id: 'Ad
 
 export const voidSchema = z.object({ reason: reasonSchema }).meta({ id: 'VoidInput' })
 
-const paymentMethodSchema = z.enum(PAYMENT_METHODS).meta({ id: 'PaymentMethod' })
+export const paymentMethodSchema = z.enum(PAYMENT_METHODS).meta({ id: 'PaymentMethod' })
 
 export const createChargeSchema = z
   .object({

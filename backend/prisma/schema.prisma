@@ -8,12 +8,14 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String
-  timezone  String   @default("America/Argentina/Buenos_Aires")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id               String   @id @default(uuid(7)) @db.Uuid
+  name             String
+  timezone         String   @default("America/Argentina/Buenos_Aires")
+  active           Boolean  @default(true)
+  coveragesEnabled Boolean  @default(false)
+  settings         Json     @default("{}")
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
   branches          Branch[]
   users             User[]
@@ -23,6 +25,7 @@ model Organization {
   exchangeRates     ExchangeRate[]
   coverageProviders CoverageProvider[]
   liquidations      Liquidation[]
+  reminders         Reminder[]
 }
 
 model Branch {
@@ -167,20 +170,21 @@ enum DocumentType {
 }
 
 model Patient {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  organizationId String       @db.Uuid
-  firstName      String
-  lastName       String
-  documentType   DocumentType @default(DNI)
-  documentNumber String?
-  birthDate      DateTime?    @db.Date
-  phone          String?
-  email          String?
-  address        String?
-  searchText     String
-  archivedAt     DateTime?    @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  id               String       @id @default(uuid(7)) @db.Uuid
+  organizationId   String       @db.Uuid
+  firstName        String
+  lastName         String
+  documentType     DocumentType @default(DNI)
+  documentNumber   String?
+  birthDate        DateTime?    @db.Date
+  phone            String?
+  phoneHasWhatsapp Boolean      @default(true)
+  email            String?
+  address          String?
+  searchText       String
+  archivedAt       DateTime?    @db.Timestamptz(3)
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
 
   organization       Organization        @relation(fields: [organizationId], references: [id])
   appointments       Appointment[]
@@ -194,6 +198,7 @@ model Patient {
   treatmentPlans     TreatmentPlan[]
   notes              PatientNote[]
   coverages          PatientCoverage[]
+  reminders          Reminder[]
 
   @@unique([organizationId, documentType, documentNumber])
   @@index([organizationId, archivedAt])
@@ -263,6 +268,7 @@ model Appointment {
   clinicalEntries ClinicalEntry[]
   services        PerformedService[]
   closureItem     TreatmentItem?      @relation(fields: [closureTreatmentItemId], references: [id], onDelete: Restrict)
+  reminders       Reminder[]
 
   @@index([organizationId, startsAt])
   @@index([professionalId, startsAt])
@@ -336,6 +342,7 @@ model PerformedService {
 
   @@index([organizationId, patientId, performedAt])
   @@index([patientCoverageId, performedAt])
+  @@index([organizationId, performedAt])
   @@index([appointmentId])
   @@index([treatmentItemId])
 }
@@ -777,4 +784,36 @@ model LiquidationItem {
 
   @@index([liquidationId])
   @@index([serviceId])
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+model Reminder {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  organizationId String         @db.Uuid
+  appointmentId  String         @db.Uuid
+  patientId      String         @db.Uuid
+  status         ReminderStatus @default(PENDING)
+  phone          String?
+  message        String
+  failureReason  String?
+  scheduledFor   DateTime       @db.Date
+  sentAt         DateTime?      @db.Timestamptz(3)
+  sentById       String?        @db.Uuid
+  confirmedAt    DateTime?      @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  @@unique([appointmentId, scheduledFor])
+  @@index([organizationId, scheduledFor])
 }

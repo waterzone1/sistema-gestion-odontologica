@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/input'
+import { Pagination, usePagedList } from '@/components/pagination'
 import { useAddPatientNote, useArchivePatientNote, usePatientNotes } from '@/hooks/use-patient-notes'
 import type { PatientNote } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -20,9 +21,10 @@ export function PatientNotes({ patientId, canWrite }: Props) {
   const add = useAddPatientNote(patientId)
   const archive = useArchivePatientNote(patientId)
   const [content, setContent] = useState('')
+  const paged = usePagedList(notes.data ?? [], 3)
 
   return (
-    <section aria-label="Mensajes del equipo" className="rounded-lg border bg-card p-5 shadow-sm sm:col-span-2">
+    <section aria-label="Mensajes del equipo" data-tour="patient-notes" className="rounded-lg border bg-card p-5 shadow-sm sm:col-span-2">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           <MessageSquare className="size-4" aria-hidden />
@@ -68,7 +70,7 @@ export function PatientNotes({ patientId, canWrite }: Props) {
         <p className="text-sm text-muted-foreground">No hay mensajes.</p>
       )}
       <ul className="space-y-2">
-        {(notes.data ?? []).map((note) => (
+        {paged.items.map((note) => (
           <li key={note.id} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2">
             <NoteText note={note} />
             {canWrite && !note.archivedAt && (
@@ -84,6 +86,15 @@ export function PatientNotes({ patientId, canWrite }: Props) {
           </li>
         ))}
       </ul>
+      {paged.totalPages > 1 && (
+        <Pagination
+          label="Paginación de mensajes"
+          page={paged.page}
+          totalPages={paged.totalPages}
+          summary={`${notes.data?.length ?? 0} mensajes`}
+          onChange={paged.setPage}
+        />
+      )}
     </section>
   )
 }

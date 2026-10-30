@@ -6,6 +6,7 @@ import { AppError } from '../../shared/errors.js'
 import { recordAudit } from '../audit/audit.service.js'
 import type { AuthContext } from '../auth/auth.types.js'
 import { findPatientOrFail, writableProfile } from '../clinical/clinical.access.js'
+import { organizationSettings } from '../organizations/organization.service.js'
 import { detectMime, extensionMatches, sanitizeFilename, type AllowedMime } from './domain/fileType.js'
 import { discardFile, openFile, storageKeyFor, storeFile, type FileStorageConfig } from './files.storage.js'
 import type { ClinicalFileDto, UploadFileQuery } from './files.schemas.js'
@@ -43,6 +44,10 @@ export async function uploadFile(
   content: Buffer,
 ): Promise<ClinicalFileDto> {
   if (content.length === 0) throw new AppError(422, 'EMPTY_FILE', 'El archivo está vacío')
+  const { files: limits } = await organizationSettings(db, actor.organizationId)
+  if (content.length > limits.maxMb * 1024 * 1024) {
+    throw new AppError(413, 'FILE_TOO_LARGE', `El archivo supera el máximo de ${limits.maxMb} MB`)
+  }
   const mime = detectMime(content)
   if (!mime) throw new AppError(415, 'UNSUPPORTED_FILE', 'Solo se aceptan archivos PDF, JPG o PNG')
   const cleaned = sanitizeFilename(query.filename)
