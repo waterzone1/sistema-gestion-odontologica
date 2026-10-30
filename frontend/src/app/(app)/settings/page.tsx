@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { FormError } from '@/components/form-error'
 import { LoadingBlock, PageHeader } from '@/components/page-header'
 import { Pagination, usePagedList } from '@/components/pagination'
+import { OrganizationSettingsSections } from '@/components/settings/organization-settings'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, Select } from '@/components/ui/input'
@@ -15,7 +16,7 @@ import { sessionKey, useSession } from '@/hooks/use-session'
 import { api, type SessionUser } from '@/lib/api'
 import { isValidAmount, normalizeAmount } from '@/lib/billing'
 import { formatDateTime, formatMoney, pad } from '@/lib/format'
-import { moveInOrder, navLinks } from '@/lib/nav'
+import { moveInOrder, navLinks, visibleNav } from '@/lib/nav'
 import { can } from '@/lib/permissions'
 import { THEME_LABELS, type ThemePreference } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -38,7 +39,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Configuración" description="Preferencias de tu usuario. Se aplican en cualquier computadora donde ingreses." />
+      <PageHeader title="Configuración" description="Tus preferencias (se aplican en cualquier computadora donde ingreses) y, según tu rol, los ajustes del consultorio." />
       <FormError error={save.error} className="mb-4" />
       <div className="space-y-4">
         <Section id="tema" title="Tema">
@@ -152,6 +153,7 @@ export default function SettingsPage() {
         </Section>
 
         {can(user, 'organization:manage') && <ModulesSection user={user} />}
+        <OrganizationSettingsSections user={user} />
         {can(user, 'account:read') && <ExchangeRateSection canEdit={can(user, 'exchange-rate:manage')} />}
       </div>
     </>
@@ -177,39 +179,50 @@ function MenuSection({ user, save }: { user: SessionUser; save: ReturnType<typeo
   const onChange = (menuOrder: string[]) => save.mutate({ preferences: { menuOrder } })
   return (
     <Section id="menu" title="Menú y pantalla de inicio" description="Ordená el menú a tu gusto y elegí qué pantalla se abre al entrar.">
-      <ol className="divide-y rounded-md border">
-        {links.map((link, index) => {
-          const Icon = link.icon
-          return (
-            <li key={link.href} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
-              <span className="flex items-center gap-2">
-                <Icon className="size-4 text-muted-foreground" aria-hidden />
-                {link.label}
-              </span>
-              <span className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`Subir ${link.label}`}
-                  disabled={pending || index === 0}
-                  onClick={() => onChange(moveInOrder(order, link.href, -1))}
-                >
-                  <ArrowUp className="size-4" aria-hidden />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`Bajar ${link.label}`}
-                  disabled={pending || index === links.length - 1}
-                  onClick={() => onChange(moveInOrder(order, link.href, 1))}
-                >
-                  <ArrowDown className="size-4" aria-hidden />
-                </Button>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
+      <div className="space-y-3">
+        {visibleNav(user).map((group, groupIndex) => (
+          <div key={group.label ?? `grupo-${groupIndex}`}>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label ?? (groupIndex === 0 ? 'Principal' : 'Otros')}</p>
+            <ol className="divide-y rounded-md border">
+              {group.items.map((link, index) => {
+                const Icon = link.icon
+                const movable = group.items.length > 1
+                return (
+                  <li key={link.href} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-4 text-muted-foreground" aria-hidden />
+                      {link.label}
+                    </span>
+                    {movable && (
+                      <span className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Subir ${link.label}`}
+                          disabled={pending || index === 0}
+                          onClick={() => onChange(moveInOrder(order, link.href, -1))}
+                        >
+                          <ArrowUp className="size-4" aria-hidden />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Bajar ${link.label}`}
+                          disabled={pending || index === group.items.length - 1}
+                          onClick={() => onChange(moveInOrder(order, link.href, 1))}
+                        >
+                          <ArrowDown className="size-4" aria-hidden />
+                        </Button>
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Cada sección del menú se ordena por separado.</p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <Field label="Pantalla al entrar" htmlFor="pref-home" className="sm:w-64">
           <Select

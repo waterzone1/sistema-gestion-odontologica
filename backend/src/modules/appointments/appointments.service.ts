@@ -275,10 +275,9 @@ export async function listAppointments(
 ): Promise<AppointmentDto[]> {
   const appointments = await db.appointment.findMany({
     where: {
-      ...visibleWhere(actor),
+      AND: [visibleWhere(actor), query.branchId ? { branchId: query.branchId } : {}],
       startsAt: { lt: new Date(query.to) },
       endsAt: { gt: new Date(query.from) },
-      ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.professionalId ? { professionalId: query.professionalId } : {}),
       ...(query.patientId ? { patientId: query.patientId } : {}),
       ...(query.status ? { status: query.status } : {}),

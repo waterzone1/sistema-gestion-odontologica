@@ -36,10 +36,9 @@ const TOURS: Tour[] = [
         text: 'Tocá este botón para abrir las secciones que tu rol tiene habilitadas.',
       },
       {
-        target: 'search',
-        title: 'Buscador de pacientes',
-        text: 'Desde cualquier pantalla, escribí apellido, DNI o teléfono y entrá directo a la ficha.',
-        permission: 'patients:read',
+        target: 'quick-actions',
+        title: 'Accesos rápidos',
+        text: 'Arriba tenés lo que más se usa según tu rol: dar un turno, cargar un paciente o abrir la ficha de tu próximo paciente.',
       },
       {
         target: 'user',
@@ -54,7 +53,7 @@ const TOURS: Tour[] = [
       {
         target: 'help',
         title: 'Ayuda',
-        text: 'Cada pantalla tiene su propio recorrido, que aparece la primera vez que entrás. Con este botón lo repetís cuando quieras.',
+        text: 'Cada pantalla tiene su propio recorrido, que aparece la primera vez que entrás. Desde Ayuda, en el menú, lo repetís cuando quieras.',
       },
     ],
   },

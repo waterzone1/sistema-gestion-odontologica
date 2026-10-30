@@ -101,6 +101,10 @@ describe('plan de tratamiento', () => {
     expect(aceptado).toMatchObject({ status: 'ACCEPTED', total: '260000.00' })
     const repetido = await as(app, recepcion).post(`${planes()}/${plan.id}/accept`)
     expect(codigo(repetido)).toBe('PLAN_NOT_DRAFT')
+
+    const recotizado = await as(app, recepcion).put(`${planes()}/${plan.id}/items/${primero?.id}/price`, { price: '95000' }).expect(200)
+    expect(recotizado.body).toMatchObject({ status: 'DRAFT', total: '265000.00' })
+    await as(app, recepcion).post(`${planes()}/${plan.id}/accept`).expect(200)
   })
 
   it('cada rol hace solo su parte', async () => {

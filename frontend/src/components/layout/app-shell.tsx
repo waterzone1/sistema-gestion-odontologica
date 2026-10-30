@@ -4,15 +4,15 @@ import { LogOut, Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
-import { GlobalSearch } from '@/components/layout/global-search'
 import { ConnectionStatus } from '@/components/layout/connection-status'
-import { TourHost } from '@/components/layout/tour-host'
+import { QuickActions } from '@/components/layout/quick-actions'
+import { HelpMenu, TourHost } from '@/components/layout/tour-host'
 import { Button } from '@/components/ui/button'
 import { LoadingBlock } from '@/components/page-header'
 import { useLogout, useSession } from '@/hooks/use-session'
 import { SERVER_UNREACHABLE, type SessionUser } from '@/lib/api'
 import { visibleNav } from '@/lib/nav'
-import { can, ROLE_LABELS } from '@/lib/permissions'
+import { ROLE_LABELS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isPending || !data || mustChange) return <LoadingBlock label="Cargando…" />
 
   return (
-    <Shell user={data.user} pathname={pathname} onLogout={() => logout.mutate()} loggingOut={logout.isPending}>
+    <Shell user={data.user} pathname={pathname} onLogout={() => logout.mutate()} loggingOut={logout.isPending} logoutFailed={logout.isError}>
       {children}
     </Shell>
   )
@@ -52,18 +52,21 @@ function Shell({
   pathname,
   onLogout,
   loggingOut,
+  logoutFailed,
   children,
 }: {
   user: SessionUser
   pathname: string
   onLogout: () => void
   loggingOut: boolean
+  logoutFailed: boolean
   children: ReactNode
 }) {
   const groups = visibleNav(user)
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
+    <TourHost user={user} pathname={pathname}>
     <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]">
       <aside className="hidden border-r bg-card md:sticky md:top-0 md:flex md:h-screen md:flex-col">
         <div className="px-5 py-4 text-sm font-semibold leading-tight">Sistema de Gestión Odontológica</div>
@@ -80,6 +83,9 @@ function Shell({
               ))}
             </div>
           ))}
+          <div className="space-y-1 border-t pt-3">
+            <HelpMenu />
+          </div>
         </nav>
         <div className="border-t px-5 py-3">
           <ConnectionStatus />
@@ -100,11 +106,7 @@ function Shell({
             >
               {menuOpen ? <X className="size-4" aria-hidden /> : <Menu className="size-4" aria-hidden />}
             </Button>
-            {can(user, 'patients:read') && (
-              <div data-tour="search" className="min-w-0 flex-1">
-                <GlobalSearch />
-              </div>
-            )}
+            <QuickActions user={user} pathname={pathname} />
           </div>
           <div className="flex items-center gap-3" data-tour="user">
             <div className="hidden text-right leading-tight sm:block">
@@ -117,6 +119,11 @@ function Shell({
               <LogOut className="size-4" aria-hidden />
               <span className="hidden sm:inline">Salir</span>
             </Button>
+            {logoutFailed && (
+              <p role="alert" className="text-xs text-destructive">
+                No se pudo cerrar la sesión. Reintentá.
+              </p>
+            )}
           </div>
         </header>
 
@@ -135,13 +142,14 @@ function Shell({
                 </div>
               </div>
             ))}
+            <HelpMenu onPick={() => setMenuOpen(false)} />
           </nav>
         )}
 
-        <main className={cn('mx-auto w-full flex-1 px-4 pb-24 pt-6', pathname.startsWith('/agenda') ? 'max-w-[110rem]' : 'max-w-5xl')}>{children}</main>
+        <main className={cn('mx-auto w-full flex-1 px-4 pb-10 pt-6', pathname.startsWith('/agenda') ? 'max-w-[110rem]' : 'max-w-5xl')}>{children}</main>
       </div>
-      <TourHost user={user} pathname={pathname} />
     </div>
+    </TourHost>
   )
 }
 

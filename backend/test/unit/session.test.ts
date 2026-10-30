@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   absoluteExpiry,
   SESSION_ABSOLUTE_MS,
-  SESSION_IDLE_MS,
   sessionState,
   shouldTouch,
 } from '../../src/modules/auth/domain/session.js'
+
+const SESSION_IDLE_MS = 8 * 60 * 60 * 1000
 
 const ahora = new Date('2026-09-29T12:00:00Z')
 const haceMs = (ms: number) => new Date(ahora.getTime() - ms)
@@ -21,23 +22,23 @@ function sesion(parcial: Partial<{ lastSeenAt: Date; expiresAt: Date; revokedAt:
 
 describe('sessionState', () => {
   it('una sesion recien creada es valida', () => {
-    expect(sessionState(sesion(), ahora)).toBe('valid')
+    expect(sessionState(sesion(), ahora, SESSION_IDLE_MS)).toBe('valid')
   })
 
   it('una sesion revocada no es valida aunque no haya vencido', () => {
-    expect(sessionState(sesion({ revokedAt: haceMs(1000) }), ahora)).toBe('revoked')
+    expect(sessionState(sesion({ revokedAt: haceMs(1000) }), ahora, SESSION_IDLE_MS)).toBe('revoked')
   })
 
   it('vence por tiempo absoluto', () => {
-    expect(sessionState(sesion({ expiresAt: haceMs(1) }), ahora)).toBe('expired')
+    expect(sessionState(sesion({ expiresAt: haceMs(1) }), ahora, SESSION_IDLE_MS)).toBe('expired')
   })
 
   it('vence por inactividad', () => {
-    expect(sessionState(sesion({ lastSeenAt: haceMs(SESSION_IDLE_MS) }), ahora)).toBe('idle')
+    expect(sessionState(sesion({ lastSeenAt: haceMs(SESSION_IDLE_MS) }), ahora, SESSION_IDLE_MS)).toBe('idle')
   })
 
   it('justo antes del limite de inactividad sigue valida', () => {
-    expect(sessionState(sesion({ lastSeenAt: haceMs(SESSION_IDLE_MS - 1) }), ahora)).toBe('valid')
+    expect(sessionState(sesion({ lastSeenAt: haceMs(SESSION_IDLE_MS - 1) }), ahora, SESSION_IDLE_MS)).toBe('valid')
   })
 
   it('el vencimiento absoluto es de 7 dias', () => {

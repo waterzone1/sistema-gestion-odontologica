@@ -5307,6 +5307,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Organization"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrganizationInput"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Organization"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/organization/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrganizationSettingsInput"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Organization"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/organization/modules": {
         parameters: {
             query?: never;
@@ -8513,8 +8671,52 @@ export interface components {
         GenerateRemindersInput: {
             date?: string;
         };
+        Organization: {
+            name: string;
+            timezone: string;
+            modules: components["schemas"]["OrganizationModules"];
+            settings: components["schemas"]["OrganizationSettings"];
+            limits: {
+                fileMaxMb: number;
+            };
+        };
         OrganizationModules: {
             coverages: boolean;
+        };
+        OrganizationSettings: {
+            backups: components["schemas"]["BackupSettings"];
+            reminders: components["schemas"]["ReminderSettings"];
+            files: components["schemas"]["FileSettings"];
+            sessions: components["schemas"]["SessionSettings"];
+        };
+        BackupSettings: {
+            schedule: "EVERY_6H" | "EVERY_12H" | "DAILY" | "WEEKLY";
+            hour: number;
+            weekday: number;
+            paused: boolean;
+            keepDaily: number;
+            keepWeekly: number;
+            keepManual: number;
+        };
+        ReminderSettings: {
+            daysAhead: number;
+            template: string;
+        };
+        FileSettings: {
+            maxMb: number;
+        };
+        SessionSettings: {
+            idleMinutes: number;
+        };
+        UpdateOrganizationInput: {
+            name?: string;
+            timezone?: string;
+        };
+        UpdateOrganizationSettingsInput: {
+            backups?: components["schemas"]["BackupSettings"];
+            reminders?: components["schemas"]["ReminderSettings"];
+            files?: components["schemas"]["FileSettings"];
+            sessions?: components["schemas"]["SessionSettings"];
         };
         BackupRecord: {
             id: string;

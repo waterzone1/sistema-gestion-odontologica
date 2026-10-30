@@ -20,7 +20,7 @@ export function backupsRouter(db: Db, config: BackupConfig, logger: Logger): Rou
   })
 
   router.get('/status', manage, async (_req: Request, res: Response) => {
-    res.json(await backups.backupStatus(config))
+    res.json(await backups.backupStatus(db, config))
   })
 
   router.post('/', manage, async (req: Request, res: Response) => {

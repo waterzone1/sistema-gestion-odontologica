@@ -30,7 +30,6 @@ services:
       FILES_DIR: /app/data/files
       FILE_MAX_MB: ${FILE_MAX_MB:-20}
       BACKUP_DIR: /app/backups
-      BACKUP_HOUR: ${BACKUP_HOUR:-3}
     volumes:
       - clinical_files:/app/data/files
       - backups:/app/backups

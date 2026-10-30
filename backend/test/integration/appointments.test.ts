@@ -226,6 +226,7 @@ describe('listado y visibilidad', () => {
     expect(ids(await as(app, recepcion).get(`/api/appointments?${rangoDia}`))).toEqual([enA.id])
     expect(ids(await as(app, admin).get(`/api/appointments?${rangoDia}`))).toEqual([enA.id, enB.id])
     expect((await as(app, recepcion).get(`/api/appointments/${enB.id}`)).status).toBe(404)
+    expect(ids(await as(app, recepcion).get(`/api/appointments?${rangoDia}&branchId=${seed.secondBranchId}`))).toEqual([])
   })
 
   it('el odontologo ve solo sus turnos', async () => {

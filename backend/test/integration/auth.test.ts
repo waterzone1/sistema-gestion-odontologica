@@ -79,6 +79,7 @@ describe('login', () => {
     }
     const bloqueado = await login(app, 'admin', 'mal-mal-mal-1')
     expect(bloqueado.status).toBe(429)
+    expect((await login(app, '  ADMIN ', 'mal-mal-mal-1')).status).toBe(429)
     expect((await login(app, 'recepcion', PASSWORD)).status).toBe(200)
   })
 

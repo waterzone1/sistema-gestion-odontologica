@@ -54,7 +54,7 @@ Los archivos clínicos se guardan en `FILES_DIR` (por defecto `backend/data/file
 
 Para instalar en un servidor Ubuntu del consultorio, ver [docs/deployment.md](docs/deployment.md) (incluye el script `infra/deploy/install.sh`).
 
-Los backups van a `BACKUP_DIR` (en Docker, el volumen `backups`, separado de los datos). El automático corre todos los días a la hora `BACKUP_HOUR` (por defecto las 3) y se desactiva con `BACKUP_SCHEDULE=off`. Generar y restaurar necesita `pg_dump` y `pg_restore` de PostgreSQL 16: la imagen de Docker los trae; fuera de Docker se indica la carpeta con `PG_BIN_DIR`.
+Los backups van a `BACKUP_DIR` (en Docker, el volumen `backups`, separado de los datos). La frecuencia, la hora y la retención del automático se configuran en Administración › Backups (por defecto, diario a las 3); `BACKUP_SCHEDULE=off` lo apaga en todo el servidor. Generar y restaurar necesita `pg_dump` y `pg_restore` de PostgreSQL 16: la imagen de Docker los trae; fuera de Docker se indica la carpeta con `PG_BIN_DIR`.
 
 El comando crea tres usuarios de demostración, imprime su clave al terminar y se niega a correr con `NODE_ENV=production`. La imagen de producción no incluye estos datos.
 

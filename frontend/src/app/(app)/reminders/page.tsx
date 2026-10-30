@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import type { components } from '@/lib/api-types'
 import { formatDate, formatTime, shiftIsoDay, toIsoDay } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { useOrganization } from '@/hooks/use-organization'
 
 type Day = components['schemas']['RemindersDay']
 type Reminder = components['schemas']['Reminder']
@@ -32,9 +33,12 @@ export default function RemindersPage() {
   const session = useSession()
   const user = session.data?.user
   const allowed = can(user, 'appointments:manage')
-  const [day, setDay] = useState(() => shiftIsoDay(toIsoDay(new Date()), 1))
+  const organization = useOrganization()
+  const [chosen, setDay] = useState<string | null>(null)
+  const [today] = useState(() => toIsoDay(new Date()))
+  const day = chosen ?? shiftIsoDay(today, organization.data?.settings.reminders.daysAhead ?? 1)
   const key = ['reminders', day]
-  const reminders = useQuery({ queryKey: key, queryFn: () => api.get<Day>(`/api/reminders?date=${day}`), enabled: allowed })
+  const reminders = useQuery({ queryKey: key, queryFn: () => api.get<Day>(`/api/reminders?date=${day}`), enabled: allowed && !organization.isPending })
   const refresh = (data: Day) => client.setQueryData(key, data)
   const generate = useMutation({ mutationFn: () => api.post<Day>('/api/reminders/generate', { date: day }), onSuccess: refresh })
   const act = useMutation({
@@ -113,11 +117,16 @@ export default function RemindersPage() {
                     {reminder.status === 'SENT' ? 'Reenviar' : 'Enviar por WhatsApp'}
                   </a>
                 )}
-                {!reminder.whatsappUrl && reminder.status === 'PENDING' && (
-                  <Button variant="outline" size="sm" disabled={act.isPending} onClick={() => act.mutate({ id: reminder.id, action: 'sent' })}>
-                    <Phone className="size-4" aria-hidden />
-                    Avisado por llamada
-                  </Button>
+                {!reminder.whatsappUrl && reminder.status === 'PENDING' && reminder.phone && (
+                  <>
+                    <a href={`tel:${reminder.phone.replace(/[^\d+]/g, '')}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                      <Phone className="size-4" aria-hidden />
+                      Llamar
+                    </a>
+                    <Button variant="outline" size="sm" disabled={act.isPending} onClick={() => act.mutate({ id: reminder.id, action: 'sent' })}>
+                      Marcar avisado
+                    </Button>
+                  </>
                 )}
                 {(reminder.status === 'PENDING' || reminder.status === 'SENT' || reminder.status === 'FAILED') &&
                   reminder.appointment.status !== 'CANCELLED' && (

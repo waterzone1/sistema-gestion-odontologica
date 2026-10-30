@@ -8,7 +8,8 @@ import { addDays, dayOf, isoDay, localDayRange, minuteToTime, toLocal } from '..
 import { localDay } from '../billing/domain/balance.js'
 import { transitionStatus } from '../appointments/appointments.service.js'
 import { patientName } from '../patients/domain/name.js'
-import { reminderMessage, whatsappLink, whatsappNumber } from './domain/message.js'
+import { readSettings, renderTemplate } from '../organizations/domain/settings.js'
+import { whatsappLink, whatsappNumber } from './domain/message.js'
 import type { ReminderDto, RemindersDayDto } from './reminders.schemas.js'
 
 const include = {
@@ -68,9 +69,10 @@ function toDto(reminder: ReminderRecord, timeZone: string): ReminderDto {
 export async function generateReminders(db: Db, actor: AuthContext, day?: string): Promise<RemindersDayDto> {
   const organization = await db.organization.findUniqueOrThrow({
     where: { id: actor.organizationId },
-    select: { name: true, timezone: true },
+    select: { name: true, timezone: true, settings: true },
   })
-  const target = day ?? addDays(localDay(new Date(), organization.timezone), 1)
+  const settings = readSettings(organization.settings).reminders
+  const target = day ?? addDays(localDay(new Date(), organization.timezone), settings.daysAhead)
   const appointments = await db.appointment.findMany({
     where: {
       organizationId: actor.organizationId,
@@ -91,13 +93,13 @@ export async function generateReminders(db: Db, actor: AuthContext, day?: string
         data: appointments.map((appointment) => {
           const local = toLocal(appointment.startsAt, organization.timezone)
           const [year, month, date] = local.day.split('-')
-          const message = reminderMessage({
-            firstName: appointment.patient.firstName,
-            day: `${date}/${month}/${year}`,
-            time: minuteToTime(local.minute),
-            professional: appointment.professional.user.displayName,
-            branch: appointment.branch.name,
-            clinic: organization.name,
+          const message = renderTemplate(settings.template, {
+            nombre: appointment.patient.firstName,
+            fecha: `${date}/${month}/${year}`,
+            hora: minuteToTime(local.minute),
+            profesional: appointment.professional.user.displayName,
+            sede: appointment.branch.name,
+            consultorio: organization.name,
           })
           const valid = whatsappNumber(appointment.patient.phone) !== null
           return {

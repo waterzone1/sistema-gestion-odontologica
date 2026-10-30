@@ -76,6 +76,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   BACKUP_FAILED: 'Backup fallido',
   BACKUP_RESTORED: 'Restauración desde backup',
   ORGANIZATION_MODULES_UPDATED: 'Módulos de la organización',
+  ORGANIZATION_UPDATED: 'Datos del consultorio',
+  ORGANIZATION_SETTINGS_UPDATED: 'Ajustes del consultorio',
 }
 
 export function auditActionLabel(action: string): string {
@@ -155,6 +157,11 @@ export function auditDetails(metadata: Record<string, unknown> | null): string[]
   if (m['sesionesRevocadas'] !== undefined) details.push(`${String(m['sesionesRevocadas'])} sesiones cerradas`)
   if (m['coberturas'] !== undefined) details.push(m['coberturas'] ? 'Coberturas activadas' : 'Coberturas desactivadas')
   if (Array.isArray(m['advertencias'])) details.push(...m['advertencias'].map(String))
+  if (Array.isArray(m['secciones'])) {
+    const names: Record<string, string> = { backups: 'backups', reminders: 'recordatorios', files: 'archivos', sessions: 'sesiones' }
+    details.push(`Cambió: ${m['secciones'].map((key) => names[String(key)] ?? String(key)).join(', ')}`)
+  }
+  if (m['reabreAceptacion'] === true) details.push('El presupuesto vuelve a requerir aceptación')
   const reason = m['motivo'] ?? m['reason']
   if (typeof reason === 'string' && reason !== '') details.push(`Motivo: ${reason}`)
   return details

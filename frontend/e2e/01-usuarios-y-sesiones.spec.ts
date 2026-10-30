@@ -52,7 +52,7 @@ test('la configuración inicial crea la organización y deja al administrador ad
   await tutorial.getByRole('button', { name: 'Siguiente' }).click()
   await expect(admin.getByRole('dialog', { name: 'Menú' })).toBeVisible()
   await admin.getByRole('dialog').getByRole('button', { name: 'Siguiente' }).click()
-  await expect(admin.getByRole('dialog', { name: 'Buscador de pacientes' })).toBeVisible()
+  await expect(admin.getByRole('dialog', { name: 'Accesos rápidos' })).toBeVisible()
   await admin.screenshot({ path: captura('02b-tutorial') })
   await silenceTours('marta', CLAVE_ADMIN)
   await admin.getByRole('dialog').getByRole('button', { name: 'Saltear' }).click()

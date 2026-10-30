@@ -107,7 +107,7 @@ export function createApp({
   app.use('/api/debtors', debtorsRouter(db))
   app.use('/api/billing/pending', pendingBillingRouter(db))
   app.use('/api/exchange-rates', exchangeRatesRouter(db))
-  app.use('/api/organization', organizationRouter(db))
+  app.use('/api/organization', organizationRouter(db, files.maxBytes))
   app.use('/api/cash', cashRouter(db))
   app.use('/api/coverages', coveragesRouter(db))
   app.use('/api/liquidations', liquidationsRouter(db))

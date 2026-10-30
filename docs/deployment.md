@@ -73,7 +73,7 @@ Ese archivo se instala como autoridad certificadora de confianza en cada computa
 
 ## Backups
 
-El backend hace un backup automático por día a la hora `BACKUP_HOUR` (por defecto las 3) y conserva 7 diarios, 4 semanales y los últimos 10 manuales. Desde Administración › Backups se generan a mano, se descargan y se restauran.
+El backend hace backups automáticos con la frecuencia y la hora que se configuran en Administración › Backups (por defecto, todos los días a las 3) y conserva, salvo que se cambie ahí, 7 diarios, 4 semanales y los últimos 10 manuales. Desde Administración › Backups se generan a mano, se descargan y se restauran.
 
 Para que los backups queden en otro disco, montarlo (por ejemplo en `/mnt/backups`) y crear un `docker-compose.override.yml`:
 

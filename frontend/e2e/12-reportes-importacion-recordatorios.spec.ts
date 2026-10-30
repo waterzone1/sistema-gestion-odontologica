@@ -13,12 +13,17 @@ async function ingresar(page: Page, usuario: { username: string; password: strin
   await expect(page).toHaveURL(/\/dashboard$/)
 }
 
-test('el buscador global encuentra al paciente y abre su ficha', async ({ page }) => {
+test('los accesos rápidos cargan un paciente nuevo y abren su ficha', async ({ page }) => {
   await ingresar(page, RECEPCION)
-  await page.getByLabel('Búsqueda rápida de pacientes').fill('ross')
-  await page.getByRole('list', { name: 'Pacientes encontrados' }).getByRole('button', { name: /Rossi, Luca/ }).click()
+  await page.getByRole('button', { name: 'Nuevo paciente' }).click()
+  const dialogo = page.getByRole('dialog')
+  await dialogo.getByLabel('Nombre').fill('Rocío')
+  await dialogo.getByLabel('Apellido').fill('Acosta')
+  await dialogo.getByLabel('Número de documento').fill('40111222')
+  await dialogo.getByLabel('Fecha de nacimiento').fill('03041991')
+  await dialogo.getByRole('button', { name: /Crear|Guardar/ }).click()
   await expect(page).toHaveURL(/\/patients\/[0-9a-f-]+$/)
-  await expect(page.getByRole('heading', { name: /Rossi, Luca/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Acosta, Rocío/ })).toBeVisible()
 })
 
 test('recepción importa pacientes desde un CSV con vista previa', async ({ page }) => {

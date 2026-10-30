@@ -149,11 +149,16 @@ export async function priceItem(db: Db, actor: AuthContext, patientId: string, p
     }
     const agreed = fromCents(toCents(price))
     await tx.treatmentItem.update({ where: { id: itemId }, data: { agreedPrice: agreed } })
+    const reopened = plan.acceptedAt !== null && item.agreedPrice?.toFixed(2) !== agreed
+    if (reopened) {
+      await tx.treatmentPlan.update({ where: { id: planId }, data: { acceptedAt: null, acceptedById: null } })
+      await syncPlanStatus(tx, planId)
+    }
     await audit(tx, actor, {
       action: 'TREATMENT_ITEM_PRICED',
       entityType: 'TreatmentItem',
       entityId: itemId,
-      metadata: { planId, before: item.agreedPrice?.toFixed(2) ?? null, after: agreed },
+      metadata: { planId, before: item.agreedPrice?.toFixed(2) ?? null, after: agreed, ...(reopened ? { reabreAceptacion: true } : {}) },
     })
     return reload(tx, actor, patientId, planId)
   })

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { backupsToDelete, type RetainedBackup } from '../../src/modules/backups/domain/retention.js'
 
+const POLITICA = { daily: 7, weekly: 4, manual: 10 }
+
 const dia = (iso: string) => iso.slice(0, 10)
 
 function diarios(desde: string, cantidad: number): RetainedBackup[] {
@@ -14,7 +16,7 @@ function diarios(desde: string, cantidad: number): RetainedBackup[] {
 describe('retencion de backups', () => {
   it('conserva los ultimos 7 diarios y uno por semana de las ultimas 4 semanas', () => {
     const backups = diarios('2026-09-01', 50)
-    const borrar = new Set(backupsToDelete(backups, dia))
+    const borrar = new Set(backupsToDelete(backups, dia, POLITICA))
     const quedan = backups.filter((b) => !borrar.has(b.id)).map((b) => b.id)
     expect(quedan).toHaveLength(9)
     expect(quedan).toContain('d-2026-10-20')
@@ -29,7 +31,7 @@ describe('retencion de backups', () => {
       { id: 'temprano', kind: 'SCHEDULED', status: 'SUCCEEDED', startedAt: '2026-10-20T03:00:00.000Z' },
       { id: 'tarde', kind: 'SCHEDULED', status: 'SUCCEEDED', startedAt: '2026-10-20T15:00:00.000Z' },
     ]
-    expect(backupsToDelete(backups, dia)).toEqual(['temprano'])
+    expect(backupsToDelete(backups, dia, POLITICA)).toEqual(['temprano'])
   })
 
   it('los manuales se conservan aparte, nunca borra uno en curso y guarda pocos fallidos', () => {
@@ -40,7 +42,14 @@ describe('retencion de backups', () => {
       startedAt: `2026-10-${String(i + 1).padStart(2, '0')}T12:00:00.000Z`,
     }))
     const enCurso: RetainedBackup = { id: 'corriendo', kind: 'MANUAL', status: 'RUNNING', startedAt: '2026-09-01T00:00:00.000Z' }
-    const borrar = backupsToDelete([...manuales, enCurso], dia)
+    const borrar = backupsToDelete([...manuales, enCurso], dia, POLITICA)
     expect(borrar.sort()).toEqual(['m-0', 'm-1'])
+  })
+})
+
+describe('politica configurable', () => {
+  it('respeta cuantos manuales conservar', () => {
+    const manuales = Array.from({ length: 4 }, (_, i) => ({ id: `m${i}`, kind: 'MANUAL' as const, status: 'SUCCEEDED' as const, startedAt: `2026-10-0${i + 1}T10:00:00.000Z` }))
+    expect(backupsToDelete(manuales, dia, { daily: 7, weekly: 4, manual: 2 }).sort()).toEqual(['m0', 'm1'])
   })
 })

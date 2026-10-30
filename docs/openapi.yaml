@@ -3003,7 +3003,32 @@ components:
         date:
           type: string
           format: date
-          description: Por defecto, mañana
+          description: Por defecto, la anticipación configurada (mañana si no se cambió)
+    Organization:
+      type: object
+      properties:
+        name:
+          type: string
+        timezone:
+          type: string
+        modules:
+          $ref: "#/components/schemas/OrganizationModules"
+        settings:
+          $ref: "#/components/schemas/OrganizationSettings"
+        limits:
+          type: object
+          properties:
+            fileMaxMb:
+              type: integer
+              description: Tope del servidor para archivos clínicos
+          required:
+            - fileMaxMb
+      required:
+        - name
+        - timezone
+        - modules
+        - settings
+        - limits
     OrganizationModules:
       type: object
       properties:
@@ -3012,6 +3037,119 @@ components:
           description: Coberturas, convenios y liquidaciones a obras sociales y prepagas
       required:
         - coverages
+    OrganizationSettings:
+      type: object
+      properties:
+        backups:
+          $ref: "#/components/schemas/BackupSettings"
+        reminders:
+          $ref: "#/components/schemas/ReminderSettings"
+        files:
+          $ref: "#/components/schemas/FileSettings"
+        sessions:
+          $ref: "#/components/schemas/SessionSettings"
+      required:
+        - backups
+        - reminders
+        - files
+        - sessions
+    BackupSettings:
+      type: object
+      properties:
+        schedule:
+          type: string
+          enum:
+            - EVERY_6H
+            - EVERY_12H
+            - DAILY
+            - WEEKLY
+          description: Cada 6 h, cada 12 h, una vez por día o una vez por semana
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+          description: Hora de inicio (en la zona del consultorio)
+        weekday:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: "Día de la semana para el semanal: 1 lunes … 7 domingo"
+        paused:
+          type: boolean
+        keepDaily:
+          type: integer
+          minimum: 1
+          maximum: 60
+        keepWeekly:
+          type: integer
+          minimum: 0
+          maximum: 52
+        keepManual:
+          type: integer
+          minimum: 1
+          maximum: 50
+      required:
+        - schedule
+        - hour
+        - weekday
+        - paused
+        - keepDaily
+        - keepWeekly
+        - keepManual
+    ReminderSettings:
+      type: object
+      properties:
+        daysAhead:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: Con cuántos días de anticipación se generan los recordatorios
+        template:
+          type: string
+          minLength: 20
+          maxLength: 600
+          description: Texto del mensaje con variables entre llaves
+      required:
+        - daysAhead
+        - template
+    FileSettings:
+      type: object
+      properties:
+        maxMb:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: Tamaño máximo de cada archivo clínico, en MB
+      required:
+        - maxMb
+    SessionSettings:
+      type: object
+      properties:
+        idleMinutes:
+          type: integer
+          description: Minutos sin actividad antes de cerrar la sesión
+      required:
+        - idleMinutes
+    UpdateOrganizationInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        timezone:
+          type: string
+    UpdateOrganizationSettingsInput:
+      type: object
+      properties:
+        backups:
+          $ref: "#/components/schemas/BackupSettings"
+        reminders:
+          $ref: "#/components/schemas/ReminderSettings"
+        files:
+          $ref: "#/components/schemas/FileSettings"
+        sessions:
+          $ref: "#/components/schemas/SessionSettings"
     BackupRecord:
       type: object
       properties:
@@ -7614,10 +7752,109 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+  /api/organization:
+    get:
+      tags: &a16
+        - Organización
+      summary: Datos, módulos y ajustes del consultorio
+      security: *a2
+      responses:
+        "200":
+          description: Organización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: *a16
+      summary: Cambia el nombre o la zona horaria del consultorio
+      description: Solo administración. El nombre aparece en los recordatorios; la
+        zona horaria rige la agenda, la caja y los reportes.
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationInput"
+      responses:
+        "200":
+          description: Organización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+  /api/organization/settings:
+    put:
+      tags: *a16
+      summary: Guarda una o más secciones de ajustes
+      description: "Cada sección exige su permiso: backups (administración),
+        recordatorios (quien administra turnos), archivos y sesiones
+        (administración). El tamaño de archivo no puede superar el tope del
+        servidor."
+      security: *a1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationSettingsInput"
+      responses:
+        "200":
+          description: Organización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Sin sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "403":
+          description: Sin permiso, o falla la verificación CSRF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "422":
+          description: Los datos enviados no son válidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
   /api/organization/modules:
     put:
-      tags:
-        - Organización
+      tags: *a16
       summary: Activa o desactiva módulos opcionales
       description: Solo administración. Con coberturas desactivadas se ocultan y
         rechazan coberturas, convenios y liquidaciones, y las prestaciones
@@ -7655,7 +7892,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups:
     get:
-      tags: &a16
+      tags: &a17
         - Backups
       summary: Historial de backups, del más reciente al más antiguo
       description: "Solo administración. Retención: 7 diarios, 4 semanales y los
@@ -7683,7 +7920,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a16
+      tags: *a17
       summary: Genera un backup ahora
       description: "Dump lógico completo de PostgreSQL más los archivos clínicos y un
         manifest con checksums, empaquetados juntos. Corre en segundo plano:
@@ -7716,7 +7953,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/status:
     get:
-      tags: *a16
+      tags: *a17
       summary: "Estado: mantenimiento, backup en curso, último exitoso y próximo
         programado"
       security: *a2
@@ -7741,7 +7978,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/{id}/download:
     get:
-      tags: *a16
+      tags: *a17
       summary: Descarga el paquete del backup
       security: *a2
       parameters:
@@ -7778,7 +8015,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/backups/{id}/restore:
     post:
-      tags: *a16
+      tags: *a17
       summary: Restaura la base y los archivos desde un backup
       description: Verifica el checksum y la versión del esquema, pone el sistema en
         mantenimiento (las demás solicitudes reciben 503), restaura la base en
@@ -7842,7 +8079,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical:
     get:
-      tags: &a17
+      tags: &a18
         - Historia clínica
       summary: Historia clínica del paciente
       description: Solo los odontólogos acceden. Administración y recepción reciben
@@ -7883,7 +8120,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a17
+      tags: *a18
       summary: Registra una nota de evolución
       description: "La nota queda a nombre del odontólogo y no se puede editar ni
         borrar: se corrige agregando una corrección."
@@ -7940,7 +8177,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/profile:
     get:
-      tags: *a17
+      tags: *a18
       summary: "Perfil clínico vigente: alertas, alergias, medicación y antecedentes"
       description: Solo odontólogos. La consulta queda auditada.
       security: *a2
@@ -7977,7 +8214,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     put:
-      tags: *a17
+      tags: *a18
       summary: Guarda una nueva versión del perfil clínico
       description: Cada cambio crea una versión nueva; las anteriores se conservan.
       security: *a1
@@ -8032,7 +8269,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/clinical/{entryId}/corrections:
     post:
-      tags: *a17
+      tags: *a18
       summary: Agrega una corrección a una nota
       description: La nota original se conserva intacta; la corrección queda vinculada
         a ella.
@@ -8095,7 +8332,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files:
     get:
-      tags: &a18
+      tags: &a19
         - Archivos clínicos
       summary: Archivos clínicos del paciente
       description: Solo odontólogos. Por defecto no incluye los archivados.
@@ -8144,7 +8381,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a18
+      tags: *a19
       summary: Sube un archivo clínico (PDF, JPG o PNG)
       description: El cuerpo es el contenido binario del archivo. El tipo se verifica
         por su contenido, no por la extensión. El tamaño máximo es configurable
@@ -8240,7 +8477,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/content:
     get:
-      tags: *a18
+      tags: *a19
       summary: Descarga o visualiza un archivo clínico
       description: Solo a través del backend, con sesión y permiso clínico. Cada
         descarga queda auditada.
@@ -8281,7 +8518,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/files/{fileId}/archive:
     post:
-      tags: *a18
+      tags: *a19
       summary: Archiva un archivo clínico (no se borra)
       security: *a1
       parameters:
@@ -8324,7 +8561,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram:
     get:
-      tags: &a19
+      tags: &a20
         - Odontograma
       summary: "Odontograma del paciente: condición actual e historial"
       description: Solo odontólogos. La condición actual se deriva de los registros;
@@ -8364,7 +8601,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/odontogram/findings:
     post:
-      tags: *a19
+      tags: *a20
       summary: Registra la condición de una pieza o de sus superficies
       description: Corona, endodoncia, implante, ausente, extracción indicada y
         prótesis se registran sobre la pieza completa. Marcar sano limpia la
@@ -8422,7 +8659,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans:
     get:
-      tags: &a20
+      tags: &a21
         - Plan de tratamiento
       summary: Planes de tratamiento del paciente
       description: El odontólogo ve piezas y superficies pero no importes; recepción y
@@ -8463,7 +8700,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a20
+      tags: *a21
       summary: Crea un plan de tratamiento
       security: *a1
       parameters:
@@ -8511,7 +8748,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items:
     post:
-      tags: *a20
+      tags: *a21
       summary: Agrega una práctica al plan, con pieza y superficies opcionales
       security: *a1
       parameters:
@@ -8577,7 +8814,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/price:
     put:
-      tags: *a20
+      tags: *a21
       summary: Fija el precio acordado de un ítem
       description: Recepción y administración. Al registrar la prestación de ese ítem
         se cobra este precio.
@@ -8645,7 +8882,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/accept:
     post:
-      tags: *a20
+      tags: *a21
       summary: Registra que el paciente aceptó el presupuesto
       description: Exige que todos los ítems vigentes estén cotizados.
       security: *a1
@@ -8701,7 +8938,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/start:
     post:
-      tags: *a20
+      tags: *a21
       summary: Marca un ítem como en curso
       security: *a1
       parameters:
@@ -8756,7 +8993,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/complete:
     post:
-      tags: *a20
+      tags: *a21
       summary: El odontólogo marca un ítem como realizado
       description: "Es un hecho clínico: no registra la prestación ni el cobro. El
         ítem queda para que recepción registre la prestación con el precio
@@ -8814,7 +9051,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/patients/{patientId}/treatment-plans/{planId}/items/{itemId}/cancel:
     post:
-      tags: *a20
+      tags: *a21
       summary: Cancela un ítem con motivo (no se borra)
       security: *a1
       parameters:
@@ -8880,7 +9117,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices:
     get:
-      tags: &a21
+      tags: &a22
         - Prácticas
       summary: Lista el catálogo de prácticas
       security: *a2
@@ -8922,7 +9159,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a21
+      tags: *a22
       summary: Crea una práctica
       description: El código es único por organización y se guarda en mayúsculas.
       security: *a1
@@ -8964,7 +9201,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/practices/{id}:
     patch:
-      tags: *a21
+      tags: *a22
       summary: Edita o desactiva una práctica
       description: "Las prácticas no se borran: se desactivan. Cambiar el precio no
         modifica las prestaciones ya registradas."
@@ -9020,7 +9257,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments:
     get:
-      tags: &a22
+      tags: &a23
         - Turnos
       summary: Lista los turnos de un rango de fechas
       description: Recepción y administración ven los turnos de sus sedes (el
@@ -9091,7 +9328,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     post:
-      tags: *a22
+      tags: *a23
       summary: Crea un turno
       description: "Un profesional no puede tener dos turnos no cancelados que se
         superpongan, aunque sean en sedes distintas: lo garantiza la base de
@@ -9148,7 +9385,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}:
     get:
-      tags: *a22
+      tags: *a23
       summary: Detalle de un turno
       security: *a2
       parameters:
@@ -9184,7 +9421,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
     patch:
-      tags: *a22
+      tags: *a23
       summary: Edita o reprograma un turno pendiente o confirmado
       description: Si se cambia el horario o el profesional de un turno confirmado,
         vuelve a quedar pendiente de confirmar.
@@ -9246,7 +9483,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/status:
     post:
-      tags: *a22
+      tags: *a23
       summary: Cambia el estado del turno
       description: Confirmar y cancelar requieren gestionar la agenda; marcar atendido
         o ausente también lo puede hacer el odontólogo dueño del turno. Cancelar
@@ -9303,7 +9540,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/reactivate:
     post:
-      tags: *a22
+      tags: *a23
       summary: Reactiva un turno cancelado o ausente
       description: Vuelve a Pendiente si el horario sigue libre. Aplica las mismas
         reglas de disponibilidad que al dar un turno nuevo.
@@ -9360,7 +9597,7 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
   /api/appointments/{id}/close:
     post:
-      tags: *a22
+      tags: *a23
       summary: Cierra un turno atendido sin prestación propia
       description: Lo marca como sesión de un ítem del plan de tratamiento (ya cobrado
         o en curso) o sin cargo con motivo. Registrar una prestación desde el

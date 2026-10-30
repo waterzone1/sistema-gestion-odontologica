@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { scheduleSummary } from '@/components/backups/backup-settings'
+import { previewMessage } from '@/components/settings/organization-settings'
 import { monthGrid } from '@/components/ui/date-input'
 import { csvAmount, toCsv } from '@/lib/csv'
 import { ONBOARDING_TOUR, TOUR_IDS, tourForPath, tourSteps } from '@/lib/tours'
@@ -18,7 +20,7 @@ describe('recorridos guiados', () => {
   it('los pasos dependen de los permisos del rol', () => {
     expect(titulos('agenda', ['appointments:read'])).not.toContain('Dar un turno')
     expect(titulos('agenda', ['appointments:read', 'appointments:manage'])).toContain('Dar un turno')
-    expect(titulos(ONBOARDING_TOUR, [])).not.toContain('Buscador de pacientes')
+    expect(titulos(ONBOARDING_TOUR, [])).toContain('Accesos rápidos')
     expect(titulos('settings', ['organization:manage'])).toContain('Módulos')
   })
 })
@@ -42,5 +44,19 @@ describe('calendario de fechas', () => {
     expect(noviembre.slice(0, 6)).toEqual([null, null, null, null, null, null])
     expect(noviembre[6]?.getDate()).toBe(1)
     expect(noviembre.filter(Boolean)).toHaveLength(30)
+  })
+})
+
+describe('ajustes del consultorio', () => {
+  it('resume la frecuencia del backup automatico', () => {
+    const base = { schedule: 'DAILY' as const, hour: 3, weekday: 7, paused: false, keepDaily: 7, keepWeekly: 4, keepManual: 10 }
+    expect(scheduleSummary(base)).toBe('Todos los días a las 03:00.')
+    expect(scheduleSummary({ ...base, schedule: 'EVERY_6H', hour: 2 })).toBe('Todos los días a las 02:00, 08:00, 14:00, 20:00.')
+    expect(scheduleSummary({ ...base, schedule: 'WEEKLY' })).toBe('Los domingos a las 03:00.')
+    expect(scheduleSummary({ ...base, paused: true })).toBe('El backup automático está en pausa.')
+  })
+
+  it('muestra el mensaje del recordatorio con datos de ejemplo', () => {
+    expect(previewMessage('Hola {nombre}, te espera {profesional} en {consultorio}. {otra}', 'Sonrisas')).toBe('Hola Ana, te espera Dra. Paz en Sonrisas. {otra}')
   })
 })

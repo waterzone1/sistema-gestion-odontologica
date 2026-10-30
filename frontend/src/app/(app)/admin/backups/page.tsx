@@ -18,6 +18,7 @@ import { api, type BackupRecord, type BackupStatus, type RestoreResult } from '@
 import { formatBytes } from '@/lib/files'
 import { formatDateTime } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { BackupSettings } from '@/components/backups/backup-settings'
 
 const STATUS_LABELS: Record<BackupRecord['status'], string> = { RUNNING: 'En curso', SUCCEEDED: 'Completo', FAILED: 'Falló' }
 const KIND_LABELS: Record<BackupRecord['kind'], string> = { SCHEDULED: 'Automático', MANUAL: 'Manual' }
@@ -62,7 +63,7 @@ export default function BackupsPage() {
     <>
       <PageHeader
         title="Backups"
-        description="Copia completa de la base y de los archivos clínicos, con un manifest y su checksum. Se hace uno automático por día; se conservan 7 diarios, 4 semanales y los últimos 10 manuales."
+        description="Copia completa de la base y de los archivos clínicos, con un manifest y su checksum. La frecuencia y cuántos se conservan se configuran acá abajo."
         actions={
           <Button disabled={running !== null || start.isPending || status.data?.toolsAvailable === false} onClick={() => start.mutate()}>
             <DatabaseBackup className="size-4" aria-hidden />
@@ -82,6 +83,7 @@ export default function BackupsPage() {
         </Alert>
       )}
       <FormError error={start.error ?? status.error ?? backups.error} className="mb-4" />
+      <BackupSettings />
       <section aria-label="Estado" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Figure label="Último backup completo" value={status.data?.lastSuccess ? formatDateTime(status.data.lastSuccess) : 'Ninguno'} />
         <Figure label="Próximo automático" value={status.data?.nextScheduled ? formatDateTime(status.data.nextScheduled) : 'Sin programar'} />

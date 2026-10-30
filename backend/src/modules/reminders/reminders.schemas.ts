@@ -4,7 +4,7 @@ import { appointmentStatusSchema } from '../appointments/appointments.schemas.js
 export const reminderParamsSchema = z.object({ id: z.uuid() })
 export const remindersQuerySchema = z.object({ date: z.iso.date('Fecha inválida') })
 export const generateRemindersSchema = z
-  .object({ date: z.iso.date('Fecha inválida').optional().meta({ description: 'Por defecto, mañana' }) })
+  .object({ date: z.iso.date('Fecha inválida').optional().meta({ description: 'Por defecto, la anticipación configurada (mañana si no se cambió)' }) })
   .meta({ id: 'GenerateRemindersInput' })
 
 export const reminderSchema = z

@@ -11,8 +11,6 @@ export interface RetentionPolicy {
   manual: number
 }
 
-const DEFAULT_RETENTION: RetentionPolicy = { daily: 7, weekly: 4, manual: 10 }
-
 function weekKey(day: string): string {
   const date = new Date(`${day}T00:00:00.000Z`)
   const weekday = (date.getUTCDay() + 6) % 7
@@ -23,7 +21,7 @@ function weekKey(day: string): string {
 export function backupsToDelete(
   backups: readonly RetainedBackup[],
   dayOf: (iso: string) => string,
-  policy: RetentionPolicy = DEFAULT_RETENTION,
+  policy: RetentionPolicy,
 ): string[] {
   const newestFirst = [...backups].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   const keep = new Set<string>()

@@ -125,6 +125,7 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'post', path: `/api/reminders/${FANTASMA}/confirm`, allowed: ADMIN_Y_RECEPCION },
   { method: 'post', path: `/api/reminders/${FANTASMA}/cancel`, allowed: ADMIN_Y_RECEPCION },
   { method: 'put', path: '/api/organization/modules', body: {}, allowed: SOLO_ADMIN },
+  { method: 'patch', path: '/api/organization', body: {}, allowed: SOLO_ADMIN },
   { method: 'get', path: '/api/backups', allowed: SOLO_ADMIN },
   { method: 'get', path: '/api/backups/status', allowed: SOLO_ADMIN },
   { method: 'post', path: '/api/backups/backup-20261020-030000-abcdef/restore', body: {}, allowed: SOLO_ADMIN },

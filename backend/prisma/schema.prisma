@@ -13,6 +13,7 @@ model Organization {
   timezone         String   @default("America/Argentina/Buenos_Aires")
   active           Boolean  @default(true)
   coveragesEnabled Boolean  @default(false)
+  settings         Json     @default("{}")
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 

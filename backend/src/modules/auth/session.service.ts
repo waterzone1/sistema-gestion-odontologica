@@ -1,5 +1,6 @@
 import type { Db } from '../../shared/db.js'
 import { generateToken, hashToken } from '../../shared/tokens.js'
+import { readSettings } from '../organizations/domain/settings.js'
 import { effectivePermissions, withModules } from '../users/domain/permissions.js'
 import type { AuthContext } from './auth.types.js'
 import { readPreferences } from './auth.schemas.js'
@@ -46,10 +47,11 @@ export async function resolveSession(
 ): Promise<AuthContext | null> {
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { user: { include: { roles: true, branches: true, organization: { select: { coveragesEnabled: true } } } } },
+    include: { user: { include: { roles: true, branches: true, organization: { select: { coveragesEnabled: true, settings: true } } } } },
   })
   if (!session) return null
-  if (sessionState(session, now) !== 'valid') return null
+  const idleMs = readSettings(session.user.organization.settings).sessions.idleMinutes * 60_000
+  if (sessionState(session, now, idleMs) !== 'valid') return null
   if (!session.user.active) return null
 
   if (shouldTouch(session.lastSeenAt, now)) {

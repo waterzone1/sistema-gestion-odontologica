@@ -17,16 +17,3 @@ export function whatsappLink(phone: string | null, message: string): string | nu
   const number = whatsappNumber(phone)
   return number ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : null
 }
-
-export interface ReminderParts {
-  firstName: string
-  day: string
-  time: string
-  professional: string
-  branch: string
-  clinic: string
-}
-
-export function reminderMessage(parts: ReminderParts): string {
-  return `Hola ${parts.firstName}, te recordamos tu turno del ${parts.day} a las ${parts.time} con ${parts.professional} en ${parts.clinic} (${parts.branch}). Por favor confirmá tu asistencia respondiendo este mensaje. ¡Gracias!`
-}
